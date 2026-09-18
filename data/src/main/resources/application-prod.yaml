@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?currentSchema=${DB_SCHEMA}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  flyway:
+    create-schemas: true
+    default-schema: ${DB_SCHEMA}
+    schemas: ${DB_SCHEMA}
+
+logging:
+  level:
+    root: INFO
+    nl.loc.data: INFO
+
+loc:
+  storage:
+    r2:
+      enabled: ${R2_ENABLED:false}
