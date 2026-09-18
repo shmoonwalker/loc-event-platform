@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: loc-data
+  main:
+    web-application-type: none
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:project_db}?currentSchema=${DB_SCHEMA:data}
+    username: ${DB_USER:admin}
+    password: ${DB_PASSWORD:password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ${DB_SCHEMA:data}
+        jdbc:
+          batch_size: 100
+  flyway:
+    create-schemas: true
+    default-schema: ${DB_SCHEMA:data}
+    schemas: ${DB_SCHEMA:data}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+loc:
+  storage:
+    r2:
+      enabled: ${R2_ENABLED:false}
+      endpoint: ${R2_ENDPOINT:}
+      region: ${R2_REGION:auto}
+      access-key: ${R2_ACCESS_KEY:}
+      secret-key: ${R2_SECRET_KEY:}
+      bucket: ${R2_BUCKET:}
