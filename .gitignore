@@ -196,6 +196,9 @@ build/
 *.pid.lock
 *.hprof
 
+# Loc data app: local raw payloads written when object storage is disabled
+data/raw-data/
+
 # IDE metadata
 .idea/
 *.iml

@@ -3,23 +3,6 @@ spring:
     name: loc-data
   main:
     web-application-type: none
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:project_db}?currentSchema=${DB_SCHEMA:data}
-    username: ${DB_USER:admin}
-    password: ${DB_PASSWORD:password}
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        default_schema: ${DB_SCHEMA:data}
-        jdbc:
-          batch_size: 100
-  flyway:
-    create-schemas: true
-    default-schema: ${DB_SCHEMA:data}
-    schemas: ${DB_SCHEMA:data}
 
 management:
   endpoints:
@@ -28,11 +11,15 @@ management:
         include: health,info
 
 loc:
-  storage:
-    r2:
-      enabled: ${R2_ENABLED:false}
-      endpoint: ${R2_ENDPOINT:}
-      region: ${R2_REGION:auto}
-      access-key: ${R2_ACCESS_KEY:}
-      secret-key: ${R2_SECRET_KEY:}
-      bucket: ${R2_BUCKET:}
+  object-storage:
+    # Enable once R2 credentials and the bucket are configured.
+    enabled: ${R2_ENABLED:false}
+    endpoint: ${R2_ENDPOINT:}
+    region: ${R2_REGION:auto}
+    access-key-id: ${R2_ACCESS_KEY:}
+    secret-access-key: ${R2_SECRET_KEY:}
+    bucket: ${R2_BUCKET:}
+
+  amsterdam:
+    base-url: https://api.data.amsterdam.nl/v1
+    api-key: ${AMSTERDAM_API_KEY}
