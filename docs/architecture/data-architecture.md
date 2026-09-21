@@ -260,9 +260,8 @@ Conceptually:
 
 ```text
 SourceAdapter
-├── Ticketmaster
-├── Amsterdam Open Data
 ├── RVO
+├── Ticketmaster
 └── future providers
 ```
 
@@ -284,21 +283,21 @@ The rest of the processing pipeline should not depend on how the source was fetc
 
 ## Initial MVP Sources
 
-The first data MVP starts with:
+The data MVP targets multiple external providers with different shapes and
+collection styles:
 
-| Source              | Role                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| Ticketmaster NL     | Large national event source with rich event, venue, classification, and lifecycle data |
-| Amsterdam Open Data | Municipal open-data source with sparse records and geographic information              |
-| RVO Events          | Government event source useful for networking, workshops, and learning events          |
+| Source          | Role                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------- |
+| RVO Events      | Intended first collect source — government events (networking, workshops, learning)     |
+| Ticketmaster NL | National event source with rich event, venue, classification, and lifecycle data        |
 
-These sources intentionally have different structures and collection styles.
+The goal is a multi-source architecture rather than a provider-specific importer.
+These are MVP sources, not the final set of Loc data providers. Additional
+sources can be added later through new adapters.
 
-The purpose is to validate that Loc has a genuinely multi-source architecture rather than a provider-specific importer.
-
-These are MVP sources, not the final set of Loc data providers.
-
-Additional sources can be added later through new adapters.
+Today the data application provides object storage (R2) and the Spring
+application shell. Collectors are not implemented yet; RVO is the planned first
+source adapter.
 
 ---
 

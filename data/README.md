@@ -10,9 +10,15 @@ design is documented in
 
 ## Project foundation
 
-The project currently contains the application skeleton and the raw object
-store. Collection, persistence models, processing, messaging, and tests will be
-added in later work.
+The module currently ships the Spring Boot application shell and raw object
+storage (Cloudflare R2 via the S3 API). No collection source is wired yet.
+
+The intended first source to implement is **RVO** (Rijksdienst voor Ondernemend
+Nederland events). Source adapters store immutable payloads under
+`raw/<source>/<collection-run>/…`, then processing and catalog publication will
+follow in later work.
+
+Persistence models, processing, messaging, and tests are not in place yet.
 
 ## Raw object storage
 

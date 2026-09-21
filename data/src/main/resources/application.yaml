@@ -13,13 +13,12 @@ management:
 loc:
   object-storage:
     # Enable once R2 credentials and the bucket are configured.
-    enabled: ${R2_ENABLED:false}
+    enabled: ${R2_ENABLED:true}
     endpoint: ${R2_ENDPOINT:}
     region: ${R2_REGION:auto}
     access-key-id: ${R2_ACCESS_KEY:}
     secret-access-key: ${R2_SECRET_KEY:}
     bucket: ${R2_BUCKET:}
 
-  amsterdam:
-    base-url: https://api.data.amsterdam.nl/v1
-    api-key: ${AMSTERDAM_API_KEY}
+  rvo:
+    base-url: https://www.rvo.nl/api/v1/opendata/events
