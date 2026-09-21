@@ -3,7 +3,15 @@ logging:
     root: INFO
     nl.loc.data: DEBUG
 
+# Object storage settings are inherited from application.yaml.
+# Storage is disabled by default; set R2_ENABLED=true plus the R2_* variables
+# to use the real development bucket.
+
 loc:
-  storage:
-    r2:
-      enabled: false
+  object-storage:
+    enabled: ${R2_ENABLED:true}
+    endpoint: ${R2_ENDPOINT:}
+    region: ${R2_REGION:auto}
+    access-key-id: ${R2_ACCESS_KEY:}
+    secret-access-key: ${R2_SECRET_KEY:}
+    bucket: ${R2_BUCKET:}
