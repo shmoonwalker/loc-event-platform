@@ -6,6 +6,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -16,16 +17,24 @@ import nl.loc.data.event.EventLocation;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.LocationType;
 import nl.loc.data.event.NormalizedEvent;
+import nl.loc.data.processing.SourceEventMapper;
 
+@Slf4j
 @Component
-public class RvoEventMapper {
+public class RvoEventMapper implements SourceEventMapper {
 
     private static final String SOURCE = "rvo";
     private static final String SITE_ORIGIN = "https://www.rvo.nl";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public NormalizedEvent map(String detailJson, String rawObjectKey) {
+    @Override
+    public String source() {
+        return SOURCE;
+    }
+
+    @Override
+    public List<NormalizedEvent> map(String detailJson, String rawObjectKey) {
         if (detailJson == null || detailJson.isBlank()) {
             throw new IllegalArgumentException("RVO detail JSON is missing");
         }
@@ -37,7 +46,7 @@ public class RvoEventMapper {
             throw new IllegalArgumentException("RVO detail JSON is missing id");
         }
 
-        return new NormalizedEvent(
+        return List.of(new NormalizedEvent(
                 SOURCE,
                 externalId,
                 blankToNull(rawObjectKey),
@@ -46,11 +55,11 @@ public class RvoEventMapper {
                 absoluteUrl(text(root, "url")),
                 text(root, "link"),
                 organizerNames(root),
-                parseInstant(text(root, "created")),
-                parseInstant(text(root, "changed")),
+                parseInstant(text(root, "created"), "created", rawObjectKey),
+                parseInstant(text(root, "changed"), "changed", rawObjectKey),
                 mapLocation(root),
-                mapTimeSlots(root)
-        );
+                mapTimeSlots(root, rawObjectKey)
+        ));
     }
 
     private JsonNode readObject(String detailJson) {
@@ -88,19 +97,20 @@ public class RvoEventMapper {
         return isOnline.booleanValue() ? LocationType.ONLINE : LocationType.PHYSICAL;
     }
 
-    private static List<EventTimeSlot> mapTimeSlots(JsonNode root) {
+    private static List<EventTimeSlot> mapTimeSlots(JsonNode root, String rawObjectKey) {
         JsonNode dates = root.get("dates");
         if (dates == null || !dates.isArray() || dates.isEmpty()) {
             return List.of();
         }
 
         List<EventTimeSlot> slots = new ArrayList<>();
-        for (JsonNode date : dates) {
+        for (int index = 0; index < dates.size(); index++) {
+            JsonNode date = dates.get(index);
             if (date == null || !date.isObject()) {
                 continue;
             }
-            Instant startsAt = parseInstant(text(date, "value"));
-            Instant endsAt = parseInstant(text(date, "end_value"));
+            Instant startsAt = parseInstant(text(date, "value"), "dates[" + index + "].value", rawObjectKey);
+            Instant endsAt = parseInstant(text(date, "end_value"), "dates[" + index + "].end_value", rawObjectKey);
             if (startsAt == null && endsAt == null) {
                 continue;
             }
@@ -141,13 +151,14 @@ public class RvoEventMapper {
         return SITE_ORIGIN + "/" + url;
     }
 
-    private static Instant parseInstant(String value) {
+    private static Instant parseInstant(String value, String field, String rawObjectKey) {
         if (value == null) {
             return null;
         }
         try {
             return OffsetDateTime.parse(value).toInstant();
         } catch (DateTimeParseException exception) {
+            log.warn("Ignoring invalid RVO timestamp rawObjectKey={} field={}", rawObjectKey, field);
             return null;
         }
     }

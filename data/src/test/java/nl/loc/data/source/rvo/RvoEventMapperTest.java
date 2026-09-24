@@ -44,7 +44,7 @@ class RvoEventMapperTest {
                 }
                 """;
 
-        NormalizedEvent event = mapper.map(json, "raw/rvo/run/events/12345.json");
+        NormalizedEvent event = mapper.map(json, "raw/rvo/run/events/12345.json").getFirst();
 
         assertEquals("rvo", event.source());
         assertEquals("12345", event.externalId());
@@ -82,7 +82,7 @@ class RvoEventMapperTest {
                 }
                 """;
 
-        NormalizedEvent event = mapper.map(json, "raw/rvo/run/events/online-1.json");
+        NormalizedEvent event = mapper.map(json, "raw/rvo/run/events/online-1.json").getFirst();
 
         assertEquals(LocationType.ONLINE, event.location().locationType());
         assertNull(event.location().latitude());
@@ -102,11 +102,11 @@ class RvoEventMapperTest {
         NormalizedEvent emptyDates = mapper.map(
                 "{\"id\":\"empty-dates\",\"dates\":[]}",
                 "raw/rvo/run/events/empty-dates.json"
-        );
+        ).getFirst();
         NormalizedEvent missingDates = mapper.map(
                 "{\"id\":\"no-dates\"}",
                 "raw/rvo/run/events/no-dates.json"
-        );
+        ).getFirst();
 
         assertNotNull(emptyDates.timeSlots());
         assertEquals(List.of(), emptyDates.timeSlots());

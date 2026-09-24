@@ -1,9 +1,11 @@
 package nl.loc.data.source.rvo;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+@Slf4j
 @Component
 public class RvoClient {
 
@@ -16,6 +18,7 @@ public class RvoClient {
     }
 
    public String fetchListPage(int page) {
+        log.debug("Fetching RVO list page={}", page);
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .queryParam("page", page)
@@ -25,6 +28,7 @@ public class RvoClient {
    }
 
    public String fetchEvent(String id) {
+        log.debug("Fetching RVO event externalId={}", id);
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/{id}")

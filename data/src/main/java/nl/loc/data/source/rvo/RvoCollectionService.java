@@ -31,30 +31,51 @@ public class RvoCollectionService {
         String runId = UUID.randomUUID().toString();
         log.info("Starting RVO collection run {}", runId);
 
+        long startedAt = System.nanoTime();
+        String stage = "fetch-list";
+        String currentEventId = null;
         int page = 0;
         int storedPages = 0;
         int storedEvents = 0;
 
-        while (true) {
-            String listJson = rvoClient.fetchListPage(page);
-            JsonNode events = parseArray(listJson, "list page " + page);
-            if (events.isEmpty()) {
-                break;
+        try {
+            while (true) {
+                currentEventId = null;
+                stage = "fetch-list";
+                String listJson = rvoClient.fetchListPage(page);
+                stage = "parse-list";
+                JsonNode events = parseArray(listJson, "list page " + page);
+                if (events.isEmpty()) {
+                    log.debug("Reached empty RVO page runId={} page={}", runId, page);
+                    break;
+                }
+
+                stage = "store-list";
+                store(rawKey(runId, "page-%03d.json".formatted(page)), listJson);
+                storedPages++;
+
+                stage = "read-event-ids";
+                for (String id : eventIds(events)) {
+                    currentEventId = id;
+                    stage = "fetch-detail";
+                    String detailJson = rvoClient.fetchEvent(id);
+                    stage = "store-detail";
+                    store(rawKey(runId, "events/" + id + ".json"), detailJson);
+                    storedEvents++;
+                }
+
+                log.debug("Collected RVO page runId={} page={} storedEvents={}", runId, page, storedEvents);
+                page++;
             }
-
-            store(rawKey(runId, "page-%03d.json".formatted(page)), listJson);
-            storedPages++;
-
-            for (String id : eventIds(events)) {
-                String detailJson = rvoClient.fetchEvent(id);
-                store(rawKey(runId, "events/" + id + ".json"), detailJson);
-                storedEvents++;
-            }
-
-            page++;
+        } catch (RuntimeException exception) {
+            log.error("RVO collection failed runId={} page={} eventId={} stage={} storedPages={} storedEvents={} durationMs={}",
+                    runId, page, currentEventId, stage, storedPages, storedEvents,
+                    (System.nanoTime() - startedAt) / 1_000_000, exception);
+            throw exception;
         }
 
-        log.info("Finished RVO collection run {} ({} pages, {} events)", runId, storedPages, storedEvents);
+        log.info("Finished RVO collection runId={} storedPages={} storedEvents={} durationMs={}",
+                runId, storedPages, storedEvents, (System.nanoTime() - startedAt) / 1_000_000);
     }
 
     private List<String> eventIds(JsonNode events) {
