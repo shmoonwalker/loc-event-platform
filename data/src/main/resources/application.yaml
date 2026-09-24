@@ -3,6 +3,19 @@ spring:
     name: loc-data
   main:
     web-application-type: none
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:${POSTGRES_DB:project_db}}?currentSchema=catalog
+    username: ${DB_USER:${POSTGRES_USER:admin}}
+    password: ${DB_PASSWORD:${POSTGRES_PASSWORD:password}}
+  flyway:
+    schemas: catalog
+    default-schema: catalog
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        default_schema: catalog
 
 management:
   endpoints:
