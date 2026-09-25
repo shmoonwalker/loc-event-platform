@@ -5,6 +5,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nl.loc.data.processing.RawEventProcessingService;
+import nl.loc.data.processing.SourceEventMapper;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 public class IngestionRun {
 
     private final List<SourceCollector> collectors;
+    private final List<SourceEventMapper> mappers;
     private final RawEventProcessingService rawEventProcessingService;
 
     public void runAll() {
@@ -31,6 +33,12 @@ public class IngestionRun {
         log.info("Collecting source={}", collector.source());
         List<String> detailKeys = collector.collect();
         log.info("Collected source={} detailCount={}", collector.source(), detailKeys.size());
+        if (!hasMapper(collector.source())) {
+            log.info("Processing skipped source={} reason=no mapper registered storedCount={}",
+                    collector.source(), detailKeys.size());
+            log.info("Ingestion finished source={} published=0 failed=0", collector.source());
+            return;
+        }
         publishStored(collector.source(), detailKeys);
     }
 
@@ -58,6 +66,15 @@ public class IngestionRun {
             }
         }
         log.info("Ingestion finished source={} published={} failed={}", source, published, failed);
+    }
+
+    private boolean hasMapper(String source) {
+        for (SourceEventMapper mapper : mappers) {
+            if (mapper.source().equals(source)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private SourceCollector collectorFor(String source) {
