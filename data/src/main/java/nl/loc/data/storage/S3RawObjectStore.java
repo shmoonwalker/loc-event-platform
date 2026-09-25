@@ -27,23 +27,25 @@ public class S3RawObjectStore implements RawObjectStore {
         Assert.notNull(payload, "Payload must not be null");
         Assert.hasText(contentType, "Content type must not be blank");
 
+        log.debug("Writing raw object key={} bytes={}", key, payload.length);
         client.putObject(PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
                 .contentType(contentType)
                 .ifNoneMatch("*")
                 .build(), RequestBody.fromBytes(payload));
-        log.info("Stored raw object key={} bytes={} contentType={}", key, payload.length, contentType);
+        log.debug("Stored raw object key={} bytes={} contentType={}", key, payload.length, contentType);
     }
 
     @Override
     public byte[] get(String key) {
         Assert.hasText(key, "Object key must not be blank");
+        log.debug("Reading raw object key={}", key);
         byte[] payload = client.getObjectAsBytes(GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
                 .build()).asByteArray();
-        log.info("Read raw object key={} bytes={}", key, payload.length);
+        log.debug("Read raw object key={} bytes={}", key, payload.length);
         return payload;
     }
 }
