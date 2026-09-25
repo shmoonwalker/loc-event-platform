@@ -1,5 +1,7 @@
 package nl.loc.data.storage;
 
+import java.util.Map;
+
 import org.springframework.util.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,17 +25,26 @@ public class S3RawObjectStore implements RawObjectStore {
 
     @Override
     public void put(String key, byte[] payload, String contentType) {
+        put(key, payload, contentType, Map.of());
+    }
+
+    @Override
+    public void put(String key, byte[] payload, String contentType, Map<String, String> metadata) {
         Assert.hasText(key, "Object key must not be blank");
         Assert.notNull(payload, "Payload must not be null");
         Assert.hasText(contentType, "Content type must not be blank");
+        Assert.notNull(metadata, "Metadata must not be null");
 
-        log.debug("Writing raw object key={} bytes={}", key, payload.length);
-        client.putObject(PutObjectRequest.builder()
+        log.debug("Writing raw object key={} bytes={} metadataKeys={}", key, payload.length, metadata.size());
+        PutObjectRequest.Builder request = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
                 .contentType(contentType)
-                .ifNoneMatch("*")
-                .build(), RequestBody.fromBytes(payload));
+                .ifNoneMatch("*");
+        if (!metadata.isEmpty()) {
+            request.metadata(metadata);
+        }
+        client.putObject(request.build(), RequestBody.fromBytes(payload));
         log.debug("Stored raw object key={} bytes={} contentType={}", key, payload.length, contentType);
     }
 

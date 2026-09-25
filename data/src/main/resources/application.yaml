@@ -35,3 +35,10 @@ loc:
 
   rvo:
     base-url: https://www.rvo.nl/api/v1/opendata/events
+
+  ticketmaster:
+    base-url: https://app.ticketmaster.com/discovery/v2/events.json
+    country-code: NL
+    locale: nl-nl
+    page-size: 200
+    api-key: ${Ticketmaster:}
