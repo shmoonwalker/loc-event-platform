@@ -51,7 +51,7 @@ public class RvoEventMapper implements SourceEventMapper {
                 externalId,
                 blankToNull(rawObjectKey),
                 text(root, "title"),
-                text(root, "intro"),
+                mapDescription(root),
                 absoluteUrl(text(root, "url")),
                 text(root, "link"),
                 organizerNames(root),
@@ -73,6 +73,27 @@ public class RvoEventMapper implements SourceEventMapper {
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("Could not parse RVO detail JSON", exception);
         }
+    }
+
+    private static String mapDescription(JsonNode root) {
+        List<String> sections = new ArrayList<>();
+        String intro = HtmlPlainText.convert(text(root, "intro"));
+        if (intro != null) {
+            sections.add(intro);
+        }
+
+        JsonNode body = root.get("body");
+        if (body != null && body.isArray()) {
+            for (JsonNode section : body) {
+                if (section.isTextual()) {
+                    String content = HtmlPlainText.convert(section.asText());
+                    if (content != null) {
+                        sections.add(content);
+                    }
+                }
+            }
+        }
+        return sections.isEmpty() ? null : String.join("\n\n", sections);
     }
 
     private static EventLocation mapLocation(JsonNode root) {

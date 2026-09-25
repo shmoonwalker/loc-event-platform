@@ -23,12 +23,7 @@ public class CatalogPublicationService {
     private final CatalogEventLocationRepository catalogEventLocationRepository;
     private final CatalogEventRepository catalogEventRepository;
 
-    private CatalogEvent upsertEvent(NormalizedEvent event) {
-        Optional<CatalogEvent> existing = catalogEventRepository.findBySourceAndExternalId(
-                event.source(),
-                event.externalId()
-        );
-
+    private CatalogEvent upsertEvent(NormalizedEvent event, Optional<CatalogEvent> existing) {
         CatalogEvent catalogEvent;
         if (existing.isPresent()) {
             catalogEvent = existing.get();
@@ -63,12 +58,15 @@ public class CatalogPublicationService {
     }
 
     private void upsertLocation(CatalogEvent catalogEvent, EventLocation location) {
+        Optional<CatalogEventLocation> existing = catalogEventLocationRepository.findById(catalogEvent.getId());
+
         if (location == null) {
-            log.debug("Skipping absent location catalogEventId={}", catalogEvent.getId());
+            existing.ifPresent(catalogLocation -> {
+                catalogEventLocationRepository.delete(catalogLocation);
+                log.debug("Scheduled removal of absent location catalogEventId={}", catalogEvent.getId());
+            });
             return;
         }
-
-        Optional<CatalogEventLocation> existing = catalogEventLocationRepository.findById(catalogEvent.getId());
 
         CatalogEventLocation catalogLocation;
         if (existing.isPresent()) {
@@ -141,7 +139,23 @@ public class CatalogPublicationService {
     public CatalogEvent publish(NormalizedEvent event) {
         log.debug("Publishing catalog event source={} externalId={} rawObjectKey={}",
                 event.source(), event.externalId(), event.rawObjectKey());
-        CatalogEvent catalogEvent = upsertEvent(event);
+        Optional<CatalogEvent> existing = catalogEventRepository.findBySourceAndExternalId(
+                event.source(),
+                event.externalId()
+        );
+        if (existing.isPresent()) {
+            CatalogEvent storedEvent = existing.get();
+            if (storedEvent.getSourceUpdatedAt() != null
+                    && (event.sourceUpdatedAt() == null
+                    || event.sourceUpdatedAt().isBefore(storedEvent.getSourceUpdatedAt()))) {
+                log.info("Skipping outdated snapshot source={} externalId={} incomingSourceUpdatedAt={} storedSourceUpdatedAt={} rawObjectKey={}",
+                        event.source(), event.externalId(), event.sourceUpdatedAt(),
+                        storedEvent.getSourceUpdatedAt(), event.rawObjectKey());
+                return storedEvent;
+            }
+        }
+
+        CatalogEvent catalogEvent = upsertEvent(event, existing);
         upsertLocation(catalogEvent, event.location());
         syncTimeSlots(catalogEvent, event.timeSlots());
         return catalogEvent;

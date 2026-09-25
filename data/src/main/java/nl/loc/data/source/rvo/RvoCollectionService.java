@@ -13,12 +13,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import nl.loc.data.collection.SourceCollector;
 import nl.loc.data.storage.RawObjectStore;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RvoCollectionService {
+public class RvoCollectionService implements SourceCollector {
 
     private static final String SOURCE = "rvo";
     private static final String JSON = "application/json";
@@ -27,7 +28,13 @@ public class RvoCollectionService {
     private final RawObjectStore rawObjectStore;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public void collect() {
+    @Override
+    public String source() {
+        return SOURCE;
+    }
+
+    @Override
+    public List<String> collect() {
         String runId = UUID.randomUUID().toString();
         log.info("Starting RVO collection run {}", runId);
 
@@ -35,8 +42,8 @@ public class RvoCollectionService {
         String stage = "fetch-list";
         String currentEventId = null;
         int page = 0;
-        int storedPages = 0;
         int storedEvents = 0;
+        List<String> detailKeys = new ArrayList<>();
 
         try {
             while (true) {
@@ -50,17 +57,15 @@ public class RvoCollectionService {
                     break;
                 }
 
-                stage = "store-list";
-                store(rawKey(runId, "page-%03d.json".formatted(page)), listJson);
-                storedPages++;
-
                 stage = "read-event-ids";
                 for (String id : eventIds(events)) {
                     currentEventId = id;
                     stage = "fetch-detail";
                     String detailJson = rvoClient.fetchEvent(id);
                     stage = "store-detail";
-                    store(rawKey(runId, "events/" + id + ".json"), detailJson);
+                    String detailKey = rawKey(runId, "events/" + id + ".json");
+                    store(detailKey, detailJson);
+                    detailKeys.add(detailKey);
                     storedEvents++;
                 }
 
@@ -68,14 +73,15 @@ public class RvoCollectionService {
                 page++;
             }
         } catch (RuntimeException exception) {
-            log.error("RVO collection failed runId={} page={} eventId={} stage={} storedPages={} storedEvents={} durationMs={}",
-                    runId, page, currentEventId, stage, storedPages, storedEvents,
+            log.error("RVO collection failed runId={} page={} eventId={} stage={} storedEvents={} durationMs={}",
+                    runId, page, currentEventId, stage, storedEvents,
                     (System.nanoTime() - startedAt) / 1_000_000, exception);
             throw exception;
         }
 
-        log.info("Finished RVO collection runId={} storedPages={} storedEvents={} durationMs={}",
-                runId, storedPages, storedEvents, (System.nanoTime() - startedAt) / 1_000_000);
+        log.info("Finished RVO collection runId={} storedEvents={} durationMs={}",
+                runId, storedEvents, (System.nanoTime() - startedAt) / 1_000_000);
+        return List.copyOf(detailKeys);
     }
 
     private List<String> eventIds(JsonNode events) {
