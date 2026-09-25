@@ -11,5 +11,5 @@ public interface RawObjectStore {
     /** Creates an object with optional user metadata. Existing objects must not be overwritten. */
     void put(String key, byte[] payload, String contentType, Map<String, String> metadata);
 
-    byte[] get(String key);
+    RawObject get(String key);
 }

@@ -117,13 +117,17 @@ public class TicketmasterCollectionService implements SourceCollector {
         }
 
         if (pageEvents.size() >= MAX_PAGE_OFFSET) {
-            Duration half = Duration.between(windowStart, windowEnd).dividedBy(2);
-            Instant midpoint = windowStart.plus(half);
-            if (half.isZero() || !midpoint.isAfter(windowStart) || !midpoint.isBefore(windowEnd)) {
+            // Match the whole-second precision sent by TicketmasterClient.
+            long startSecond = windowStart.getEpochSecond();
+            long endSecond = windowEnd.getEpochSecond();
+            if (endSecond - startSecond <= 1) {
                 throw new IllegalStateException(
                         "Ticketmaster window still returns " + MAX_PAGE_OFFSET
-                                + " events and cannot be split further: " + windowStart + " to " + windowEnd);
+                                + " events and cannot be split further at API second precision: "
+                                + windowStart + " to " + windowEnd
+                                + "; another partitioning strategy is required");
             }
+            Instant midpoint = Instant.ofEpochSecond(startSecond + (endSecond - startSecond) / 2);
             log.info("Ticketmaster window hit paging cap; splitting runId={} windowStart={} midpoint={} windowEnd={}",
                     runId, windowStart, midpoint, windowEnd);
             return collectWindow(runId, collectedAt, windowStart, midpoint, seenEventIds, eventKeys, progress)

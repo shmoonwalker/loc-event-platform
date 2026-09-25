@@ -49,14 +49,15 @@ public class S3RawObjectStore implements RawObjectStore {
     }
 
     @Override
-    public byte[] get(String key) {
+    public RawObject get(String key) {
         Assert.hasText(key, "Object key must not be blank");
         log.debug("Reading raw object key={}", key);
-        byte[] payload = client.getObjectAsBytes(GetObjectRequest.builder()
+        var response = client.getObjectAsBytes(GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
-                .build()).asByteArray();
+                .build());
+        byte[] payload = response.asByteArray();
         log.debug("Read raw object key={} bytes={}", key, payload.length);
-        return payload;
+        return new RawObject(payload, response.response().metadata());
     }
 }

@@ -1,5 +1,6 @@
 package nl.loc.data.catalog;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,7 +24,7 @@ public class CatalogPublicationService {
     private final CatalogEventLocationRepository catalogEventLocationRepository;
     private final CatalogEventRepository catalogEventRepository;
 
-    private CatalogEvent upsertEvent(NormalizedEvent event, Optional<CatalogEvent> existing) {
+    private CatalogEvent upsertEvent(NormalizedEvent event, Instant collectedAt, Optional<CatalogEvent> existing) {
         CatalogEvent catalogEvent;
         if (existing.isPresent()) {
             catalogEvent = existing.get();
@@ -35,7 +36,8 @@ public class CatalogPublicationService {
                     event.registrationUrl(),
                     event.organizerNames(),
                     event.sourceCreatedAt(),
-                    event.sourceUpdatedAt()
+                    event.sourceUpdatedAt(),
+                    collectedAt
             );
         } else {
             catalogEvent = new CatalogEvent(
@@ -48,7 +50,8 @@ public class CatalogPublicationService {
                     event.registrationUrl(),
                     event.organizerNames(),
                     event.sourceCreatedAt(),
-                    event.sourceUpdatedAt()
+                    event.sourceUpdatedAt(),
+                    collectedAt
             );
         }
 
@@ -136,7 +139,7 @@ public class CatalogPublicationService {
     }
 
     @Transactional
-    public CatalogEvent publish(NormalizedEvent event) {
+    public CatalogEvent publish(NormalizedEvent event, Instant collectedAt) {
         log.debug("Publishing catalog event source={} externalId={} rawObjectKey={}",
                 event.source(), event.externalId(), event.rawObjectKey());
         Optional<CatalogEvent> existing = catalogEventRepository.findBySourceAndExternalId(
@@ -153,9 +156,18 @@ public class CatalogPublicationService {
                         storedEvent.getSourceUpdatedAt(), event.rawObjectKey());
                 return storedEvent;
             }
+            // Collection order is only a fallback when neither snapshot has a source update time.
+            if (storedEvent.getSourceUpdatedAt() == null && event.sourceUpdatedAt() == null
+                    && storedEvent.getCollectedAt() != null
+                    && (collectedAt == null || collectedAt.isBefore(storedEvent.getCollectedAt()))) {
+                log.info("Skipping outdated collection source={} externalId={} incomingCollectedAt={} storedCollectedAt={} rawObjectKey={}",
+                        event.source(), event.externalId(), collectedAt,
+                        storedEvent.getCollectedAt(), event.rawObjectKey());
+                return storedEvent;
+            }
         }
 
-        CatalogEvent catalogEvent = upsertEvent(event, existing);
+        CatalogEvent catalogEvent = upsertEvent(event, collectedAt, existing);
         upsertLocation(catalogEvent, event.location());
         syncTimeSlots(catalogEvent, event.timeSlots());
         return catalogEvent;

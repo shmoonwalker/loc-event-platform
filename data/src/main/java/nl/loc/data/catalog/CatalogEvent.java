@@ -68,6 +68,9 @@ public class CatalogEvent {
     @Column(name = "source_updated_at")
     private Instant sourceUpdatedAt;
 
+    @Column(name = "collected_at")
+    private Instant collectedAt;
+
     public CatalogEvent(
             String source,
             String externalId,
@@ -78,7 +81,8 @@ public class CatalogEvent {
             String registrationUrl,
             List<String> organizerNames,
             Instant sourceCreatedAt,
-            Instant sourceUpdatedAt
+            Instant sourceUpdatedAt,
+            Instant collectedAt
     ) {
         this.source = requireText(source, "source");
         this.externalId = requireText(externalId, "externalId");
@@ -90,7 +94,8 @@ public class CatalogEvent {
                 registrationUrl,
                 organizerNames,
                 sourceCreatedAt,
-                sourceUpdatedAt
+                sourceUpdatedAt,
+                collectedAt
         );
     }
 
@@ -102,7 +107,8 @@ public class CatalogEvent {
             String registrationUrl,
             List<String> organizerNames,
             Instant sourceCreatedAt,
-            Instant sourceUpdatedAt
+            Instant sourceUpdatedAt,
+            Instant collectedAt
     ) {
         this.rawObjectKey = requireText(rawObjectKey, "rawObjectKey");
         this.title = normalize(title);
@@ -112,6 +118,7 @@ public class CatalogEvent {
         this.organizerNames = normalizeNames(organizerNames);
         this.sourceCreatedAt = sourceCreatedAt;
         this.sourceUpdatedAt = sourceUpdatedAt;
+        this.collectedAt = collectedAt;
     }
 
     public List<String> getOrganizerNames() {
