@@ -13,6 +13,7 @@ import nl.loc.data.event.NormalizedEvent;
 import nl.loc.data.storage.RawObject;
 import nl.loc.data.storage.RawObjectStore;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -22,7 +23,10 @@ public class RawEventProcessingService {
     private final RawObjectStore rawObjectStore;
     private final List<SourceEventMapper> mappers;
     private final CatalogPublicationService catalogPublicationService;
+    private final RawProcessingRepository processingRepository;
+    private final EventContentFingerprint contentFingerprint;
 
+    @Transactional
     public void process(String source, String rawObjectKey) {
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException("source is required");
@@ -46,11 +50,18 @@ public class RawEventProcessingService {
 
             stage = "map-events";
             List<NormalizedEvent> events = mapper.map(rawJson, rawObjectKey);
+            if (events.isEmpty()) {
+                throw new IllegalArgumentException("Raw event file produced no events: " + rawObjectKey);
+            }
 
             stage = "publish-events";
             for (NormalizedEvent event : events) {
-                catalogPublicationService.publish(event, collectedAt);
+                if (!source.equals(event.source())) {
+                    throw new IllegalArgumentException("Mapped source does not match " + source);
+                }
+                catalogPublicationService.publish(event, collectedAt, contentFingerprint.of(event));
             }
+            processingRepository.markProcessed(source, rawObjectKey);
 
             log.info("Published events source={} count={} rawObjectKey={} durationMs={}",
                     source, events.size(), rawObjectKey, (System.nanoTime() - startedAt) / 1_000_000);

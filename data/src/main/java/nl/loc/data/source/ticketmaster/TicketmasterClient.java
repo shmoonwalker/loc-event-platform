@@ -133,6 +133,10 @@ public class TicketmasterClient {
         return pageSize;
     }
 
+    public String countryCode() {
+        return countryCode;
+    }
+
     private void requireApiKey() {
         Assert.hasText(apiKey, "loc.ticketmaster.api-key is blank; set the Ticketmaster environment variable");
     }

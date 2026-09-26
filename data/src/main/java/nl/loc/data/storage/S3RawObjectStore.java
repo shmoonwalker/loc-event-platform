@@ -1,6 +1,8 @@
 package nl.loc.data.storage;
 
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.util.Assert;
 import org.slf4j.Logger;
@@ -9,6 +11,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 
 /** Cloudflare R2 storage through its S3-compatible API. */
 public class S3RawObjectStore implements RawObjectStore {
@@ -59,5 +62,18 @@ public class S3RawObjectStore implements RawObjectStore {
         byte[] payload = response.asByteArray();
         log.debug("Read raw object key={} bytes={}", key, payload.length);
         return new RawObject(payload, response.response().metadata());
+    }
+
+    @Override
+    public List<StoredRawObject> list(String prefix) {
+        Assert.hasText(prefix, "Object prefix must not be blank");
+        List<StoredRawObject> objects = new ArrayList<>();
+        var request = ListObjectsV2Request.builder().bucket(bucket).prefix(prefix).build();
+        for (var page : client.listObjectsV2Paginator(request)) {
+            for (var object : page.contents()) {
+                objects.add(new StoredRawObject(object.key(), object.lastModified()));
+            }
+        }
+        return List.copyOf(objects);
     }
 }

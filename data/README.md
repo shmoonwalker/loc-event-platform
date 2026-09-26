@@ -1,24 +1,68 @@
 # Loc data application
 
-This directory contains Loc's separate Java/Spring Boot data application. It
-will collect external event data, store immutable raw payloads in Cloudflare
-R2, and keep operational and catalog state in PostgreSQL.
+This Java 25 application collects RVO and Ticketmaster events into Cloudflare
+R2 and publishes normalized events into PostgreSQL's `catalog` schema.
 
-Processing and publication will be implemented incrementally. The detailed
-design is documented in
-[`../docs/architecture/data-architecture.md`](../docs/architecture/data-architecture.md).
+## Normal startup: process saved events
 
-## Project foundation
+With database and R2 environment variables loaded, start from `data/`:
 
-The module currently ships the Spring Boot application shell and raw object
-storage (Cloudflare R2 via the S3 API). No collection source is wired yet.
+```bash
+./mvnw -Dmaven.test.skip=true spring-boot:run -Dspring-boot.run.profiles=dev
+```
 
-The intended first source to implement is **RVO** (Rijksdienst voor Ondernemend
-Nederland events). Source adapters store immutable payloads under
-`raw/<source>/<collection-run>/…`, then processing and catalog publication will
-follow in later work.
+No ingestion arguments are needed. Startup lists saved event files for both
+sources, including older collection folders, and imports files that have no
+successful-processing checkpoint. R2 listing is paginated. This does not call
+the source APIs or upload the raw files again. It performs one pass on startup;
+it is not a continuously polling worker.
 
-Persistence models, processing, messaging, and tests are not in place yet.
+`catalog.processed_raw_object` records success in the same transaction as the
+catalog changes. A failed file remains pending for the next startup, while
+other files continue processing. Previously imported files without checkpoints
+are processed once again using the existing snapshot ordering checks.
+
+New raw snapshots are still saved during each collection. After mapping, the
+application compares a hash of the normalized content with the catalog row.
+If unchanged, it skips location, time-slot, image and price synchronization,
+but still updates snapshot provenance, freshness and source presence. Older
+snapshots are rejected before this comparison. Existing rows without a hash
+receive one on their next accepted import. Mapper changes that alter normalized
+content produce a different hash; explicit `reprocess` can apply those changes.
+
+Optional commands via `-Dspring-boot.run.arguments="..."`:
+
+| Arguments | Behavior |
+| --- | --- |
+| `process ticketmaster` | Process pending saved Ticketmaster event files only |
+| `process rvo` | Process pending saved RVO event files only |
+| `run ticketmaster` | Collect fresh Ticketmaster data, then process pending saved files |
+| `run rvo` | Collect fresh RVO data, then process pending saved files |
+| `run-all` | Collect and process both sources |
+| `reprocess <source> <rawObjectKey>...` | Explicitly replay selected files even if already processed |
+
+Automatic discovery reads only `raw/<source>/<run-id>/events/<id>.json` files,
+not list pages or other objects. Fresh Ticketmaster collection requires the
+`Ticketmaster` API-key environment variable; processing saved files does not.
+
+## Source presence
+
+A saved collection run records its actual country/date scope, start time and
+collected event IDs. Only completed runs can deactivate missing catalog events.
+Ticketmaster checks the event country and known start times against that run's
+window; dates outside the window and uncertain locations/dates are left alone.
+RVO collection covers its full list endpoint.
+
+Presence uses collection start order, independently of mapping success. Older
+runs cannot reverse newer decisions, and a newer completed run can reactivate
+an event. Publication checks completed runs even when first importing an old
+file, so importing historical data does not bypass the presence decision.
+Source-level transaction locks serialize publication and reconciliation.
+
+Old R2 folders without completion records can still be imported automatically,
+but cannot prove that other events disappeared. Legacy database runs without
+a recorded scope cannot deactivate rows either. Failed collections do not
+produce absence decisions; any successfully saved files remain processable.
 
 ## Raw object storage
 
@@ -36,7 +80,7 @@ Object keys follow `raw/<source>/<collection-run>/<file>`.
 
 | Variable        | Purpose                                                     | Default      |
 | --------------- | ----------------------------------------------------------- | ------------ |
-| `R2_ENABLED`    | Enable R2 storage                      | `false` (dev) / `true` (prod) |
+| `R2_ENABLED`    | Enable R2 storage                      | `true` |
 | `R2_ENDPOINT`   | `https://<account-id>.r2.cloudflarestorage.com`             | —            |
 | `R2_REGION`     | R2 accepts `auto`                                           | `auto`       |
 | `R2_ACCESS_KEY` | R2 API token access key id                                  | —            |
@@ -66,8 +110,8 @@ jurisdiction-specific endpoint if your bucket has one. Spring Boot does not
 load `.env` automatically. Keep actual credentials out of committed files.
 
 `RawObjectStore.put(key, payload, contentType)` uploads bytes and refuses to
-replace an existing key. `get(key)` reads the stored bytes. SDK failures propagate
-to the caller; there is no automatic local fallback. No request is sent at startup
-and no bucket is created by the application. Collection is not wired to storage yet.
+replace an existing key. `get(key)` reads the stored payload and metadata;
+`list(prefix)` discovers saved objects. SDK failures propagate to the caller;
+there is no local fallback and the application does not create buckets.
 
 The client uses the [Cloudflare S3 configuration](https://developers.cloudflare.com/r2/examples/aws/aws-sdk-java/).

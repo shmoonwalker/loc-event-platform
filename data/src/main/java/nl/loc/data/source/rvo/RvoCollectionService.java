@@ -3,7 +3,10 @@ package nl.loc.data.source.rvo;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
+import java.time.Instant;
+import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -14,6 +17,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nl.loc.data.collection.SourceCollector;
+import nl.loc.data.collection.CollectionRun;
+import nl.loc.data.collection.CollectionScope;
+import nl.loc.data.collection.CollectedEvent;
 import nl.loc.data.storage.RawObjectStore;
 
 @Slf4j
@@ -34,8 +40,13 @@ public class RvoCollectionService implements SourceCollector {
     }
 
     @Override
-    public List<String> collect() {
-        String runId = UUID.randomUUID().toString();
+    public CollectionScope scope(Instant startedAt) {
+        return CollectionScope.full();
+    }
+
+    @Override
+    public List<CollectedEvent> collect(CollectionRun run) {
+        String runId = run.getId().toString();
         log.info("Starting RVO collection run {}", runId);
 
         long startedAt = System.nanoTime();
@@ -43,7 +54,8 @@ public class RvoCollectionService implements SourceCollector {
         String currentEventId = null;
         int page = 0;
         int storedEvents = 0;
-        List<String> detailKeys = new ArrayList<>();
+        List<CollectedEvent> collectedEvents = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
 
         try {
             while (true) {
@@ -59,13 +71,16 @@ public class RvoCollectionService implements SourceCollector {
 
                 stage = "read-event-ids";
                 for (String id : eventIds(events)) {
+                    if (!seenIds.add(id)) {
+                        continue;
+                    }
                     currentEventId = id;
                     stage = "fetch-detail";
                     String detailJson = rvoClient.fetchEvent(id);
                     stage = "store-detail";
                     String detailKey = rawKey(runId, "events/" + id + ".json");
-                    store(detailKey, detailJson);
-                    detailKeys.add(detailKey);
+                    store(detailKey, detailJson, run.getStartedAt());
+                    collectedEvents.add(new CollectedEvent(id, detailKey));
                     storedEvents++;
                 }
 
@@ -81,7 +96,7 @@ public class RvoCollectionService implements SourceCollector {
 
         log.info("Finished RVO collection runId={} storedEvents={} durationMs={}",
                 runId, storedEvents, (System.nanoTime() - startedAt) / 1_000_000);
-        return List.copyOf(detailKeys);
+        return List.copyOf(collectedEvents);
     }
 
     private List<String> eventIds(JsonNode events) {
@@ -108,8 +123,9 @@ public class RvoCollectionService implements SourceCollector {
         }
     }
 
-    private void store(String key, String json) {
-        rawObjectStore.put(key, json.getBytes(StandardCharsets.UTF_8), JSON);
+    private void store(String key, String json, Instant collectedAt) {
+        rawObjectStore.put(key, json.getBytes(StandardCharsets.UTF_8), JSON,
+                Map.of("collectedAt", collectedAt.toString()));
     }
 
     private static String rawKey(String runId, String file) {
