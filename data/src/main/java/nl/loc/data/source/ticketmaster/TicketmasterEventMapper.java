@@ -16,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLifecycle;
 import nl.loc.data.event.EventLocation;
-import nl.loc.data.event.EventPriceRange;
 import nl.loc.data.event.LocationType;
 import nl.loc.data.event.NormalizedEvent;
 import nl.loc.data.processing.SourceEventMapper;
@@ -48,7 +47,8 @@ public class TicketmasterEventMapper implements SourceEventMapper {
                 sourceUrl, null, promoterNames(root),
                 // Discovery does not provide a documented event modification timestamp.
                 null, null, mapLocation(venue), TicketmasterTimeMapper.map(root, venue),
-                mapLifecycle(root), mapPriceRanges(root), mapImages(root)));
+                mapLifecycle(root), mapImages(root),
+                TicketmasterCategoryMapper.map(root)));
     }
 
     private JsonNode readObject(String json) {
@@ -140,27 +140,6 @@ public class TicketmasterEventMapper implements SourceEventMapper {
             case "onsale", "offsale" -> EventLifecycle.SCHEDULED;
             default -> EventLifecycle.UNKNOWN;
         };
-    }
-
-    private static List<EventPriceRange> mapPriceRanges(JsonNode root) {
-        JsonNode ranges = root.path("priceRanges");
-        Set<EventPriceRange> result = new LinkedHashSet<>();
-        if (ranges.isArray()) {
-            for (JsonNode range : ranges) {
-                BigDecimal min = decimal(range, "min");
-                BigDecimal max = decimal(range, "max");
-                if ((min == null && max == null)
-                        || (min != null && min.signum() < 0) || (max != null && max.signum() < 0)
-                        || (min != null && max != null && min.compareTo(max) > 0)) {
-                    log.warn("Ignoring invalid Ticketmaster price range eventId={}", text(root, "id"));
-                    continue;
-                }
-                String currency = text(range, "currency");
-                result.add(new EventPriceRange(min, max,
-                        currency == null ? null : currency.toUpperCase(Locale.ROOT), text(range, "type")));
-            }
-        }
-        return List.copyOf(result);
     }
 
     private static List<EventImage> mapImages(JsonNode root) {

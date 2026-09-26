@@ -63,7 +63,7 @@ public class RvoEventMapper implements SourceEventMapper {
                 mapTimeSlots(root, rawObjectKey),
                 EventLifecycle.UNKNOWN,
                 List.of(),
-                List.of()
+                RvoCategoryMapper.map(root)
         ));
     }
 

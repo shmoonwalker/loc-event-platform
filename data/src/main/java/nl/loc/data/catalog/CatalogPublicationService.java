@@ -3,15 +3,18 @@ package nl.loc.data.catalog;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import nl.loc.data.event.Category;
+import nl.loc.data.event.CategoryAssignment;
 import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLocation;
-import nl.loc.data.event.EventPriceRange;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.NormalizedEvent;
 import org.springframework.stereotype.Service;
@@ -26,7 +29,8 @@ public class CatalogPublicationService {
     private final CatalogEventLocationRepository catalogEventLocationRepository;
     private final CatalogEventRepository catalogEventRepository;
     private final CatalogEventImageRepository catalogEventImageRepository;
-    private final CatalogEventPriceRangeRepository catalogEventPriceRangeRepository;
+    private final CatalogCategoryRepository catalogCategoryRepository;
+    private final CatalogEventCategoryRepository catalogEventCategoryRepository;
     private final CatalogSourceLock sourceLock;
     private final CatalogPresenceService presenceService;
 
@@ -174,28 +178,39 @@ public class CatalogPublicationService {
                 .toList());
     }
 
-    private void syncPriceRanges(CatalogEvent event, List<EventPriceRange> ranges) {
-        List<EventPriceRange> incoming = ranges == null ? List.of() : ranges;
-        List<CatalogEventPriceRange> existing = catalogEventPriceRangeRepository
-                .findByEventOrderByRangeIndex(event);
-        Map<Integer, CatalogEventPriceRange> byIndex = new HashMap<>();
-        for (CatalogEventPriceRange row : existing) {
-            byIndex.put(row.getRangeIndex(), row);
+    private void syncCategories(CatalogEvent event, List<Category> categories) {
+        List<Category> incoming = CategoryAssignment.resolve(categories);
+        Map<String, CatalogCategory> storedByName = new HashMap<>();
+        for (CatalogCategory stored : catalogCategoryRepository.findAll()) {
+            storedByName.put(stored.getName(), stored);
         }
-        List<CatalogEventPriceRange> toSave = new ArrayList<>();
-        for (int index = 0; index < incoming.size(); index++) {
-            CatalogEventPriceRange row = byIndex.get(index);
-            if (row == null) {
-                row = new CatalogEventPriceRange(event, index, incoming.get(index));
-            } else {
-                row.updateFromImport(incoming.get(index));
+        List<CatalogCategory> wanted = new ArrayList<>();
+        for (Category category : incoming) {
+            CatalogCategory stored = storedByName.get(category.catalogName());
+            if (stored == null) {
+                throw new IllegalStateException("Catalog category is missing: " + category.catalogName());
             }
-            toSave.add(row);
+            wanted.add(stored);
         }
-        catalogEventPriceRangeRepository.saveAll(toSave);
-        catalogEventPriceRangeRepository.deleteAll(existing.stream()
-                .filter(row -> row.getRangeIndex() >= incoming.size())
+        List<CatalogEventCategory> existing = catalogEventCategoryRepository.findByEvent(event);
+        Set<Long> wantedIds = new HashSet<>();
+        for (CatalogCategory category : wanted) {
+            wantedIds.add(category.getId());
+        }
+        catalogEventCategoryRepository.deleteAll(existing.stream()
+                .filter(link -> !wantedIds.contains(link.getCategory().getId()))
                 .toList());
+        Set<Long> existingIds = new HashSet<>();
+        for (CatalogEventCategory link : existing) {
+            existingIds.add(link.getCategory().getId());
+        }
+        List<CatalogEventCategory> toSave = new ArrayList<>();
+        for (CatalogCategory category : wanted) {
+            if (!existingIds.contains(category.getId())) {
+                toSave.add(new CatalogEventCategory(event, category));
+            }
+        }
+        catalogEventCategoryRepository.saveAll(toSave);
     }
 
     @Transactional
@@ -243,7 +258,7 @@ public class CatalogPublicationService {
         upsertLocation(catalogEvent, event.location());
         syncTimeSlots(catalogEvent, event.timeSlots());
         syncImages(catalogEvent, event.images());
-        syncPriceRanges(catalogEvent, event.priceRanges());
+        syncCategories(catalogEvent, event.categories());
         // Flush child changes before presence checks query the event's country and dates.
         catalogEventRepository.flush();
         presenceService.refresh(catalogEvent);
