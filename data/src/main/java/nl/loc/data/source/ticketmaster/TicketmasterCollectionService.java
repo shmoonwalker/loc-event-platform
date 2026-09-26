@@ -2,14 +2,13 @@ package nl.loc.data.source.ticketmaster;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 
@@ -20,6 +19,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nl.loc.data.collection.SourceCollector;
+import nl.loc.data.collection.CollectionRun;
+import nl.loc.data.collection.CollectionScope;
+import nl.loc.data.collection.CollectedEvent;
 import nl.loc.data.storage.RawObjectStore;
 
 @Slf4j
@@ -43,11 +45,23 @@ public class TicketmasterCollectionService implements SourceCollector {
     }
 
     @Override
-    public List<String> collect() {
-        String runId = UUID.randomUUID().toString();
-        Instant collectedAt = Instant.now();
-        Instant horizonStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
+    public CollectionScope scope(Instant startedAt) {
+        Instant horizonStart = startedAt.atZone(ZoneOffset.UTC).toLocalDate()
+                .atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant horizonEnd = horizonStart.atZone(ZoneOffset.UTC).plusMonths(HORIZON_MONTHS).toInstant();
+        String country = ticketmasterClient.countryCode().toUpperCase(Locale.ROOT);
+        if (!country.matches("[A-Z]{2}")) {
+            throw new IllegalArgumentException("Ticketmaster collection requires one country code");
+        }
+        return new CollectionScope(false, country, horizonStart, horizonEnd);
+    }
+
+    @Override
+    public List<CollectedEvent> collect(CollectionRun run) {
+        String runId = run.getId().toString();
+        Instant collectedAt = run.getStartedAt();
+        Instant horizonStart = run.getScopeStartsAt();
+        Instant horizonEnd = run.getScopeEndsAt();
 
         log.info("Starting Ticketmaster collection run {}", runId);
 
@@ -57,17 +71,20 @@ public class TicketmasterCollectionService implements SourceCollector {
         progress.windowEnd = horizonStart.plus(WINDOW);
         int storedEvents = 0;
         Set<String> seenEventIds = new HashSet<>();
-        List<String> eventKeys = new ArrayList<>();
+        List<CollectedEvent> collectedEvents = new ArrayList<>();
 
         try {
             Instant windowStart = horizonStart;
             while (windowStart.isBefore(horizonEnd)) {
                 Instant windowEnd = windowStart.plus(WINDOW);
+                if (windowEnd.isAfter(horizonEnd)) {
+                    windowEnd = horizonEnd;
+                }
                 progress.windowStart = windowStart;
                 progress.windowEnd = windowEnd;
                 progress.stage = "fetch-window";
                 storedEvents += collectWindow(runId, collectedAt, windowStart, windowEnd,
-                        seenEventIds, eventKeys, progress);
+                        seenEventIds, collectedEvents, progress);
                 windowStart = windowEnd;
             }
         } catch (RuntimeException exception) {
@@ -79,7 +96,7 @@ public class TicketmasterCollectionService implements SourceCollector {
 
         log.info("Finished Ticketmaster collection runId={} storedEvents={} durationMs={}",
                 runId, storedEvents, (System.nanoTime() - startedAt) / 1_000_000);
-        return List.copyOf(eventKeys);
+        return List.copyOf(collectedEvents);
     }
 
     private int collectWindow(String runId,
@@ -87,22 +104,27 @@ public class TicketmasterCollectionService implements SourceCollector {
                               Instant windowStart,
                               Instant windowEnd,
                               Set<String> seenEventIds,
-                              List<String> eventKeys,
+                              List<CollectedEvent> collectedEvents,
                               Progress progress)
     {
         progress.windowStart = windowStart;
         progress.windowEnd = windowEnd;
 
         int pageSize = ticketmasterClient.pageSize();
+        if (pageSize < 1 || pageSize > MAX_PAGE_OFFSET) {
+            throw new IllegalArgumentException("Ticketmaster page size must be between 1 and " + MAX_PAGE_OFFSET);
+        }
         List<JsonNode> pageEvents = new ArrayList<>();
         int page = 0;
+        boolean hasMorePages = false;
 
         while (pageSize * page < MAX_PAGE_OFFSET) {
             progress.page = page;
             progress.stage = "fetch-page";
             String pageJson = ticketmasterClient.fetchEventsPage(windowStart, windowEnd, page);
             progress.stage = "parse-page";
-            JsonNode events = parseEvents(pageJson, windowStart, windowEnd, page);
+            EventsPage result = parseEvents(pageJson, windowStart, windowEnd, page);
+            JsonNode events = result.events();
             if (events.isEmpty()) {
                 log.debug("Reached empty Ticketmaster page runId={} windowStart={} windowEnd={} page={}",
                         runId, windowStart, windowEnd, page);
@@ -114,9 +136,13 @@ public class TicketmasterCollectionService implements SourceCollector {
             log.debug("Collected Ticketmaster page runId={} windowStart={} windowEnd={} page={} windowEventCount={}",
                     runId, windowStart, windowEnd, page, pageEvents.size());
             page++;
+            hasMorePages = page < result.totalPages();
+            if (!hasMorePages) {
+                break;
+            }
         }
 
-        if (pageEvents.size() >= MAX_PAGE_OFFSET) {
+        if (pageEvents.size() >= MAX_PAGE_OFFSET || hasMorePages) {
             // Match the whole-second precision sent by TicketmasterClient.
             long startSecond = windowStart.getEpochSecond();
             long endSecond = windowEnd.getEpochSecond();
@@ -130,8 +156,8 @@ public class TicketmasterCollectionService implements SourceCollector {
             Instant midpoint = Instant.ofEpochSecond(startSecond + (endSecond - startSecond) / 2);
             log.info("Ticketmaster window hit paging cap; splitting runId={} windowStart={} midpoint={} windowEnd={}",
                     runId, windowStart, midpoint, windowEnd);
-            return collectWindow(runId, collectedAt, windowStart, midpoint, seenEventIds, eventKeys, progress)
-                    + collectWindow(runId, collectedAt, midpoint, windowEnd, seenEventIds, eventKeys, progress);
+            return collectWindow(runId, collectedAt, windowStart, midpoint, seenEventIds, collectedEvents, progress)
+                    + collectWindow(runId, collectedAt, midpoint, windowEnd, seenEventIds, collectedEvents, progress);
         }
 
         progress.stage = "store-events";
@@ -148,28 +174,48 @@ public class TicketmasterCollectionService implements SourceCollector {
             }
             String key = rawKey(runId, "events/" + eventId + ".json");
             store(key, event, collectedAt);
-            eventKeys.add(key);
+            collectedEvents.add(new CollectedEvent(eventId, key));
             newlyStored++;
         }
         return newlyStored;
     }
 
-    private JsonNode parseEvents(String json, Instant windowStart, Instant windowEnd, int page) {
+    private EventsPage parseEvents(String json, Instant windowStart, Instant windowEnd, int page) {
         try {
             JsonNode root = objectMapper.readTree(json);
             if (root == null || !root.isObject()) {
                 throw new IllegalStateException("Ticketmaster page was not a JSON object"
                         + " windowStart=" + windowStart + " windowEnd=" + windowEnd + " page=" + page);
             }
+            JsonNode pagination = root.path("page");
+            if (!pagination.path("totalElements").isIntegralNumber()
+                    || !pagination.path("totalPages").isIntegralNumber()
+                    || !pagination.path("number").isIntegralNumber()
+                    || pagination.path("totalElements").asLong() < 0
+                    || pagination.path("totalPages").asInt() < 0
+                    || pagination.path("number").asInt() != page) {
+                throw new IllegalStateException("Ticketmaster response has invalid pagination page=" + page);
+            }
+            long totalElements = pagination.path("totalElements").asLong();
+            int totalPages = pagination.path("totalPages").asInt();
+            if (totalElements > 0 && totalPages == 0) {
+                throw new IllegalStateException("Ticketmaster non-empty result has no pages");
+            }
             JsonNode events = root.path("_embedded").path("events");
             if (events.isMissingNode() || events.isNull()) {
-                return objectMapper.createArrayNode();
+                events = objectMapper.createArrayNode();
             }
             if (!events.isArray()) {
                 throw new IllegalStateException("Ticketmaster _embedded.events was not a JSON array"
                         + " windowStart=" + windowStart + " windowEnd=" + windowEnd + " page=" + page);
             }
-            return events;
+            if (events.isEmpty() && totalElements > 0 && page < totalPages) {
+                throw new IllegalStateException("Ticketmaster returned an incomplete empty page=" + page);
+            }
+            if (!events.isEmpty() && (totalElements == 0 || page >= totalPages)) {
+                throw new IllegalStateException("Ticketmaster events contradict pagination page=" + page);
+            }
+            return new EventsPage(events, totalPages);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Could not parse Ticketmaster page"
                     + " windowStart=" + windowStart + " windowEnd=" + windowEnd + " page=" + page, exception);
@@ -195,5 +241,8 @@ public class TicketmasterCollectionService implements SourceCollector {
         private int page;
         private String eventId;
         private String stage = "init";
+    }
+
+    private record EventsPage(JsonNode events, int totalPages) {
     }
 }

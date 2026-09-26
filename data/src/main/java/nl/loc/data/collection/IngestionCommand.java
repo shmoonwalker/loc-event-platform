@@ -18,12 +18,17 @@ public class IngestionCommand implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (args == null || args.length == 0) {
-            log.info("No ingestion command. Use run-all, run <source>, or reprocess <source> <rawObjectKey>...");
+            log.info("Processing pending stored events for all sources");
+            ingestionRun.processPendingAll();
             return;
         }
 
         String command = args[0];
         switch (command) {
+            case "process" -> {
+                requireArgCount(args, 2, "process <source>");
+                ingestionRun.processPending(args[1]);
+            }
             case "run-all" -> {
                 requireArgCount(args, 1, "run-all");
                 ingestionRun.runAll();

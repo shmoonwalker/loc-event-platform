@@ -1,6 +1,7 @@
 package nl.loc.data.storage;
 
 import java.util.Map;
+import java.util.List;
 
 /** Stores original payloads using keys such as raw/<source>/<run-id>/events.json. */
 public interface RawObjectStore {
@@ -12,4 +13,6 @@ public interface RawObjectStore {
     void put(String key, byte[] payload, String contentType, Map<String, String> metadata);
 
     RawObject get(String key);
+
+    List<StoredRawObject> list(String prefix);
 }
