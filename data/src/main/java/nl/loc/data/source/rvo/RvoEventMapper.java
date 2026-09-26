@@ -14,10 +14,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import nl.loc.data.event.EventLocation;
+import nl.loc.data.event.EventLifecycle;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.LocationType;
 import nl.loc.data.event.NormalizedEvent;
 import nl.loc.data.processing.SourceEventMapper;
+import nl.loc.data.text.HtmlPlainText;
 
 @Slf4j
 @Component
@@ -58,7 +60,10 @@ public class RvoEventMapper implements SourceEventMapper {
                 parseInstant(text(root, "created"), "created", rawObjectKey),
                 parseInstant(text(root, "changed"), "changed", rawObjectKey),
                 mapLocation(root),
-                mapTimeSlots(root, rawObjectKey)
+                mapTimeSlots(root, rawObjectKey),
+                EventLifecycle.UNKNOWN,
+                List.of(),
+                List.of()
         ));
     }
 
@@ -130,12 +135,12 @@ public class RvoEventMapper implements SourceEventMapper {
             if (date == null || !date.isObject()) {
                 continue;
             }
-            Instant startsAt = parseInstant(text(date, "value"), "dates[" + index + "].value", rawObjectKey);
-            Instant endsAt = parseInstant(text(date, "end_value"), "dates[" + index + "].end_value", rawObjectKey);
+            OffsetDateTime startsAt = parseOffsetDateTime(text(date, "value"), "dates[" + index + "].value", rawObjectKey);
+            OffsetDateTime endsAt = parseOffsetDateTime(text(date, "end_value"), "dates[" + index + "].end_value", rawObjectKey);
             if (startsAt == null && endsAt == null) {
                 continue;
             }
-            slots.add(new EventTimeSlot(startsAt, endsAt));
+            slots.add(EventTimeSlot.fromOffsetDateTimes(startsAt, endsAt));
         }
         return List.copyOf(slots);
     }
@@ -173,11 +178,16 @@ public class RvoEventMapper implements SourceEventMapper {
     }
 
     private static Instant parseInstant(String value, String field, String rawObjectKey) {
+        OffsetDateTime parsed = parseOffsetDateTime(value, field, rawObjectKey);
+        return parsed == null ? null : parsed.toInstant();
+    }
+
+    private static OffsetDateTime parseOffsetDateTime(String value, String field, String rawObjectKey) {
         if (value == null) {
             return null;
         }
         try {
-            return OffsetDateTime.parse(value).toInstant();
+            return OffsetDateTime.parse(value);
         } catch (DateTimeParseException exception) {
             log.warn("Ignoring invalid RVO timestamp rawObjectKey={} field={}", rawObjectKey, field);
             return null;

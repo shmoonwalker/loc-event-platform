@@ -1,4 +1,4 @@
-package nl.loc.data.source.rvo;
+package nl.loc.data.text;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
@@ -6,12 +6,12 @@ import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
 
 /** Converts source HTML into plain text with paragraph breaks and list markers. */
-final class HtmlPlainText {
+public final class HtmlPlainText {
 
     private HtmlPlainText() {
     }
 
-    static String convert(String html) {
+    public static String convert(String html) {
         if (html == null || html.isBlank()) {
             return null;
         }

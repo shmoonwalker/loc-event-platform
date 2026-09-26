@@ -49,6 +49,12 @@ public class CatalogEventLocation {
     @Column
     private Double longitude;
 
+    @Column(name = "external_venue_id")
+    private String externalVenueId;
+
+    @Column(name = "country_code")
+    private String countryCode;
+
     public CatalogEventLocation(
             CatalogEvent event,
             LocationType locationType,
@@ -58,7 +64,9 @@ public class CatalogEventLocation {
             String postalCode,
             String country,
             Double latitude,
-            Double longitude
+            Double longitude,
+            String externalVenueId,
+            String countryCode
     ) {
         this.event = require(event, "event");
         updateFromImport(
@@ -69,7 +77,9 @@ public class CatalogEventLocation {
                 postalCode,
                 country,
                 latitude,
-                longitude
+                longitude,
+                externalVenueId,
+                countryCode
         );
     }
 
@@ -81,7 +91,9 @@ public class CatalogEventLocation {
            String postalCode,
            String country,
            Double latitude,
-           Double longitude
+           Double longitude,
+           String externalVenueId,
+           String countryCode
     )
 {
         this.locationType = require(locationType, "locationType");
@@ -92,6 +104,8 @@ public class CatalogEventLocation {
         this.country = normalize(country);
         this.latitude = latitude;
         this.longitude = longitude;
+        this.externalVenueId = normalize(externalVenueId);
+        this.countryCode = normalize(countryCode);
     }
 
     private static <T> T require(T value, String fieldName) {
