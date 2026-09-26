@@ -9,7 +9,9 @@ import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLocation;
+import nl.loc.data.event.EventPriceRange;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.NormalizedEvent;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,10 @@ public class CatalogPublicationService {
     private final CatalogEventTimeSlotRepository catalogEventTimeSlotRepository;
     private final CatalogEventLocationRepository catalogEventLocationRepository;
     private final CatalogEventRepository catalogEventRepository;
+    private final CatalogEventImageRepository catalogEventImageRepository;
+    private final CatalogEventPriceRangeRepository catalogEventPriceRangeRepository;
+    private final CatalogSourceLock sourceLock;
+    private final CatalogPresenceService presenceService;
 
     private CatalogEvent upsertEvent(NormalizedEvent event, Instant collectedAt, Optional<CatalogEvent> existing) {
         CatalogEvent catalogEvent;
@@ -37,7 +43,8 @@ public class CatalogPublicationService {
                     event.organizerNames(),
                     event.sourceCreatedAt(),
                     event.sourceUpdatedAt(),
-                    collectedAt
+                    collectedAt,
+                    event.lifecycleStatus()
             );
         } else {
             catalogEvent = new CatalogEvent(
@@ -51,7 +58,8 @@ public class CatalogPublicationService {
                     event.organizerNames(),
                     event.sourceCreatedAt(),
                     event.sourceUpdatedAt(),
-                    collectedAt
+                    collectedAt,
+                    event.lifecycleStatus()
             );
         }
 
@@ -82,7 +90,9 @@ public class CatalogPublicationService {
                     location.postalCode(),
                     location.country(),
                     location.latitude(),
-                    location.longitude()
+                    location.longitude(),
+                    location.externalVenueId(),
+                    location.countryCode()
             );
         } else {
             catalogLocation = new CatalogEventLocation(
@@ -94,7 +104,9 @@ public class CatalogPublicationService {
                     location.postalCode(),
                     location.country(),
                     location.latitude(),
-                    location.longitude()
+                    location.longitude(),
+                    location.externalVenueId(),
+                    location.countryCode()
             );
         }
 
@@ -118,9 +130,9 @@ public class CatalogPublicationService {
             CatalogEventTimeSlot catalogSlot = existingByIndex.get(i);
 
             if (catalogSlot != null) {
-                catalogSlot.updateFromImport(slot.startsAt(), slot.endsAt());
+                catalogSlot.updateFromImport(slot);
             } else {
-                catalogSlot = new CatalogEventTimeSlot(catalogEvent, i, slot.startsAt(), slot.endsAt());
+                catalogSlot = new CatalogEventTimeSlot(catalogEvent, i, slot);
             }
 
             slotsToSave.add(catalogSlot);
@@ -138,8 +150,57 @@ public class CatalogPublicationService {
                 catalogEvent.getId(), slotsToSave.size(), slotsToDelete.size());
     }
 
+    private void syncImages(CatalogEvent event, List<EventImage> images) {
+        List<EventImage> incoming = images == null ? List.of() : images;
+        List<CatalogEventImage> existing = catalogEventImageRepository
+                .findByEventOrderByDisplayOrder(event);
+        Map<Integer, CatalogEventImage> byIndex = new HashMap<>();
+        for (CatalogEventImage row : existing) {
+            byIndex.put(row.getDisplayOrder(), row);
+        }
+        List<CatalogEventImage> toSave = new ArrayList<>();
+        for (int index = 0; index < incoming.size(); index++) {
+            CatalogEventImage row = byIndex.get(index);
+            if (row == null) {
+                row = new CatalogEventImage(event, index, incoming.get(index));
+            } else {
+                row.updateFromImport(incoming.get(index));
+            }
+            toSave.add(row);
+        }
+        catalogEventImageRepository.saveAll(toSave);
+        catalogEventImageRepository.deleteAll(existing.stream()
+                .filter(row -> row.getDisplayOrder() >= incoming.size())
+                .toList());
+    }
+
+    private void syncPriceRanges(CatalogEvent event, List<EventPriceRange> ranges) {
+        List<EventPriceRange> incoming = ranges == null ? List.of() : ranges;
+        List<CatalogEventPriceRange> existing = catalogEventPriceRangeRepository
+                .findByEventOrderByRangeIndex(event);
+        Map<Integer, CatalogEventPriceRange> byIndex = new HashMap<>();
+        for (CatalogEventPriceRange row : existing) {
+            byIndex.put(row.getRangeIndex(), row);
+        }
+        List<CatalogEventPriceRange> toSave = new ArrayList<>();
+        for (int index = 0; index < incoming.size(); index++) {
+            CatalogEventPriceRange row = byIndex.get(index);
+            if (row == null) {
+                row = new CatalogEventPriceRange(event, index, incoming.get(index));
+            } else {
+                row.updateFromImport(incoming.get(index));
+            }
+            toSave.add(row);
+        }
+        catalogEventPriceRangeRepository.saveAll(toSave);
+        catalogEventPriceRangeRepository.deleteAll(existing.stream()
+                .filter(row -> row.getRangeIndex() >= incoming.size())
+                .toList());
+    }
+
     @Transactional
-    public CatalogEvent publish(NormalizedEvent event, Instant collectedAt) {
+    public CatalogEvent publish(NormalizedEvent event, Instant collectedAt, String contentHash) {
+        sourceLock.acquire(event.source());
         log.debug("Publishing catalog event source={} externalId={} rawObjectKey={}",
                 event.source(), event.externalId(), event.rawObjectKey());
         Optional<CatalogEvent> existing = catalogEventRepository.findBySourceAndExternalId(
@@ -165,11 +226,27 @@ public class CatalogPublicationService {
                         storedEvent.getCollectedAt(), event.rawObjectKey());
                 return storedEvent;
             }
+            if (contentHash.equals(storedEvent.getContentHash())) {
+                // Freshness must advance even when content is identical; otherwise an
+                // intermediate older snapshot could later restore outdated content.
+                storedEvent.updateSnapshotReference(event.rawObjectKey(), event.sourceCreatedAt(),
+                        event.sourceUpdatedAt(), collectedAt);
+                presenceService.refresh(storedEvent);
+                log.info("Skipping unchanged event content source={} externalId={} rawObjectKey={}",
+                        event.source(), event.externalId(), event.rawObjectKey());
+                return storedEvent;
+            }
         }
 
         CatalogEvent catalogEvent = upsertEvent(event, collectedAt, existing);
+        catalogEvent.recordContentHash(contentHash);
         upsertLocation(catalogEvent, event.location());
         syncTimeSlots(catalogEvent, event.timeSlots());
+        syncImages(catalogEvent, event.images());
+        syncPriceRanges(catalogEvent, event.priceRanges());
+        // Flush child changes before presence checks query the event's country and dates.
+        catalogEventRepository.flush();
+        presenceService.refresh(catalogEvent);
         return catalogEvent;
     }
 }
