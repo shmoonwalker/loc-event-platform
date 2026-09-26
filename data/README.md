@@ -24,7 +24,7 @@ are processed once again using the existing snapshot ordering checks.
 
 New raw snapshots are still saved during each collection. After mapping, the
 application compares a hash of the normalized content with the catalog row.
-If unchanged, it skips location, time-slot, image and price synchronization,
+If unchanged, it skips location, time-slot, image and category synchronization,
 but still updates snapshot provenance, freshness and source presence. Older
 snapshots are rejected before this comparison. Existing rows without a hash
 receive one on their next accepted import. Mapper changes that alter normalized

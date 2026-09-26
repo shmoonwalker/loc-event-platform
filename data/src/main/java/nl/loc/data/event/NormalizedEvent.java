@@ -17,7 +17,7 @@ public record NormalizedEvent(
         EventLocation location,
         List<EventTimeSlot> timeSlots,
         EventLifecycle lifecycleStatus,
-        List<EventPriceRange> priceRanges,
-        List<EventImage> images
+        List<EventImage> images,
+        List<Category> categories
 ) {
 }
