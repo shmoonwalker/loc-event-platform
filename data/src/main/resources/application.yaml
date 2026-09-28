@@ -16,6 +16,24 @@ spring:
     properties:
       hibernate:
         default_schema: catalog
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # A few workers taking one message each keeps outbound calls spread over time.
+        concurrency: 2
+        prefetch: 1
+        # Rejected messages must reach the dead letter queue instead of returning to this one.
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 5s
+          multiplier: 3
+          max-interval: 1m
+          max-retries: 3
 
 management:
   endpoints:
@@ -42,3 +60,17 @@ loc:
     locale: nl-nl
     page-size: 200
     api-key: ${Ticketmaster:}
+
+  weather:
+    # Disabling this keeps the application a one-pass importer with no scheduler and no queue.
+    enabled: ${WEATHER_ENABLED:true}
+    base-url: https://api.open-meteo.com/v1/forecast
+    scan-interval: ${WEATHER_SCAN_INTERVAL:PT5M}
+    # Leaves startup ingestion undisturbed before the first scan runs.
+    scan-initial-delay: PT30S
+    # Upper bound on messages queued per scan, so a backlog is worked through steadily.
+    scan-limit: ${WEATHER_SCAN_LIMIT:200}
+    # How long a queued slot is left alone before it counts as due again.
+    claim-ttl: PT15M
+    connect-timeout: PT5S
+    read-timeout: PT10S
