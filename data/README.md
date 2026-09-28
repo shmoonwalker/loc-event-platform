@@ -64,6 +64,80 @@ but cannot prove that other events disappeared. Legacy database runs without
 a recorded scope cannot deactivate rows either. Failed collections do not
 produce absence decisions; any successfully saved files remain processable.
 
+## Weather enrichment
+
+Forecasts are catalog enrichment owned by this application, not something the backend fetches
+while a page loads. Each row in `catalog.event_weather` belongs to one time slot, because one
+event can run on several dates and every date needs its own forecast.
+
+Publication never writes weather. An event is published immediately, with or without a
+forecast, and the forecast arrives later.
+
+A scheduled scan (`WeatherRefreshScan`) selects slots whose check is due, claims each one and
+puts a message on `loc.weather.refresh` carrying only the slot id. `WeatherRefreshListener`
+re-reads the slot, calls Open-Meteo and stores the result. The queue carries the work while
+PostgreSQL records which work is due, so a lost message costs nothing — the slot is still due
+and the next scan queues it again.
+
+A slot is only eligible when it is physical, has coordinates, has a known start date *and*
+time, belongs to an event that is neither cancelled nor dropped by its source, and starts in
+the future. Online events are published normally and simply never get a forecast.
+
+`next_check_at` decides everything about volume. It is set from the start time, so a slot a
+month out is never read at all until it enters the window:
+
+| Time until start | Next check |
+| --- | --- |
+| More than 14 days | When the slot reaches 14 days out |
+| 14 to 7 days | In 3 days |
+| 7 to 3 days | In 2 days |
+| Under 3 days | Tomorrow |
+| Already started | Never again |
+
+A forecast is refreshed at most once a day. Open-Meteo's hourly data reaches 16 days counting
+today and its limit is a calendar date, so eligibility stops at 14 days; that margin keeps a
+slot at the edge from being due by our clock and rejected by the service.
+
+Four results are handled differently. Values are stored and rescheduled by the table above. An
+accepted hour with no values yet is not a failure, so it is retried the next day. A rejection
+for being outside the forecast range waits until the slot enters the window. A timeout or
+server error is a real failure: the queue retries it with backoff, a repeated failure reaches
+`loc.weather.refresh.dlq`, and the stored backoff takes over from there.
+
+Writes are guarded. The stored coordinates and hour are compared on every update, so a
+forecast that arrives after its slot moved is discarded rather than saved against the wrong
+date. Publication also deletes weather rows when a slot's start hour or an event's coordinates
+change, and the scan clears anything it missed.
+
+Temperature, wind, rain chance and the raw WMO code are stored as numbers. Turning a code into
+words is left to whoever reads the catalog.
+
+### Running with weather enabled
+
+With `WEATHER_ENABLED=true` (the default) the application no longer exits after its startup
+import: the scheduler and the queue listener keep it running as a worker. It needs RabbitMQ,
+which `docker-compose.yml` now provides:
+
+```bash
+docker compose up -d rabbitmq
+```
+
+| Variable               | Purpose                                             | Default    |
+| ---------------------- | --------------------------------------------------- | ---------- |
+| `WEATHER_ENABLED`      | Run the scan and the queue listener                  | `true`     |
+| `WEATHER_SCAN_INTERVAL`| Delay between scans, ISO-8601                        | `PT5M`     |
+| `WEATHER_SCAN_LIMIT`   | Most slots queued per scan                           | `200`      |
+| `RABBITMQ_HOST`        | Broker host                                          | `localhost`|
+| `RABBITMQ_PORT`        | Broker port                                          | `5672`     |
+| `RABBITMQ_USER`        | Broker user                                          | `guest`    |
+| `RABBITMQ_PASSWORD`    | Broker password                                      | `guest`    |
+
+Set `WEATHER_ENABLED=false` to keep the previous one-pass behaviour, which needs no broker.
+
+The scan limit and the listener concurrency together bound the request rate. Open-Meteo needs
+no API key but is fair-use, so a backlog is worked through over several scans instead of being
+sent at once.
+
 ## Raw object storage
 
 Raw payloads are written through `nl.loc.data.storage.RawObjectStore`. The R2 implementation is enabled by
