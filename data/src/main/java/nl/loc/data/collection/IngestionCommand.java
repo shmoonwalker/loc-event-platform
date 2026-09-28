@@ -17,34 +17,45 @@ public class IngestionCommand implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (args == null || args.length == 0) {
+        String[] commandArgs = ingestionArgs(args);
+        if (commandArgs.length == 0) {
             log.info("Processing pending stored events for all sources");
             ingestionRun.processPendingAll();
             return;
         }
 
-        String command = args[0];
+        String command = commandArgs[0];
         switch (command) {
             case "process" -> {
-                requireArgCount(args, 2, "process <source>");
-                ingestionRun.processPending(args[1]);
+                requireArgCount(commandArgs, 2, "process <source>");
+                ingestionRun.processPending(commandArgs[1]);
             }
             case "run-all" -> {
-                requireArgCount(args, 1, "run-all");
+                requireArgCount(commandArgs, 1, "run-all");
                 ingestionRun.runAll();
             }
             case "run" -> {
-                requireArgCount(args, 2, "run <source>");
-                ingestionRun.run(args[1]);
+                requireArgCount(commandArgs, 2, "run <source>");
+                ingestionRun.run(commandArgs[1]);
             }
             case "reprocess" -> {
-                if (args.length < 3) {
+                if (commandArgs.length < 3) {
                     throw new IllegalArgumentException("reprocess requires a source and at least one raw object key");
                 }
-                ingestionRun.reprocess(args[1], List.copyOf(Arrays.asList(args).subList(2, args.length)));
+                ingestionRun.reprocess(commandArgs[1], List.copyOf(Arrays.asList(commandArgs).subList(2, commandArgs.length)));
             }
             default -> throw new IllegalArgumentException("Unknown ingestion command " + command);
         }
+    }
+
+    /** Spring Boot passes --property=value as application arguments; those are not ingestion commands. */
+    private static String[] ingestionArgs(String... args) {
+        if (args == null || args.length == 0) {
+            return new String[0];
+        }
+        return Arrays.stream(args)
+                .filter(arg -> arg != null && !arg.startsWith("--"))
+                .toArray(String[]::new);
     }
 
     private static void requireArgCount(String[] args, int expected, String usage) {

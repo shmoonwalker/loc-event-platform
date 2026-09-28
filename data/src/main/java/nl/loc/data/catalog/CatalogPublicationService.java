@@ -1,11 +1,14 @@
 package nl.loc.data.catalog;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -17,6 +20,7 @@ import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLocation;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.NormalizedEvent;
+import nl.loc.data.weather.WeatherRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +35,7 @@ public class CatalogPublicationService {
     private final CatalogEventImageRepository catalogEventImageRepository;
     private final CatalogCategoryRepository catalogCategoryRepository;
     private final CatalogEventCategoryRepository catalogEventCategoryRepository;
+    private final WeatherRepository weatherRepository;
     private final CatalogSourceLock sourceLock;
     private final CatalogPresenceService presenceService;
 
@@ -72,20 +77,26 @@ public class CatalogPublicationService {
         return catalogEventRepository.save(catalogEvent);
     }
 
-    private void upsertLocation(CatalogEvent catalogEvent, EventLocation location) {
+    /** Reports whether the place moved, which makes any forecast stored for this event wrong. */
+    private boolean upsertLocation(CatalogEvent catalogEvent, EventLocation location) {
         Optional<CatalogEventLocation> existing = catalogEventLocationRepository.findById(catalogEvent.getId());
 
         if (location == null) {
-            existing.ifPresent(catalogLocation -> {
-                catalogEventLocationRepository.delete(catalogLocation);
-                log.debug("Scheduled removal of absent location catalogEventId={}", catalogEvent.getId());
-            });
-            return;
+            if (existing.isEmpty()) {
+                return false;
+            }
+            catalogEventLocationRepository.delete(existing.get());
+            log.debug("Scheduled removal of absent location catalogEventId={}", catalogEvent.getId());
+            return true;
         }
 
         CatalogEventLocation catalogLocation;
+        boolean moved = false;
         if (existing.isPresent()) {
             catalogLocation = existing.get();
+            moved = !Objects.equals(catalogLocation.getLatitude(), location.latitude())
+                    || !Objects.equals(catalogLocation.getLongitude(), location.longitude())
+                    || catalogLocation.getLocationType() != location.locationType();
             catalogLocation.updateFromImport(
                     location.locationType(),
                     location.venueName(),
@@ -117,9 +128,10 @@ public class CatalogPublicationService {
         log.debug("Saving catalog location catalogEventId={} operation={}",
                 catalogEvent.getId(), existing.isPresent() ? "update" : "insert");
         catalogEventLocationRepository.save(catalogLocation);
+        return moved;
     }
 
-    private void syncTimeSlots(CatalogEvent catalogEvent, List<EventTimeSlot> slots) {
+    private SlotSync syncTimeSlots(CatalogEvent catalogEvent, List<EventTimeSlot> slots) {
         List<EventTimeSlot> newSlots = slots == null ? List.of() : slots;
         List<CatalogEventTimeSlot> existingSlots = catalogEventTimeSlotRepository.findByEventOrderBySlotIndex(catalogEvent);
 
@@ -129,11 +141,16 @@ public class CatalogPublicationService {
         }
 
         List<CatalogEventTimeSlot> slotsToSave = new ArrayList<>();
+        Set<Long> rescheduledSlotIds = new HashSet<>();
         for (int i = 0; i < newSlots.size(); i++) {
             EventTimeSlot slot = newSlots.get(i);
             CatalogEventTimeSlot catalogSlot = existingByIndex.get(i);
 
             if (catalogSlot != null) {
+                // Rows are matched by position, so a reused row can end up describing another date.
+                if (!sameHour(catalogSlot.getStartsAt(), slot.startsAt())) {
+                    rescheduledSlotIds.add(catalogSlot.getId());
+                }
                 catalogSlot.updateFromImport(slot);
             } else {
                 catalogSlot = new CatalogEventTimeSlot(catalogEvent, i, slot);
@@ -141,7 +158,7 @@ public class CatalogPublicationService {
 
             slotsToSave.add(catalogSlot);
         }
-        catalogEventTimeSlotRepository.saveAll(slotsToSave);
+        List<CatalogEventTimeSlot> savedSlots = catalogEventTimeSlotRepository.saveAll(slotsToSave);
 
         List<CatalogEventTimeSlot> slotsToDelete = new ArrayList<>();
         for (CatalogEventTimeSlot existingSlot : existingSlots) {
@@ -152,6 +169,29 @@ public class CatalogPublicationService {
         catalogEventTimeSlotRepository.deleteAll(slotsToDelete);
         log.debug("Scheduled catalog time slot changes catalogEventId={} saved={} deleted={}",
                 catalogEvent.getId(), slotsToSave.size(), slotsToDelete.size());
+        return new SlotSync(
+                savedSlots.stream().map(CatalogEventTimeSlot::getId).toList(),
+                rescheduledSlotIds);
+    }
+
+    /** A forecast describes one hour in one place, so a change to either makes it wrong to serve. */
+    private void clearOutdatedWeather(CatalogEvent catalogEvent, SlotSync slotSync, boolean locationMoved) {
+        Collection<Long> timeSlotIds = locationMoved ? slotSync.savedSlotIds() : slotSync.rescheduledSlotIds();
+        int cleared = weatherRepository.deleteForTimeSlots(timeSlotIds);
+        if (cleared > 0) {
+            log.info("Cleared stored forecasts catalogEventId={} timeSlots={} reason={}",
+                    catalogEvent.getId(), cleared, locationMoved ? "location moved" : "slot rescheduled");
+        }
+    }
+
+    private static boolean sameHour(Instant previous, Instant current) {
+        if (previous == null || current == null) {
+            return previous == current;
+        }
+        return previous.truncatedTo(ChronoUnit.HOURS).equals(current.truncatedTo(ChronoUnit.HOURS));
+    }
+
+    private record SlotSync(List<Long> savedSlotIds, Set<Long> rescheduledSlotIds) {
     }
 
     private void syncImages(CatalogEvent event, List<EventImage> images) {
@@ -255,8 +295,9 @@ public class CatalogPublicationService {
 
         CatalogEvent catalogEvent = upsertEvent(event, collectedAt, existing);
         catalogEvent.recordContentHash(contentHash);
-        upsertLocation(catalogEvent, event.location());
-        syncTimeSlots(catalogEvent, event.timeSlots());
+        boolean locationMoved = upsertLocation(catalogEvent, event.location());
+        SlotSync slotSync = syncTimeSlots(catalogEvent, event.timeSlots());
+        clearOutdatedWeather(catalogEvent, slotSync, locationMoved);
         syncImages(catalogEvent, event.images());
         syncCategories(catalogEvent, event.categories());
         // Flush child changes before presence checks query the event's country and dates.
