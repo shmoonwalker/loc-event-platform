@@ -16,6 +16,10 @@ public class CatalogSourceLock {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void acquire(String source) {
+        // Same lock as the BEFORE STATEMENT input triggers. Acquire it before any
+        // row lock so asynchronous enrichers cannot deadlock with catalogue imports.
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(hashtext('loc-catalog-input'))",
+                (ResultSet result) -> { });
         jdbcTemplate.query("SELECT pg_advisory_xact_lock(hashtext(?))",
                 (ResultSet result) -> { }, "catalog-source:" + source);
     }

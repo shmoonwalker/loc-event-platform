@@ -42,6 +42,15 @@ management:
         include: health,info
 
 loc:
+  publication:
+    enabled: ${PUBLICATION_ENABLED:true}
+    countries: ${PUBLICATION_COUNTRIES:NL}
+    max-detail-age: ${PUBLICATION_MAX_DETAIL_AGE:PT72H}
+    recheck-interval: PT5M
+    scan-interval: PT1M
+    include-season-passes: ${PUBLICATION_INCLUDE_SEASON_PASSES:false}
+    # Only explicitly verified Ticketmaster virtual venue IDs. No keyword guessing.
+    online-venue-ids: ${PUBLICATION_ONLINE_VENUE_IDS:}
   object-storage:
     # Enable once R2 credentials and the bucket are configured.
     enabled: ${R2_ENABLED:true}

@@ -11,6 +11,8 @@ import java.util.Set;
 import java.util.Locale;
 
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
+import java.time.OffsetDateTime;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,6 +39,7 @@ public class TicketmasterCollectionService implements SourceCollector {
 
     private final TicketmasterClient ticketmasterClient;
     private final RawObjectStore rawObjectStore;
+    private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -49,9 +52,29 @@ public class TicketmasterCollectionService implements SourceCollector {
         Instant horizonStart = startedAt.atZone(ZoneOffset.UTC).toLocalDate()
                 .atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant horizonEnd = horizonStart.atZone(ZoneOffset.UTC).plusMonths(HORIZON_MONTHS).toInstant();
+        // Cover local-date events spanning the UTC midnight boundary, including unknown ends.
+        horizonStart = horizonStart.minus(Duration.ofDays(1));
         String country = ticketmasterClient.countryCode().toUpperCase(Locale.ROOT);
         if (!country.matches("[A-Z]{2}")) {
             throw new IllegalArgumentException("Ticketmaster collection requires one country code");
+        }
+        // Keep refreshing known ongoing multi-day events. A future-start-only search
+        // otherwise leaves their cancellations and changes invisible after day one.
+        List<Instant> retainedStarts = jdbc.query("""
+                SELECT min(s.starts_at) FROM catalog.event e
+                JOIN catalog.event_time_slot s ON s.event_id=e.id
+                JOIN catalog.event_location l ON l.event_id=e.id
+                WHERE e.source='ticketmaster' AND e.source_active AND NOT s.retired
+                  AND l.country_code=? AND s.starts_at < ?
+                  AND (s.ends_at > ? OR s.local_end_date >= CAST(? AS date))
+                """, (rs, row) -> {
+                    OffsetDateTime value = rs.getObject(1, OffsetDateTime.class);
+                    return value == null ? null : value.toInstant();
+                }, country, startedAt.atOffset(ZoneOffset.UTC), startedAt.atOffset(ZoneOffset.UTC),
+                startedAt.atZone(ZoneOffset.UTC).toLocalDate());
+        if (!retainedStarts.isEmpty() && retainedStarts.getFirst() != null
+                && retainedStarts.getFirst().isBefore(horizonStart)) {
+            horizonStart = retainedStarts.getFirst().atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
         }
         return new CollectionScope(false, country, horizonStart, horizonEnd);
     }
