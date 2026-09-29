@@ -57,9 +57,6 @@ public class CatalogEvent {
     @Column(name = "source_url")
     private String sourceUrl;
 
-    @Column(name = "registration_url")
-    private String registrationUrl;
-
     @Getter(AccessLevel.NONE)
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "organizer_names", nullable = false)
@@ -76,6 +73,18 @@ public class CatalogEvent {
 
     @Column(name = "content_hash")
     private String contentHash;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "qualification_issues", nullable = false)
+    private List<String> qualificationIssues = new ArrayList<>();
+
+    public void recordQualificationIssues(List<String> issues) {
+        qualificationIssues = issues == null ? new ArrayList<>() : new ArrayList<>(issues);
+    }
+
+    public void addQualificationIssue(String issue) {
+        if (!qualificationIssues.contains(issue)) qualificationIssues.add(issue);
+    }
 
     @Enumerated(EnumType.STRING)
     @Column(name = "lifecycle_status", nullable = false)
@@ -97,7 +106,6 @@ public class CatalogEvent {
             String title,
             String description,
             String sourceUrl,
-            String registrationUrl,
             List<String> organizerNames,
             Instant sourceCreatedAt,
             Instant sourceUpdatedAt,
@@ -111,7 +119,6 @@ public class CatalogEvent {
                 title,
                 description,
                 sourceUrl,
-                registrationUrl,
                 organizerNames,
                 sourceCreatedAt,
                 sourceUpdatedAt,
@@ -125,7 +132,6 @@ public class CatalogEvent {
             String title,
             String description,
             String sourceUrl,
-            String registrationUrl,
             List<String> organizerNames,
             Instant sourceCreatedAt,
             Instant sourceUpdatedAt,
@@ -136,7 +142,6 @@ public class CatalogEvent {
         this.title = normalize(title);
         this.description = normalize(description);
         this.sourceUrl = normalize(sourceUrl);
-        this.registrationUrl = normalize(registrationUrl);
         this.organizerNames = normalizeNames(organizerNames);
         this.sourceCreatedAt = sourceCreatedAt;
         this.sourceUpdatedAt = sourceUpdatedAt;

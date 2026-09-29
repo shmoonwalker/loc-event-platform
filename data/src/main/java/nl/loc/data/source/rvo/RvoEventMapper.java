@@ -55,7 +55,6 @@ public class RvoEventMapper implements SourceEventMapper {
                 text(root, "title"),
                 mapDescription(root),
                 absoluteUrl(text(root, "url")),
-                text(root, "link"),
                 organizerNames(root),
                 parseInstant(text(root, "created"), "created", rawObjectKey),
                 parseInstant(text(root, "changed"), "changed", rawObjectKey),
@@ -104,6 +103,10 @@ public class RvoEventMapper implements SourceEventMapper {
     private static EventLocation mapLocation(JsonNode root) {
         LocationType type = locationType(root.get("isOnline"));
         boolean online = type == LocationType.ONLINE;
+        Double latitude = online ? null : number(root, "latitude");
+        Double longitude = online ? null : number(root, "longitude");
+        String evidence = online ? "NOT_APPLICABLE"
+                : latitude != null && longitude != null ? "SOURCE_EVENT" : "UNKNOWN";
         return new EventLocation(
                 type,
                 text(root, "locationName"),
@@ -111,9 +114,20 @@ public class RvoEventMapper implements SourceEventMapper {
                 text(root, "locality"),
                 text(root, "postalCode"),
                 text(root, "country"),
-                online ? null : number(root, "latitude"),
-                online ? null : number(root, "longitude")
+                latitude,
+                longitude,
+                null, countryCode(text(root, "country")), evidence
         );
+    }
+
+    private static String countryCode(String country) {
+        if (country == null) return null;
+        String value = country.strip().toUpperCase(java.util.Locale.ROOT);
+        if (value.length() == 2) return value;
+        return switch (value) {
+            case "NEDERLAND", "NETHERLANDS", "THE NETHERLANDS" -> "NL";
+            default -> null;
+        };
     }
 
     private static LocationType locationType(JsonNode isOnline) {

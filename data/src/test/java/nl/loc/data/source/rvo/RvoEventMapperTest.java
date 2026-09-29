@@ -1,13 +1,17 @@
 package nl.loc.data.source.rvo;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import nl.loc.data.event.DateStatus;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.LocationType;
 import nl.loc.data.event.NormalizedEvent;
+import nl.loc.data.event.TimeStatus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -56,16 +60,11 @@ class RvoEventMapperTest {
         assertEquals("Prinses Beatrixlaan 2, Gebouw A", event.location().address());
         assertEquals(52.0907, event.location().latitude());
         assertEquals(5.1214, event.location().longitude());
+        assertEquals("SOURCE_EVENT", event.location().coordinateEvidence());
         assertEquals(
                 List.of(
-                        new EventTimeSlot(
-                                Instant.parse("2026-03-15T08:00:00Z"),
-                                Instant.parse("2026-03-15T11:00:00Z")
-                        ),
-                        new EventTimeSlot(
-                                Instant.parse("2026-03-16T08:00:00Z"),
-                                Instant.parse("2026-03-16T11:00:00Z")
-                        )
+                        slot("2026-03-15T08:00:00Z", "2026-03-15T11:00:00Z", "2026-03-15", "09:00", "12:00"),
+                        slot("2026-03-16T08:00:00Z", "2026-03-16T11:00:00Z", "2026-03-16", "09:00", "12:00")
                 ),
                 event.timeSlots()
         );
@@ -87,6 +86,7 @@ class RvoEventMapperTest {
         assertEquals(LocationType.ONLINE, event.location().locationType());
         assertNull(event.location().latitude());
         assertNull(event.location().longitude());
+        assertEquals("NOT_APPLICABLE", event.location().coordinateEvidence());
     }
 
     @Test
@@ -110,7 +110,17 @@ class RvoEventMapperTest {
 
         assertNotNull(emptyDates.timeSlots());
         assertEquals(List.of(), emptyDates.timeSlots());
+        assertEquals("UNKNOWN", emptyDates.location().coordinateEvidence());
         assertNotNull(missingDates.timeSlots());
         assertEquals(List.of(), missingDates.timeSlots());
+    }
+
+    private static EventTimeSlot slot(String start, String end, String localDate, String localStart, String localEnd) {
+        return new EventTimeSlot(
+                Instant.parse(start), Instant.parse(end),
+                LocalDate.parse(localDate), LocalTime.parse(localStart),
+                LocalDate.parse(localDate), LocalTime.parse(localEnd),
+                "+01:00",
+                DateStatus.KNOWN, TimeStatus.KNOWN, DateStatus.KNOWN, TimeStatus.KNOWN, false);
     }
 }
