@@ -35,6 +35,7 @@ public class WeatherRepository {
                      JOIN catalog.event_location l ON l.event_id = s.event_id
                      LEFT JOIN catalog.event_weather w ON w.time_slot_id = s.id
             WHERE l.location_type = 'PHYSICAL'
+              AND s.retired = FALSE
               AND l.latitude IS NOT NULL
               AND l.longitude IS NOT NULL
               AND s.starts_at IS NOT NULL
@@ -150,6 +151,7 @@ public class WeatherRepository {
                                   FROM catalog.event_time_slot s
                                            JOIN catalog.event_location l ON l.event_id = s.event_id
                                   WHERE s.id = w.time_slot_id
+                                    AND s.retired = FALSE
                                     AND l.location_type = 'PHYSICAL'
                                     AND l.latitude IS NOT NULL
                                     AND l.longitude IS NOT NULL

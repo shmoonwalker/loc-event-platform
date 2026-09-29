@@ -14,7 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import java.util.UUID;
 
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -28,11 +28,7 @@ import nl.loc.data.event.TimeStatus;
 @Entity
 @Table(
         name = "event_time_slot",
-        schema = "catalog",
-        uniqueConstraints = @UniqueConstraint(
-                name = "event_time_slot_event_index_key",
-                columnNames = {"event_id", "slot_index"}
-        )
+        schema = "catalog"
 )
 public class CatalogEventTimeSlot {
 
@@ -44,8 +40,33 @@ public class CatalogEventTimeSlot {
     @JoinColumn(name = "event_id", nullable = false, updatable = false)
     private CatalogEvent event;
 
-    @Column(name = "slot_index", nullable = false, updatable = false)
+    @Column(name = "slot_index", nullable = false)
     private int slotIndex;
+
+    @Column(name = "occurrence_key", nullable = false, updatable = false)
+    private UUID occurrenceKey = UUID.randomUUID();
+
+    @Column(nullable = false)
+    private boolean retired;
+
+    public void retire() { retired = true; }
+
+    public void restoreOccurrenceKey(UUID key) { occurrenceKey = require(key, "occurrenceKey"); }
+
+    public void activateAt(int index) {
+        retired = false;
+        slotIndex = index;
+    }
+
+    public boolean sameStart(EventTimeSlot slot) {
+        if (startsAt != null && slot.startsAt() != null) {
+            return startsAt.equals(slot.startsAt());
+        }
+        return localStartDate != null && localStartDate.equals(slot.localStartDate())
+                && java.util.Objects.equals(localStartTime, slot.localStartTime())
+                && java.util.Objects.equals(timezone, slot.timezone())
+                && startDateStatus == slot.startDateStatus() && startTimeStatus == slot.startTimeStatus();
+    }
 
     @Column(name = "starts_at")
     private Instant startsAt;

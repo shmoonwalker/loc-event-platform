@@ -40,6 +40,7 @@ public class CatalogPublicationService {
     private final TagRepository tagRepository;
     private final CatalogSourceLock sourceLock;
     private final CatalogPresenceService presenceService;
+    private final nl.loc.data.publication.OccurrenceIdentityRegistry occurrenceIdentities;
 
     private CatalogEvent upsertEvent(NormalizedEvent event, Instant collectedAt, Optional<CatalogEvent> existing) {
         CatalogEvent catalogEvent;
@@ -50,7 +51,6 @@ public class CatalogPublicationService {
                     event.title(),
                     event.description(),
                     event.sourceUrl(),
-                    event.registrationUrl(),
                     event.organizerNames(),
                     event.sourceCreatedAt(),
                     event.sourceUpdatedAt(),
@@ -65,7 +65,6 @@ public class CatalogPublicationService {
                     event.title(),
                     event.description(),
                     event.sourceUrl(),
-                    event.registrationUrl(),
                     event.organizerNames(),
                     event.sourceCreatedAt(),
                     event.sourceUpdatedAt(),
@@ -76,6 +75,7 @@ public class CatalogPublicationService {
 
         log.debug("Saving catalog event source={} externalId={} operation={}",
                 event.source(), event.externalId(), existing.isPresent() ? "update" : "insert");
+        catalogEvent.recordQualificationIssues(event.qualificationIssues());
         return catalogEventRepository.save(catalogEvent);
     }
 
@@ -129,48 +129,70 @@ public class CatalogPublicationService {
 
         log.debug("Saving catalog location catalogEventId={} operation={}",
                 catalogEvent.getId(), existing.isPresent() ? "update" : "insert");
+        catalogLocation.recordCoordinateEvidence(location.coordinateEvidence());
         catalogEventLocationRepository.save(catalogLocation);
         return moved;
     }
 
     private SlotSync syncTimeSlots(CatalogEvent catalogEvent, List<EventTimeSlot> slots) {
-        List<EventTimeSlot> newSlots = slots == null ? List.of() : slots;
+        List<EventTimeSlot> newSlots = slots == null ? List.of() : slots.stream().distinct().toList();
         List<CatalogEventTimeSlot> existingSlots = catalogEventTimeSlotRepository.findByEventOrderBySlotIndex(catalogEvent);
 
-        Map<Integer, CatalogEventTimeSlot> existingByIndex = new HashMap<>();
-        for (CatalogEventTimeSlot existingSlot : existingSlots) {
-            existingByIndex.put(existingSlot.getSlotIndex(), existingSlot);
-        }
-
         List<CatalogEventTimeSlot> slotsToSave = new ArrayList<>();
+        Set<Long> matchedIds = new HashSet<>();
+        Set<java.util.UUID> restoredIds = new HashSet<>();
         Set<Long> rescheduledSlotIds = new HashSet<>();
+        List<CatalogEventTimeSlot> active = existingSlots.stream().filter(row -> !row.isRetired()).toList();
         for (int i = 0; i < newSlots.size(); i++) {
             EventTimeSlot slot = newSlots.get(i);
-            CatalogEventTimeSlot catalogSlot = existingByIndex.get(i);
+            List<CatalogEventTimeSlot> matches = existingSlots.stream()
+                    .filter(row -> !matchedIds.contains(row.getId()) && row.sameStart(slot)).toList();
+            List<CatalogEventTimeSlot> activeMatches = matches.stream().filter(row -> !row.isRetired()).toList();
+            CatalogEventTimeSlot catalogSlot = activeMatches.size() == 1 ? activeMatches.getFirst()
+                    : matches.size() == 1 ? matches.getFirst() : null;
+            if (catalogSlot == null && matches.size() > 1) {
+                catalogEvent.addQualificationIssue("AMBIGUOUS_OCCURRENCE_IDENTITY");
+            }
+            // Ticketmaster's event ID identifies a single performance. For other sources,
+            // only an explicit reschedule of a single known occurrence establishes continuity.
+            if (catalogSlot == null && matches.isEmpty() && newSlots.size() == 1 && active.size() == 1
+                    && ("ticketmaster".equals(catalogEvent.getSource())
+                    || catalogEvent.getLifecycleStatus() == nl.loc.data.event.EventLifecycle.RESCHEDULED)) {
+                catalogSlot = active.getFirst();
+            }
+            if (catalogSlot == null && matches.isEmpty() && newSlots.size() == 1 && existingSlots.size() == 1
+                    && "ticketmaster".equals(catalogEvent.getSource())) catalogSlot = existingSlots.getFirst();
 
             if (catalogSlot != null) {
-                // Rows are matched by position, so a reused row can end up describing another date.
+                matchedIds.add(catalogSlot.getId());
                 if (!sameHour(catalogSlot.getStartsAt(), slot.startsAt())) {
                     rescheduledSlotIds.add(catalogSlot.getId());
                 }
                 catalogSlot.updateFromImport(slot);
+                catalogSlot.activateAt(i);
             } else {
                 catalogSlot = new CatalogEventTimeSlot(catalogEvent, i, slot);
+                if (existingSlots.isEmpty()) {
+                    var restoration = occurrenceIdentities.restore(catalogEvent.getSource(), catalogEvent.getExternalId(),
+                            slot, newSlots.size() == 1);
+                    if (restoration.ambiguous()) catalogEvent.addQualificationIssue("AMBIGUOUS_OCCURRENCE_IDENTITY");
+                    java.util.UUID restored = restoration.id();
+                    if (restored != null && restoredIds.add(restored)) catalogSlot.restoreOccurrenceKey(restored);
+                }
             }
 
             slotsToSave.add(catalogSlot);
         }
         List<CatalogEventTimeSlot> savedSlots = catalogEventTimeSlotRepository.saveAll(slotsToSave);
 
-        List<CatalogEventTimeSlot> slotsToDelete = new ArrayList<>();
         for (CatalogEventTimeSlot existingSlot : existingSlots) {
-            if (existingSlot.getSlotIndex() >= newSlots.size()) {
-                slotsToDelete.add(existingSlot);
+            if (!matchedIds.contains(existingSlot.getId())) {
+                existingSlot.retire();
+                rescheduledSlotIds.add(existingSlot.getId());
             }
         }
-        catalogEventTimeSlotRepository.deleteAll(slotsToDelete);
-        log.debug("Scheduled catalog time slot changes catalogEventId={} saved={} deleted={}",
-                catalogEvent.getId(), slotsToSave.size(), slotsToDelete.size());
+        log.debug("Synchronized catalog time slots catalogEventId={} saved={}",
+                catalogEvent.getId(), slotsToSave.size());
         return new SlotSync(
                 savedSlots.stream().map(CatalogEventTimeSlot::getId).toList(),
                 rescheduledSlotIds);
@@ -264,8 +286,10 @@ public class CatalogPublicationService {
                 event.source(),
                 event.externalId()
         );
+        String previousText = null;
         if (existing.isPresent()) {
             CatalogEvent storedEvent = existing.get();
+            previousText = TagRepository.fingerprint(storedEvent.getTitle(), storedEvent.getDescription());
             if (storedEvent.getSourceUpdatedAt() != null
                     && (event.sourceUpdatedAt() == null
                     || event.sourceUpdatedAt().isBefore(storedEvent.getSourceUpdatedAt()))) {
@@ -302,7 +326,11 @@ public class CatalogPublicationService {
         clearOutdatedWeather(catalogEvent, slotSync, locationMoved);
         syncImages(catalogEvent, event.images());
         syncCategories(catalogEvent, event.categories());
-        tagRepository.invalidate(catalogEvent.getId());
+        // Gemini describes the title and description. A location or schedule change keeps that result.
+        String incomingText = TagRepository.fingerprint(event.title(), event.description());
+        if (previousText != null && !previousText.equals(incomingText)) {
+            tagRepository.invalidate(catalogEvent.getId());
+        }
         // Flush child changes before presence checks query the event's country and dates.
         catalogEventRepository.flush();
         presenceService.refresh(catalogEvent);
