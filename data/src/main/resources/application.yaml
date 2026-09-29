@@ -74,3 +74,16 @@ loc:
     claim-ttl: PT15M
     connect-timeout: PT5S
     read-timeout: PT10S
+
+  tagging:
+    enabled: ${TAGGING_ENABLED:true}
+    base-url: https://generativelanguage.googleapis.com/v1beta/models
+    model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+    api-key: ${GeminiAPIKey:}
+    scan-interval: ${TAGGING_SCAN_INTERVAL:PT5M}
+    scan-initial-delay: PT45S
+    scan-limit: ${TAGGING_SCAN_LIMIT:15}
+    daily-limit: ${TAGGING_DAILY_LIMIT:400}
+    claim-ttl: PT15M
+    connect-timeout: PT5S
+    read-timeout: PT20S

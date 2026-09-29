@@ -20,6 +20,7 @@ import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLocation;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.NormalizedEvent;
+import nl.loc.data.tagging.TagRepository;
 import nl.loc.data.weather.WeatherRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ public class CatalogPublicationService {
     private final CatalogCategoryRepository catalogCategoryRepository;
     private final CatalogEventCategoryRepository catalogEventCategoryRepository;
     private final WeatherRepository weatherRepository;
+    private final TagRepository tagRepository;
     private final CatalogSourceLock sourceLock;
     private final CatalogPresenceService presenceService;
 
@@ -300,6 +302,7 @@ public class CatalogPublicationService {
         clearOutdatedWeather(catalogEvent, slotSync, locationMoved);
         syncImages(catalogEvent, event.images());
         syncCategories(catalogEvent, event.categories());
+        tagRepository.invalidate(catalogEvent.getId());
         // Flush child changes before presence checks query the event's country and dates.
         catalogEventRepository.flush();
         presenceService.refresh(catalogEvent);
