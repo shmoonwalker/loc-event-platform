@@ -5,6 +5,10 @@ R2 and publishes normalized events into PostgreSQL's `catalog` schema.
 
 ## Normal startup: process saved events
 
+Final qualification runs after startup ingestion and again on a timer. The `publish` command
+evaluates the existing catalogue without source collection or raw replay. Set
+`PUBLICATION_ENABLED=false` to disable that scanner.
+
 With database and R2 environment variables loaded, start from `data/`:
 
 ```bash
