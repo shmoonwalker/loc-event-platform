@@ -21,12 +21,16 @@ import nl.loc.data.event.NormalizedEvent;
 import nl.loc.data.processing.SourceEventMapper;
 import nl.loc.data.text.HtmlPlainText;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.Assert;
 
 @Slf4j
 @Component
 public class TicketmasterEventMapper implements SourceEventMapper {
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${loc.publication.online-venue-ids:}")
+    private String onlineVenueIds = "";
 
     @Override
     public String source() {
@@ -40,15 +44,27 @@ public class TicketmasterEventMapper implements SourceEventMapper {
         JsonNode root = readObject(rawJson);
         String id = text(root, "id");
         Assert.hasText(id, "Ticketmaster event JSON is missing id");
-        JsonNode venue = firstVenue(root);
+        List<String> issues = new ArrayList<>();
+        JsonNode venue = selectVenue(root, issues);
+        if (root.path("test").asBoolean(false)) issues.add("TEST_EVENT");
+        for (JsonNode classification : root.path("classifications")) {
+            for (String field : List.of("type", "subType")) {
+                String kind = text(classification.path(field), "name");
+                if (kind != null && Set.of("parking", "merchandise", "ticket upgrade", "upgrade").contains(kind.toLowerCase(Locale.ROOT))) {
+                    issues.add("OUT_OF_SCOPE_PRODUCT");
+                }
+                if (kind != null && Set.of("season ticket", "season tickets", "season pass").contains(kind.toLowerCase(Locale.ROOT))) issues.add("SEASON_PASS");
+            }
+        }
         String sourceUrl = httpUrl(text(root, "url"));
         return List.of(new NormalizedEvent(
                 source(), id, rawObjectKey, text(root, "name"), mapDescription(root),
-                sourceUrl, null, promoterNames(root),
+                sourceUrl, promoterNames(root),
                 // Discovery does not provide a documented event modification timestamp.
                 null, null, mapLocation(venue), TicketmasterTimeMapper.map(root, venue),
                 mapLifecycle(root), mapImages(root),
-                TicketmasterCategoryMapper.map(root)));
+                TicketmasterCategoryMapper.map(root), issues.stream().distinct().toList(),
+                TicketmasterCategoryMapper.tags(root)));
     }
 
     private JsonNode readObject(String json) {
@@ -65,7 +81,7 @@ public class TicketmasterEventMapper implements SourceEventMapper {
 
     private static String mapDescription(JsonNode root) {
         Set<String> sections = new LinkedHashSet<>();
-        for (String field : List.of("description", "info", "additionalInfo")) {
+        for (String field : List.of("description", "info", "additionalInfo", "pleaseNote")) {
             String content = HtmlPlainText.convert(text(root, field));
             if (content != null) {
                 sections.add(content);
@@ -74,22 +90,40 @@ public class TicketmasterEventMapper implements SourceEventMapper {
         return sections.isEmpty() ? null : String.join("\n\n", sections);
     }
 
-    private static JsonNode firstVenue(JsonNode root) {
+    private static JsonNode selectVenue(JsonNode root, List<String> issues) {
         JsonNode venues = root.path("_embedded").path("venues");
+        java.util.Map<String, JsonNode> distinct = new java.util.LinkedHashMap<>();
         if (venues.isArray()) {
             for (JsonNode venue : venues) {
                 if (venue.isObject()) {
-                    // The catalog currently supports one location; all venues remain in raw storage.
-                    return venue;
+                    String id = text(venue, "id");
+                    String key = id == null ? venue.toString() : id;
+                    JsonNode previous = distinct.get(key);
+                    if (previous == null || venueScore(venue) > venueScore(previous)) distinct.put(key, venue);
                 }
             }
         }
-        return MissingNode.getInstance();
+        if (distinct.size() > 1) issues.add("AMBIGUOUS_VENUE");
+        return distinct.values().stream().max(java.util.Comparator.comparingInt(TicketmasterEventMapper::venueScore))
+                .orElse(MissingNode.getInstance());
     }
 
-    private static EventLocation mapLocation(JsonNode venue) {
+    private static int venueScore(JsonNode venue) {
+        return (coordinate(venue.path("location"), "latitude", 90) != null
+                && coordinate(venue.path("location"), "longitude", 180) != null ? 4 : 0)
+                + (text(venue.path("city"), "name") != null ? 2 : 0)
+                + (text(venue.path("address"), "line1") != null ? 1 : 0);
+    }
+
+    private EventLocation mapLocation(JsonNode venue) {
         if (!venue.isObject()) {
             return null;
+        }
+        String venueId = text(venue, "id");
+        if (venueId != null && java.util.Arrays.stream(onlineVenueIds.split(","))
+                .map(String::strip).anyMatch(venueId::equals)) {
+            return new EventLocation(LocationType.ONLINE, text(venue, "name"), null, null,
+                    null, null, null, null, venueId, null, "NOT_APPLICABLE");
         }
         List<String> lines = new ArrayList<>();
         for (String field : List.of("line1", "line2", "line3")) {
@@ -107,7 +141,8 @@ public class TicketmasterEventMapper implements SourceEventMapper {
                 lines.isEmpty() ? null : String.join(", ", lines),
                 text(venue.path("city"), "name"), text(venue, "postalCode"),
                 text(venue.path("country"), "name"), latitude, longitude, text(venue, "id"),
-                countryCode == null ? null : countryCode.toUpperCase(Locale.ROOT));
+                countryCode == null ? null : countryCode.toUpperCase(Locale.ROOT),
+                latitude != null && longitude != null ? "SOURCE_VENUE" : "UNKNOWN");
     }
 
     private static List<String> promoterNames(JsonNode root) {

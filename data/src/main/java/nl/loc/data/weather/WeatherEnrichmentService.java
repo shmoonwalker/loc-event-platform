@@ -4,6 +4,8 @@ import java.time.Instant;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import nl.loc.data.publication.PublicationService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,6 +22,10 @@ public class WeatherEnrichmentService {
 
     private final WeatherRepository weatherRepository;
     private final OpenMeteoClient openMeteoClient;
+    private final PublicationService publicationService;
+
+    @Value("${loc.weather.daily-limit}")
+    private int dailyLimit;
 
     /** The message carries only an id, so eligibility is decided here and not by the sender. */
     public void refresh(long timeSlotId) {
@@ -29,11 +35,28 @@ public class WeatherEnrichmentService {
             log.debug("Skipping weather refresh timeSlotId={} reason=slot is no longer eligible", timeSlotId);
             return;
         }
+        PublicationService.Readiness readiness = publicationService.slotReadiness(timeSlotId);
+        if (!readiness.eligible()) {
+            weatherRepository.saveAttempt(target, readiness.retryAt(), target.attempts(), now,
+                    String.join(",", readiness.reasons()));
+            log.info("Skipping weather timeSlotId={} retryAt={} reasons={}",
+                    timeSlotId, readiness.retryAt(), readiness.reasons());
+            return;
+        }
         if (!WeatherSchedule.withinWindow(now, target.startsAt())) {
             Instant nextCheckAt = WeatherSchedule.afterOutsideRange(now, target.startsAt());
             log.debug("Deferring weather refresh timeSlotId={} startsAt={} nextCheckAt={} "
                     + "reason=outside the forecast window", timeSlotId, target.startsAt(), nextCheckAt);
             weatherRepository.saveAttempt(target, nextCheckAt, target.attempts(), now, null);
+            return;
+        }
+
+        if (!weatherRepository.reserveWeatherAttempt(now, dailyLimit, timeSlotId)) {
+            Instant tomorrow = now.atZone(java.time.ZoneOffset.UTC).toLocalDate().plusDays(1)
+                    .atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+            weatherRepository.saveAttempt(target, tomorrow, target.attempts(), now, "DAILY_REQUEST_LIMIT");
+            log.info("Deferring weather timeSlotId={} dailyLimit={} nextCheckAt={}",
+                    timeSlotId, dailyLimit, tomorrow);
             return;
         }
 

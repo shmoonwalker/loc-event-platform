@@ -55,7 +55,6 @@ public class RvoEventMapper implements SourceEventMapper {
                 text(root, "title"),
                 mapDescription(root),
                 absoluteUrl(text(root, "url")),
-                text(root, "link"),
                 organizerNames(root),
                 parseInstant(text(root, "created"), "created", rawObjectKey),
                 parseInstant(text(root, "changed"), "changed", rawObjectKey),
@@ -63,7 +62,9 @@ public class RvoEventMapper implements SourceEventMapper {
                 mapTimeSlots(root, rawObjectKey),
                 EventLifecycle.UNKNOWN,
                 List.of(),
-                RvoCategoryMapper.map(root)
+                RvoCategoryMapper.map(root),
+                List.of(),
+                RvoCategoryMapper.tags(root)
         ));
     }
 
@@ -104,6 +105,10 @@ public class RvoEventMapper implements SourceEventMapper {
     private static EventLocation mapLocation(JsonNode root) {
         LocationType type = locationType(root.get("isOnline"));
         boolean online = type == LocationType.ONLINE;
+        Double latitude = online ? null : number(root, "latitude");
+        Double longitude = online ? null : number(root, "longitude");
+        String evidence = online ? "NOT_APPLICABLE"
+                : latitude != null && longitude != null ? "SOURCE_EVENT" : "UNKNOWN";
         return new EventLocation(
                 type,
                 text(root, "locationName"),
@@ -111,10 +116,42 @@ public class RvoEventMapper implements SourceEventMapper {
                 text(root, "locality"),
                 text(root, "postalCode"),
                 text(root, "country"),
-                online ? null : number(root, "latitude"),
-                online ? null : number(root, "longitude")
+                latitude,
+                longitude,
+                null, type == LocationType.PHYSICAL ? countryCode(text(root, "country")) : null, evidence
         );
     }
+
+    /**
+     * RVO sends official Dutch names such as "Bondsrepubliek Duitsland" and omits the country for
+     * events in the Netherlands. The longest Dutch short name contained in the value wins.
+     */
+    private static String countryCode(String country) {
+        if (country == null) return "NL";
+        String value = country.strip().toLowerCase(DUTCH);
+        if (value.length() == 2) return value.toUpperCase(java.util.Locale.ROOT);
+        if (value.contains("nederland")) return "NL";
+        for (var alias : COUNTRY_ALIASES.entrySet()) {
+            if (value.contains(alias.getKey())) return alias.getValue();
+        }
+        String match = null;
+        int matchLength = 0;
+        for (String code : java.util.Locale.getISOCountries()) {
+            String name = java.util.Locale.of("", code).getDisplayCountry(DUTCH).toLowerCase(DUTCH);
+            if (name.length() > matchLength && value.contains(name)) {
+                match = code;
+                matchLength = name.length();
+            }
+        }
+        return match;
+    }
+
+    private static final java.util.Locale DUTCH = java.util.Locale.of("nl");
+
+    /** Official names that use an adjective or a spelling the JDK's Dutch country names do not. */
+    private static final java.util.Map<String, String> COUNTRY_ALIASES = java.util.Map.of(
+            "portugese", "PT", "argentijnse", "AR", "franse", "FR", "tsjechische", "CZ",
+            "italiaanse", "IT", "mexicaanse", "MX", "saudi-arabië", "SA", "republiek korea", "KR");
 
     private static LocationType locationType(JsonNode isOnline) {
         if (isOnline == null || isOnline.isNull() || !isOnline.isBoolean()) {

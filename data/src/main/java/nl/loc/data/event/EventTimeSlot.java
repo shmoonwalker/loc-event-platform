@@ -23,8 +23,12 @@ public record EventTimeSlot(
                 endsAt == null ? TimeStatus.UNKNOWN : TimeStatus.KNOWN, false);
     }
 
-    /** Preserves source local values and exact instants without inferring a named timezone. */
+    /** Retains a fixed source offset; differing offsets use UTC so both endpoints stay consistent. */
     public static EventTimeSlot fromOffsetDateTimes(OffsetDateTime start, OffsetDateTime end) {
+        if (start != null && end != null && !start.getOffset().equals(end.getOffset())) {
+            start = start.withOffsetSameInstant(java.time.ZoneOffset.UTC);
+            end = end.withOffsetSameInstant(java.time.ZoneOffset.UTC);
+        }
         return new EventTimeSlot(
                 start == null ? null : start.toInstant(),
                 end == null ? null : end.toInstant(),
@@ -32,7 +36,7 @@ public record EventTimeSlot(
                 start == null ? null : start.toLocalTime(),
                 end == null ? null : end.toLocalDate(),
                 end == null ? null : end.toLocalTime(),
-                null,
+                start == null ? (end == null ? null : end.getOffset().getId()) : start.getOffset().getId(),
                 start == null ? DateStatus.UNKNOWN : DateStatus.KNOWN,
                 start == null ? TimeStatus.UNKNOWN : TimeStatus.KNOWN,
                 end == null ? DateStatus.UNKNOWN : DateStatus.KNOWN,

@@ -86,7 +86,8 @@ public class CatalogPresenceService {
         if (!sameCountry) {
             return false;
         }
-        List<CatalogEventTimeSlot> slots = slotRepository.findByEventOrderBySlotIndex(event);
+        List<CatalogEventTimeSlot> slots = slotRepository.findByEventOrderBySlotIndex(event).stream()
+                .filter(slot -> !slot.isRetired()).toList();
         // Unknown dates and slots outside the searched interval are deliberately left alone.
         return !slots.isEmpty() && slots.stream().allMatch(slot -> slot.getStartsAt() != null
                 && !slot.getStartsAt().isBefore(run.getScopeStartsAt())

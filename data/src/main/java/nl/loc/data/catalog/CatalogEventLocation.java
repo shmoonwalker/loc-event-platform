@@ -55,6 +55,13 @@ public class CatalogEventLocation {
     @Column(name = "country_code")
     private String countryCode;
 
+    @Column(name = "coordinate_evidence", nullable = false)
+    private String coordinateEvidence = "UNKNOWN";
+
+    public void recordCoordinateEvidence(String evidence) {
+        coordinateEvidence = evidence == null ? "UNKNOWN" : evidence;
+    }
+
     public CatalogEventLocation(
             CatalogEvent event,
             LocationType locationType,

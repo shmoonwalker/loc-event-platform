@@ -1,6 +1,7 @@
 package nl.loc.data.source.ticketmaster;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -8,6 +9,7 @@ import java.util.Set;
 import com.fasterxml.jackson.databind.JsonNode;
 import nl.loc.data.event.Category;
 import nl.loc.data.event.CategoryAssignment;
+import nl.loc.data.tagging.ContentTag;
 
 /** Prefers segment IDs, with explicit name and genre fallbacks for incomplete classifications. */
 final class TicketmasterCategoryMapper {
@@ -86,6 +88,44 @@ final class TicketmasterCategoryMapper {
                     "tennis", "rugby", "volleyball", "volleybal", "boxing", "boksen",
                     "wrestling", "mixed martial arts", "netball"
                     -> Category.SPORTS;
+            default -> null;
+        };
+    }
+
+    /** Specific tags from Ticketmaster's own genre labels, so events without a description are still findable. */
+    static List<ContentTag> tags(JsonNode root) {
+        Set<ContentTag> tags = new LinkedHashSet<>();
+        for (JsonNode classification : root.path("classifications")) {
+            for (String field : List.of("genre", "subGenre", "subType")) {
+                ContentTag tag = fromLabel(classificationName(classification, field));
+                if (tag != null) tags.add(tag);
+            }
+            if (classification.path("family").asBoolean(false)) tags.add(ContentTag.FAMILY_FRIENDLY);
+        }
+        return List.copyOf(tags);
+    }
+
+    private static ContentTag fromLabel(String label) {
+        if (label == null || PLACEHOLDERS.contains(label)) {
+            return null;
+        }
+        return switch (label) {
+            case "rock", "hard rock", "alternative rock", "punk", "metal" -> ContentTag.ROCK;
+            case "pop", "dutch pop", "nederpop" -> ContentTag.POP;
+            case "jazz", "blues", "jazz & blues" -> ContentTag.JAZZ;
+            case "classical", "klassiek", "classical/vocal", "opera" -> ContentTag.CLASSICAL;
+            case "hip-hop/rap", "hip-hop", "rap" -> ContentTag.HIP_HOP;
+            case "house" -> ContentTag.HOUSE;
+            case "techno" -> ContentTag.TECHNO;
+            case "comedy", "komedie", "cabaret", "stand-up" -> ContentTag.COMEDY;
+            case "theatre", "theater", "musical", "musicals" -> ContentTag.THEATRE;
+            case "film", "films", "animation", "animatie" -> ContentTag.SCREENING;
+            case "football", "soccer", "voetbal" -> ContentTag.FOOTBALL;
+            case "cycling", "wielrennen" -> ContentTag.CYCLING;
+            case "running", "hardlopen", "marathon" -> ContentTag.RUNNING;
+            case "festival", "festivals" -> ContentTag.FESTIVAL;
+            case "family", "familie", "children's theatre", "kindervoorstelling" -> ContentTag.FAMILY_FRIENDLY;
+            case "fine art", "fine arts" -> ContentTag.EXHIBITION;
             default -> null;
         };
     }

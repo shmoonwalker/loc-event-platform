@@ -4,35 +4,38 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.List;
 
 import lombok.extern.slf4j.Slf4j;
-import nl.loc.data.event.Category;
+import nl.loc.data.publication.PublicationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Category tags are written here without Gemini. Gemini runs only when the description is long
- * enough, and a failed call is stored so the queue can retry it.
+ * Sends an event to Gemini once, when missing tags are the only thing keeping it out of the product.
+ * Local tags are written at import. A failure is stored with a backoff instead of being retried by
+ * the queue, because every retry would spend another free-tier request.
  */
 @Slf4j
 @Service
 public class TagEnrichmentService {
 
+    public static final int MAX_ATTEMPTS = 5;
     private static final Duration FIRST_BACKOFF = Duration.ofHours(1);
     private static final Duration MAX_BACKOFF = Duration.ofHours(24);
-    private static final int MAX_BACKOFF_DOUBLINGS = 5;
 
     private final TagRepository tagRepository;
     private final GeminiTagClient geminiTagClient;
+    private final PublicationService publicationService;
     private final int dailyLimit;
 
     public TagEnrichmentService(TagRepository tagRepository,
                                 GeminiTagClient geminiTagClient,
+                                PublicationService publicationService,
                                 @Value("${loc.tagging.daily-limit}") int dailyLimit) {
         this.tagRepository = tagRepository;
         this.geminiTagClient = geminiTagClient;
+        this.publicationService = publicationService;
         this.dailyLimit = dailyLimit;
     }
 
@@ -42,79 +45,54 @@ public class TagEnrichmentService {
             log.debug("Skipping tags eventId={} reason=event is no longer active", eventId);
             return;
         }
-
-        List<ContentTag> categoryTags = categoryTags(target);
-        tagRepository.replaceCategoryTags(eventId, categoryTags);
-
-        String fingerprint = TagRepository.fingerprint(target.title(), target.description());
-        if (tagRepository.alreadyTagged(eventId, fingerprint, TagPrompt.VERSION)) {
-            log.debug("Skipping Gemini eventId={} reason=title and description are unchanged", eventId);
+        if (tagRepository.alreadyTagged(eventId)) {
+            log.debug("Skipping Gemini eventId={} reason=already tagged", eventId);
             return;
         }
         if (!target.geminiEligible()) {
-            tagRepository.replaceGeminiTags(eventId, List.of());
-            tagRepository.saveOutcome(eventId, fingerprint, "NOT_APPLICABLE", Instant.now(),
-                    null, 0, null, null);
-            log.debug("Stored category tags only eventId={} tags={} reason=description is too thin for Gemini",
-                    eventId, slugs(categoryTags));
+            log.debug("Skipping Gemini eventId={} reason=description is too short", eventId);
+            return;
+        }
+        if (!publicationService.readyForTagging(eventId)) {
+            log.debug("Skipping Gemini eventId={} reason=event fails other publication rules", eventId);
             return;
         }
 
         Instant now = Instant.now();
-        int usedToday = tagRepository.geminiAttemptsSince(startOfUtcDay(now));
-        if (usedToday >= dailyLimit) {
+        if (!tagRepository.reserveGeminiAttempt(now, dailyLimit, eventId)) {
             Instant tomorrow = startOfUtcDay(now).plus(Duration.ofDays(1));
             tagRepository.defer(eventId, tomorrow);
-            log.info("Deferring Gemini eventId={} usedToday={} dailyLimit={} nextCheckAt={}",
-                    eventId, usedToday, dailyLimit, tomorrow);
+            log.info("Deferring Gemini eventId={} dailyLimit={} nextCheckAt={}", eventId, dailyLimit, tomorrow);
             return;
         }
 
+        String fingerprint = TagRepository.fingerprint(target.title(), target.description());
         try {
             List<ContentTag> geminiTags = geminiTagClient.tag(target);
             tagRepository.replaceGeminiTags(eventId, geminiTags);
             tagRepository.saveOutcome(eventId, fingerprint, "SUCCEEDED", now, null, 0, now, null);
-            log.debug("Stored tags eventId={} categoryTags={} geminiTags={}",
-                    eventId, slugs(categoryTags), slugs(geminiTags));
-        } catch (TaggingRejectedException exception) {
-            Instant nextCheckAt = recordFailure(target, now, exception.getMessage());
-            log.warn("Gemini rejected tagging eventId={} attempts={} nextCheckAt={}",
-                    eventId, target.attempts() + 1, nextCheckAt, exception);
-        } catch (TaggingUnavailableException exception) {
-            Instant nextCheckAt = recordFailure(target, now, exception.getMessage());
-            log.warn("Gemini tagging failed eventId={} attempts={} nextCheckAt={} reason={}",
-                    eventId, target.attempts() + 1, nextCheckAt, exception.getMessage());
-            throw exception;
+            log.debug("Stored Gemini tags eventId={} tags={}", eventId, geminiTags.stream().map(ContentTag::slug).toList());
+        } catch (TaggingRejectedException | TaggingUnavailableException exception) {
+            recordFailure(target, fingerprint, now, exception.getMessage());
         }
     }
 
-    private Instant recordFailure(TagTarget target, Instant now, String error) {
+    private void recordFailure(TagTarget target, String fingerprint, Instant now, String error) {
         int attempts = target.attempts() + 1;
-        int doublings = Math.min(Math.max(attempts, 1) - 1, MAX_BACKOFF_DOUBLINGS);
-        Duration backoff = FIRST_BACKOFF.multipliedBy(1L << doublings);
+        if (attempts >= MAX_ATTEMPTS) {
+            tagRepository.saveOutcome(target.eventId(), fingerprint, "GAVE_UP", null, null, attempts, now, error);
+            log.warn("Gemini gave up eventId={} attempts={} reason={}; publishing with local tags",
+                    target.eventId(), attempts, error);
+            return;
+        }
+        Duration backoff = FIRST_BACKOFF.multipliedBy(1L << (attempts - 1));
         if (backoff.compareTo(MAX_BACKOFF) > 0) {
             backoff = MAX_BACKOFF;
         }
         Instant nextCheckAt = now.plus(backoff);
-        tagRepository.saveOutcome(target.eventId(), TagRepository.fingerprint(target.title(), target.description()),
-                "FAILED", null, nextCheckAt, attempts, now, error);
-        return nextCheckAt;
-    }
-
-    private static List<ContentTag> categoryTags(TagTarget target) {
-        List<ContentTag> tags = new ArrayList<>();
-        for (String name : target.categoryNames()) {
-            for (Category category : Category.values()) {
-                if (category.catalogName().equals(name)) {
-                    ContentTag.fromCategory(category).ifPresent(tags::add);
-                }
-            }
-        }
-        return tags.stream().distinct().toList();
-    }
-
-    private static List<String> slugs(List<ContentTag> tags) {
-        return tags.stream().map(ContentTag::slug).toList();
+        tagRepository.saveOutcome(target.eventId(), fingerprint, "FAILED", null, nextCheckAt, attempts, now, error);
+        log.warn("Gemini tagging failed eventId={} attempts={} nextCheckAt={} reason={}",
+                target.eventId(), attempts, nextCheckAt, error);
     }
 
     private static Instant startOfUtcDay(Instant now) {

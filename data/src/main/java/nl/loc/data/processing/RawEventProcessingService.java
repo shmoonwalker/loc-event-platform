@@ -8,7 +8,7 @@ import java.util.List;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import nl.loc.data.catalog.CatalogPublicationService;
+import nl.loc.data.catalog.CatalogImportService;
 import nl.loc.data.event.NormalizedEvent;
 import nl.loc.data.storage.RawObject;
 import nl.loc.data.storage.RawObjectStore;
@@ -22,7 +22,7 @@ public class RawEventProcessingService {
 
     private final RawObjectStore rawObjectStore;
     private final List<SourceEventMapper> mappers;
-    private final CatalogPublicationService catalogPublicationService;
+    private final CatalogImportService catalogImportService;
     private final RawProcessingRepository processingRepository;
     private final EventContentFingerprint contentFingerprint;
 
@@ -54,16 +54,16 @@ public class RawEventProcessingService {
                 throw new IllegalArgumentException("Raw event file produced no events: " + rawObjectKey);
             }
 
-            stage = "publish-events";
+            stage = "import-events";
             for (NormalizedEvent event : events) {
                 if (!source.equals(event.source())) {
                     throw new IllegalArgumentException("Mapped source does not match " + source);
                 }
-                catalogPublicationService.publish(event, collectedAt, contentFingerprint.of(event));
+                catalogImportService.importEvent(event, collectedAt, contentFingerprint.of(event));
             }
             processingRepository.markProcessed(source, rawObjectKey);
 
-            log.info("Published events source={} count={} rawObjectKey={} durationMs={}",
+            log.info("Imported events source={} count={} rawObjectKey={} durationMs={}",
                     source, events.size(), rawObjectKey, (System.nanoTime() - startedAt) / 1_000_000);
         } catch (RuntimeException exception) {
             log.error("Processing failed source={} rawObjectKey={} stage={} durationMs={}",

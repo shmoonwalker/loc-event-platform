@@ -1,9 +1,14 @@
 # Loc data application
 
 This Java 25 application collects RVO and Ticketmaster events into Cloudflare
-R2 and publishes normalized events into PostgreSQL's `catalog` schema.
+R2, imports normalized events into PostgreSQL's `catalog` schema, and publishes
+the events that pass the product rules into the `publication` schema.
 
 ## Normal startup: process saved events
+
+Final qualification runs after startup ingestion and again on a timer. The `publish` command
+evaluates the existing catalogue without source collection or raw replay. Set
+`PUBLICATION_ENABLED=false` to disable that scanner.
 
 With database and R2 environment variables loaded, start from `data/`:
 
@@ -14,8 +19,10 @@ With database and R2 environment variables loaded, start from `data/`:
 No ingestion arguments are needed. Startup lists saved event files for both
 sources, including older collection folders, and imports files that have no
 successful-processing checkpoint. R2 listing is paginated. This does not call
-the source APIs or upload the raw files again. It performs one pass on startup;
-it is not a continuously polling worker.
+the source APIs or upload the raw files again. It performs one pass on startup.
+Fresh source collection runs on its daily schedule, or by the `collect` and `run`
+commands. The schedulers and queue listeners keep the process alive after the
+startup pass.
 
 `catalog.processed_raw_object` records success in the same transaction as the
 catalog changes. A failed file remains pending for the next startup, while
@@ -34,12 +41,53 @@ Optional commands via `-Dspring-boot.run.arguments="..."`:
 
 | Arguments | Behavior |
 | --- | --- |
+| `collect <source>` | Collect and save a source snapshot without processing it |
 | `process ticketmaster` | Process pending saved Ticketmaster event files only |
 | `process rvo` | Process pending saved RVO event files only |
+| `process-all` | Process pending saved event files for all sources |
 | `run ticketmaster` | Collect fresh Ticketmaster data, then process pending saved files |
 | `run rvo` | Collect fresh RVO data, then process pending saved files |
 | `run-all` | Collect and process both sources |
 | `reprocess <source> <rawObjectKey>...` | Explicitly replay selected files even if already processed |
+
+## From catalog to product
+
+The catalog import (`CatalogImportService`) is deliberately permissive: a normalized event is
+stored even when it will not pass final publication. `PublicationService` applies the product
+rules afterwards and writes `publication.event_snapshot`, `publication.discoverable_events` and
+`publication.change_log`. Only that final step is called publication.
+
+An occurrence is published when it has:
+
+- a title and a public source URL
+- a known start date, start time and timezone, and has not ended
+- for an in-person event: valid Netherlands coordinates, a city, and a venue name or address
+- fresh source details, and a source that still lists it
+- no cancellation or postponement
+
+Online events skip the location checks. A missing description, image or specific category is
+only a warning.
+
+Tags come from two places:
+
+- Local tags are written at import from the Loc category and the source's own classification
+  (Ticketmaster genres, RVO titles and subjects). They cost no API call. `other` is used only
+  when nothing more specific exists.
+- Gemini runs once per event with a description of at least 80 characters. Such an event is held
+  with `AWAITING_TAGS` until Gemini succeeds, and Gemini is only asked about events whose sole
+  blocking reason is `AWAITING_TAGS`. A successful answer, even an empty one, is final: later title
+  or description changes do not spend another request. After five failed attempts the event is
+  marked `GAVE_UP` and published with its local tags. A shorter or missing description counts as
+  no description: local tags only, no Gemini call.
+
+Weather is fetched only for published in-person occurrences, using the published coordinates.
+Online events and held occurrences never trigger a weather request. Every request attempt
+consumes the configured daily weather budget. A forecast older than four days is not shown.
+
+Collection runs on a schedule: once a source's last completed collection is older than
+`COLLECTION_INTERVAL` (default one day), it is collected and processed again. Keep this well under
+the publication freshness limit (`PUBLICATION_MAX_DETAIL_AGE`, default 72 hours), otherwise
+events are withdrawn as stale. Set `COLLECTION_ENABLED=false` to collect only by command.
 
 Automatic discovery reads only `raw/<source>/<run-id>/events/<id>.json` files,
 not list pages or other objects. Fresh Ticketmaster collection requires the
@@ -79,9 +127,9 @@ re-reads the slot, calls Open-Meteo and stores the result. The queue carries the
 PostgreSQL records which work is due, so a lost message costs nothing — the slot is still due
 and the next scan queues it again.
 
-A slot is only eligible when it is physical, has coordinates, has a known start date *and*
-time, belongs to an event that is neither cancelled nor dropped by its source, and starts in
-the future. Online events are published normally and simply never get a forecast.
+A slot is only eligible when its occurrence is currently published, is in person, and starts in
+the future. The coordinates come from the published snapshot. Online events are published
+normally and simply never get a forecast.
 
 `next_check_at` decides everything about volume. It is set from the start time, so a slot a
 month out is never read at all until it enters the window:
@@ -106,7 +154,7 @@ server error is a real failure: the queue retries it with backoff, a repeated fa
 
 Writes are guarded. The stored coordinates and hour are compared on every update, so a
 forecast that arrives after its slot moved is discarded rather than saved against the wrong
-date. Publication also deletes weather rows when a slot's start hour or an event's coordinates
+date. Catalog import also deletes weather rows when a slot's start hour or an event's coordinates
 change, and the scan clears anything it missed.
 
 Temperature, wind, rain chance and the raw WMO code are stored as numbers. Turning a code into
@@ -127,6 +175,7 @@ docker compose up -d rabbitmq
 | `WEATHER_ENABLED`      | Run the scan and the queue listener                  | `true`     |
 | `WEATHER_SCAN_INTERVAL`| Delay between scans, ISO-8601                        | `PT5M`     |
 | `WEATHER_SCAN_LIMIT`   | Most slots queued per scan                           | `200`      |
+| `WEATHER_DAILY_LIMIT`  | Maximum Open-Meteo request attempts per UTC day     | `500`      |
 | `RABBITMQ_HOST`        | Broker host                                          | `localhost`|
 | `RABBITMQ_PORT`        | Broker port                                          | `5672`     |
 | `RABBITMQ_USER`        | Broker user                                          | `guest`    |

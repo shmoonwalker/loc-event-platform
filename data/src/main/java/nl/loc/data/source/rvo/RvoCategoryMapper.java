@@ -1,13 +1,16 @@
 package nl.loc.data.source.rvo;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import nl.loc.data.event.Category;
 import nl.loc.data.event.CategoryAssignment;
+import nl.loc.data.tagging.ContentTag;
 
 /** Maps RVO subjects. A session, webinar, course, or vragenuur also adds Learning & Skills. */
 final class RvoCategoryMapper {
@@ -45,6 +48,22 @@ final class RvoCategoryMapper {
             matched.add(Category.LEARNING_AND_SKILLS);
         }
         return CategoryAssignment.resolve(matched);
+    }
+
+    /** Format and topic tags that the title or subjects state outright. */
+    static List<ContentTag> tags(JsonNode root) {
+        Set<ContentTag> tags = new LinkedHashSet<>();
+        String title = text(root, "title");
+        String normalizedTitle = title == null ? "" : normalize(title);
+        if (normalizedTitle.contains("workshop") || normalizedTitle.contains("training")) tags.add(ContentTag.WORKSHOP);
+        if (normalizedTitle.contains("congres") || normalizedTitle.contains("conferentie")
+                || normalizedTitle.contains("conference")) tags.add(ContentTag.CONFERENCE);
+        if (normalizedTitle.contains("netwerk") || normalizedTitle.contains("network")) tags.add(ContentTag.NETWORKING);
+        if (normalizedTitle.contains("beurs") || normalizedTitle.contains(" fair")) tags.add(ContentTag.FAIR);
+        for (String subject : texts(root.path("subjects"))) {
+            if ("klimaat en energie".equals(normalize(subject))) tags.add(ContentTag.CLIMATE);
+        }
+        return List.copyOf(tags);
     }
 
     private static boolean signalsLearning(JsonNode root) {

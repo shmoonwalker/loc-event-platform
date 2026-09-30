@@ -30,20 +30,25 @@ public class TagRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /** Events whose only blocking publication reason is AWAITING_TAGS, so a Gemini call is never wasted. */
     @Transactional(readOnly = true)
-    public List<Long> findDueEventIds(Instant now, int promptVersion, int limit) {
+    public List<Long> findDueEventIds(Instant now, int limit) {
         return jdbcTemplate.query("""
                 SELECT e.id
                 FROM catalog.event e
+                         JOIN publication.event_identity i ON i.source = e.source AND i.external_id = e.external_id
                          LEFT JOIN catalog.event_tagging t ON t.event_id = e.id
-                WHERE e.source_active = TRUE
-                  AND e.lifecycle_status <> 'CANCELLED'
+                WHERE EXISTS (SELECT 1
+                              FROM publication.decision d
+                              WHERE d.loc_event_id = i.loc_event_id
+                                AND d.subject_type = 'OCCURRENCE'
+                                AND d.blocking_reasons = '["AWAITING_TAGS"]'::jsonb)
                   AND (t.event_id IS NULL
-                    OR (t.prompt_version <> ? AND (t.next_check_at IS NULL OR t.next_check_at <= ?))
-                    OR (t.gemini_status = 'FAILED' AND (t.next_check_at IS NULL OR t.next_check_at <= ?)))
-                ORDER BY e.id
+                    OR (t.gemini_status IN ('PENDING', 'FAILED')
+                        AND (t.next_check_at IS NULL OR t.next_check_at <= ?)))
+                ORDER BY CASE WHEN t.event_id IS NULL THEN 0 ELSE 1 END, t.next_check_at NULLS FIRST, e.id
                 LIMIT ?
-                """, (ResultSet row, int rowNumber) -> row.getLong(1), promptVersion, utc(now), utc(now), limit);
+                """, (ResultSet row, int rowNumber) -> row.getLong(1), utc(now), limit);
     }
 
     @Transactional(readOnly = true)
@@ -66,32 +71,36 @@ public class TagRepository {
     }
 
     @Transactional(readOnly = true)
-    public boolean alreadyTagged(long eventId, String fingerprint, int promptVersion) {
+    public boolean alreadyTagged(long eventId) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
                 SELECT EXISTS (SELECT 1
                                FROM catalog.event_tagging
                                WHERE event_id = ?
-                                 AND content_fingerprint = ?
-                                 AND prompt_version = ?
-                                 AND gemini_status IN ('SUCCEEDED', 'NOT_APPLICABLE'))
-                """, Boolean.class, eventId, fingerprint, promptVersion));
+                                 AND gemini_status IN ('SUCCEEDED', 'GAVE_UP'))
+                """, Boolean.class, eventId));
     }
 
-    @Transactional(readOnly = true)
-    public int geminiAttemptsSince(Instant since) {
-        Integer count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
-                FROM catalog.event_tagging
-                WHERE last_attempt_at >= ?
-                """, Integer.class, utc(since));
-        return count == null ? 0 : count;
+    /** Reserve one real Gemini request. The reservation is committed before the network call. */
+    @Transactional
+    public boolean reserveGeminiAttempt(Instant now, int dailyLimit, long eventId) {
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(hashtext('loc-budget-gemini'))", (ResultSet row) -> { });
+        Integer used = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM catalog.enrichment_request
+                WHERE kind = 'GEMINI' AND attempted_at >= ?
+                """, Integer.class, utc(startOfUtcDay(now)));
+        if (used != null && used >= dailyLimit) return false;
+        jdbcTemplate.update("""
+                INSERT INTO catalog.enrichment_request(kind, event_id, attempted_at)
+                VALUES ('GEMINI', ?, ?)
+                """, eventId, utc(now));
+        return true;
     }
 
     @Transactional
     public void claim(long eventId, Instant claimUntil) {
         jdbcTemplate.update("""
                 INSERT INTO catalog.event_tagging (event_id, prompt_version, gemini_status, next_check_at)
-                VALUES (?, ?, 'FAILED', ?)
+                VALUES (?, ?, 'PENDING', ?)
                 ON CONFLICT (event_id) DO UPDATE SET next_check_at = EXCLUDED.next_check_at
                 """, eventId, TagPrompt.VERSION, utc(claimUntil));
     }
@@ -131,12 +140,12 @@ public class TagRepository {
     public void defer(long eventId, Instant nextCheckAt) {
         jdbcTemplate.update("""
                 INSERT INTO catalog.event_tagging (event_id, prompt_version, gemini_status, next_check_at)
-                VALUES (?, ?, 'FAILED', ?)
+                VALUES (?, ?, 'PENDING', ?)
                 ON CONFLICT (event_id) DO UPDATE SET next_check_at = EXCLUDED.next_check_at
                 """, eventId, TagPrompt.VERSION, utc(nextCheckAt));
     }
 
-    /** A new source snapshot must not keep Gemini tags that describe the old text. */
+    /** Explicit administrative reset; normal imports deliberately keep completed Gemini output. */
     @Transactional
     public void invalidate(long eventId) {
         jdbcTemplate.update("DELETE FROM catalog.event_tag WHERE event_id = ? AND origin = 'GEMINI'", eventId);
@@ -176,5 +185,9 @@ public class TagRepository {
 
     private static OffsetDateTime utc(Instant instant) {
         return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
+    }
+
+    private static Instant startOfUtcDay(Instant now) {
+        return now.atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 }

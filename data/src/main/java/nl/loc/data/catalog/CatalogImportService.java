@@ -20,15 +20,17 @@ import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLocation;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.NormalizedEvent;
+import nl.loc.data.tagging.ContentTag;
 import nl.loc.data.tagging.TagRepository;
 import nl.loc.data.weather.WeatherRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Stores normalized events in the permissive catalog. Final publication applies the product rules later. */
 @Slf4j
 @RequiredArgsConstructor
 @Service
-public class CatalogPublicationService {
+public class CatalogImportService {
 
     private final CatalogEventTimeSlotRepository catalogEventTimeSlotRepository;
     private final CatalogEventLocationRepository catalogEventLocationRepository;
@@ -40,6 +42,7 @@ public class CatalogPublicationService {
     private final TagRepository tagRepository;
     private final CatalogSourceLock sourceLock;
     private final CatalogPresenceService presenceService;
+    private final nl.loc.data.publication.OccurrenceIdentityRegistry occurrenceIdentities;
 
     private CatalogEvent upsertEvent(NormalizedEvent event, Instant collectedAt, Optional<CatalogEvent> existing) {
         CatalogEvent catalogEvent;
@@ -50,7 +53,6 @@ public class CatalogPublicationService {
                     event.title(),
                     event.description(),
                     event.sourceUrl(),
-                    event.registrationUrl(),
                     event.organizerNames(),
                     event.sourceCreatedAt(),
                     event.sourceUpdatedAt(),
@@ -65,7 +67,6 @@ public class CatalogPublicationService {
                     event.title(),
                     event.description(),
                     event.sourceUrl(),
-                    event.registrationUrl(),
                     event.organizerNames(),
                     event.sourceCreatedAt(),
                     event.sourceUpdatedAt(),
@@ -76,6 +77,7 @@ public class CatalogPublicationService {
 
         log.debug("Saving catalog event source={} externalId={} operation={}",
                 event.source(), event.externalId(), existing.isPresent() ? "update" : "insert");
+        catalogEvent.recordQualificationIssues(event.qualificationIssues());
         return catalogEventRepository.save(catalogEvent);
     }
 
@@ -129,48 +131,70 @@ public class CatalogPublicationService {
 
         log.debug("Saving catalog location catalogEventId={} operation={}",
                 catalogEvent.getId(), existing.isPresent() ? "update" : "insert");
+        catalogLocation.recordCoordinateEvidence(location.coordinateEvidence());
         catalogEventLocationRepository.save(catalogLocation);
         return moved;
     }
 
     private SlotSync syncTimeSlots(CatalogEvent catalogEvent, List<EventTimeSlot> slots) {
-        List<EventTimeSlot> newSlots = slots == null ? List.of() : slots;
+        List<EventTimeSlot> newSlots = slots == null ? List.of() : slots.stream().distinct().toList();
         List<CatalogEventTimeSlot> existingSlots = catalogEventTimeSlotRepository.findByEventOrderBySlotIndex(catalogEvent);
 
-        Map<Integer, CatalogEventTimeSlot> existingByIndex = new HashMap<>();
-        for (CatalogEventTimeSlot existingSlot : existingSlots) {
-            existingByIndex.put(existingSlot.getSlotIndex(), existingSlot);
-        }
-
         List<CatalogEventTimeSlot> slotsToSave = new ArrayList<>();
+        Set<Long> matchedIds = new HashSet<>();
+        Set<java.util.UUID> restoredIds = new HashSet<>();
         Set<Long> rescheduledSlotIds = new HashSet<>();
+        List<CatalogEventTimeSlot> active = existingSlots.stream().filter(row -> !row.isRetired()).toList();
         for (int i = 0; i < newSlots.size(); i++) {
             EventTimeSlot slot = newSlots.get(i);
-            CatalogEventTimeSlot catalogSlot = existingByIndex.get(i);
+            List<CatalogEventTimeSlot> matches = existingSlots.stream()
+                    .filter(row -> !matchedIds.contains(row.getId()) && row.sameStart(slot)).toList();
+            List<CatalogEventTimeSlot> activeMatches = matches.stream().filter(row -> !row.isRetired()).toList();
+            CatalogEventTimeSlot catalogSlot = activeMatches.size() == 1 ? activeMatches.getFirst()
+                    : matches.size() == 1 ? matches.getFirst() : null;
+            if (catalogSlot == null && matches.size() > 1) {
+                catalogEvent.addQualificationIssue("AMBIGUOUS_OCCURRENCE_IDENTITY");
+            }
+            // Ticketmaster's event ID identifies a single performance. For other sources,
+            // only an explicit reschedule of a single known occurrence establishes continuity.
+            if (catalogSlot == null && matches.isEmpty() && newSlots.size() == 1 && active.size() == 1
+                    && ("ticketmaster".equals(catalogEvent.getSource())
+                    || catalogEvent.getLifecycleStatus() == nl.loc.data.event.EventLifecycle.RESCHEDULED)) {
+                catalogSlot = active.getFirst();
+            }
+            if (catalogSlot == null && matches.isEmpty() && newSlots.size() == 1 && existingSlots.size() == 1
+                    && "ticketmaster".equals(catalogEvent.getSource())) catalogSlot = existingSlots.getFirst();
 
             if (catalogSlot != null) {
-                // Rows are matched by position, so a reused row can end up describing another date.
+                matchedIds.add(catalogSlot.getId());
                 if (!sameHour(catalogSlot.getStartsAt(), slot.startsAt())) {
                     rescheduledSlotIds.add(catalogSlot.getId());
                 }
                 catalogSlot.updateFromImport(slot);
+                catalogSlot.activateAt(i);
             } else {
                 catalogSlot = new CatalogEventTimeSlot(catalogEvent, i, slot);
+                if (existingSlots.isEmpty()) {
+                    var restoration = occurrenceIdentities.restore(catalogEvent.getSource(), catalogEvent.getExternalId(),
+                            slot, newSlots.size() == 1);
+                    if (restoration.ambiguous()) catalogEvent.addQualificationIssue("AMBIGUOUS_OCCURRENCE_IDENTITY");
+                    java.util.UUID restored = restoration.id();
+                    if (restored != null && restoredIds.add(restored)) catalogSlot.restoreOccurrenceKey(restored);
+                }
             }
 
             slotsToSave.add(catalogSlot);
         }
         List<CatalogEventTimeSlot> savedSlots = catalogEventTimeSlotRepository.saveAll(slotsToSave);
 
-        List<CatalogEventTimeSlot> slotsToDelete = new ArrayList<>();
         for (CatalogEventTimeSlot existingSlot : existingSlots) {
-            if (existingSlot.getSlotIndex() >= newSlots.size()) {
-                slotsToDelete.add(existingSlot);
+            if (!matchedIds.contains(existingSlot.getId())) {
+                existingSlot.retire();
+                rescheduledSlotIds.add(existingSlot.getId());
             }
         }
-        catalogEventTimeSlotRepository.deleteAll(slotsToDelete);
-        log.debug("Scheduled catalog time slot changes catalogEventId={} saved={} deleted={}",
-                catalogEvent.getId(), slotsToSave.size(), slotsToDelete.size());
+        log.debug("Synchronized catalog time slots catalogEventId={} saved={}",
+                catalogEvent.getId(), slotsToSave.size());
         return new SlotSync(
                 savedSlots.stream().map(CatalogEventTimeSlot::getId).toList(),
                 rescheduledSlotIds);
@@ -255,10 +279,20 @@ public class CatalogPublicationService {
         catalogEventCategoryRepository.saveAll(toSave);
     }
 
+    /** Local tags need no API call, so every event gets them from its categories and source classification. */
+    private void syncLocalTags(CatalogEvent event, List<Category> categories, List<ContentTag> sourceTags) {
+        Set<ContentTag> tags = new java.util.LinkedHashSet<>();
+        for (Category category : CategoryAssignment.resolve(categories)) {
+            ContentTag.fromCategory(category).ifPresent(tags::add);
+        }
+        if (sourceTags != null) tags.addAll(sourceTags);
+        tagRepository.replaceCategoryTags(event.getId(), List.copyOf(tags));
+    }
+
     @Transactional
-    public CatalogEvent publish(NormalizedEvent event, Instant collectedAt, String contentHash) {
+    public CatalogEvent importEvent(NormalizedEvent event, Instant collectedAt, String contentHash) {
         sourceLock.acquire(event.source());
-        log.debug("Publishing catalog event source={} externalId={} rawObjectKey={}",
+        log.debug("Importing catalog event source={} externalId={} rawObjectKey={}",
                 event.source(), event.externalId(), event.rawObjectKey());
         Optional<CatalogEvent> existing = catalogEventRepository.findBySourceAndExternalId(
                 event.source(),
@@ -268,7 +302,10 @@ public class CatalogPublicationService {
             CatalogEvent storedEvent = existing.get();
             if (storedEvent.getSourceUpdatedAt() != null
                     && (event.sourceUpdatedAt() == null
-                    || event.sourceUpdatedAt().isBefore(storedEvent.getSourceUpdatedAt()))) {
+                    || event.sourceUpdatedAt().isBefore(storedEvent.getSourceUpdatedAt())
+                    || (event.sourceUpdatedAt().equals(storedEvent.getSourceUpdatedAt())
+                    && storedEvent.getCollectedAt() != null
+                    && (collectedAt == null || collectedAt.isBefore(storedEvent.getCollectedAt()))))) {
                 log.info("Skipping outdated snapshot source={} externalId={} incomingSourceUpdatedAt={} storedSourceUpdatedAt={} rawObjectKey={}",
                         event.source(), event.externalId(), event.sourceUpdatedAt(),
                         storedEvent.getSourceUpdatedAt(), event.rawObjectKey());
@@ -302,9 +339,10 @@ public class CatalogPublicationService {
         clearOutdatedWeather(catalogEvent, slotSync, locationMoved);
         syncImages(catalogEvent, event.images());
         syncCategories(catalogEvent, event.categories());
-        tagRepository.invalidate(catalogEvent.getId());
+        // Gemini output is kept when the title or description changes; each event is sent to Gemini once.
         // Flush child changes before presence checks query the event's country and dates.
         catalogEventRepository.flush();
+        syncLocalTags(catalogEvent, event.categories(), event.sourceTags());
         presenceService.refresh(catalogEvent);
         return catalogEvent;
     }

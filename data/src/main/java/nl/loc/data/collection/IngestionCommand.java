@@ -26,9 +26,22 @@ public class IngestionCommand implements CommandLineRunner {
 
         String command = commandArgs[0];
         switch (command) {
+            case "publish" -> {
+                requireArgCount(commandArgs, 1, "publish");
+                // PublicationScan evaluates the catalogue after ApplicationReadyEvent.
+                log.info("Starting final publication from the existing catalogue; no source collection or raw replay");
+            }
             case "process" -> {
                 requireArgCount(commandArgs, 2, "process <source>");
                 ingestionRun.processPending(commandArgs[1]);
+            }
+            case "process-all" -> {
+                requireArgCount(commandArgs, 1, "process-all");
+                ingestionRun.processPendingAll();
+            }
+            case "collect" -> {
+                requireArgCount(commandArgs, 2, "collect <source>");
+                ingestionRun.collect(commandArgs[1]);
             }
             case "run-all" -> {
                 requireArgCount(commandArgs, 1, "run-all");

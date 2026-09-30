@@ -3,6 +3,8 @@ package nl.loc.data.event;
 import java.time.Instant;
 import java.util.List;
 
+import nl.loc.data.tagging.ContentTag;
+
 public record NormalizedEvent(
         String source,
         String externalId,
@@ -10,7 +12,6 @@ public record NormalizedEvent(
         String title,
         String description,
         String sourceUrl,
-        String registrationUrl,
         List<String> organizerNames,
         Instant sourceCreatedAt,
         Instant sourceUpdatedAt,
@@ -18,6 +19,8 @@ public record NormalizedEvent(
         List<EventTimeSlot> timeSlots,
         EventLifecycle lifecycleStatus,
         List<EventImage> images,
-        List<Category> categories
+        List<Category> categories,
+        List<String> qualificationIssues,
+        List<ContentTag> sourceTags
 ) {
 }
