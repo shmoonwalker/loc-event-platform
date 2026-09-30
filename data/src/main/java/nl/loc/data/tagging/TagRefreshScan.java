@@ -20,25 +20,34 @@ public class TagRefreshScan {
     private final RabbitTemplate rabbitTemplate;
     private final int scanLimit;
     private final Duration claimTtl;
+    private final boolean apiKeyConfigured;
 
     public TagRefreshScan(TagRepository tagRepository,
                           RabbitTemplate rabbitTemplate,
                           @Value("${loc.tagging.scan-limit}") int scanLimit,
-                          @Value("${loc.tagging.claim-ttl}") Duration claimTtl) {
+                          @Value("${loc.tagging.claim-ttl}") Duration claimTtl,
+                          @Value("${loc.tagging.api-key}") String apiKey) {
         this.tagRepository = tagRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.scanLimit = scanLimit;
         this.claimTtl = claimTtl;
+        this.apiKeyConfigured = apiKey != null && !apiKey.isBlank();
+        if (!apiKeyConfigured) {
+            log.warn("GeminiAPIKey is blank; events with a description stay held with AWAITING_TAGS");
+        }
     }
 
     @Scheduled(fixedDelayString = "${loc.tagging.scan-interval}",
             initialDelayString = "${loc.tagging.scan-initial-delay}")
     public void queueDueTagging() {
+        if (!apiKeyConfigured) {
+            return;
+        }
         long startedAt = System.nanoTime();
         Instant now = Instant.now();
         String stage = "find-due-events";
         try {
-            List<Long> due = tagRepository.findDueEventIds(now, TagPrompt.VERSION, scanLimit);
+            List<Long> due = tagRepository.findDueEventIds(now, scanLimit);
             if (due.isEmpty()) {
                 log.debug("No tag jobs due");
                 return;
