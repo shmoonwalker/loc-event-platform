@@ -1,0 +1,2 @@
+docker build -t loc-frontend frontend
+docker run --rm -p 3000:3000 loc-frontend
