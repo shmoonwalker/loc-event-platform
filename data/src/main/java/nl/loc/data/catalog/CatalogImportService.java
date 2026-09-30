@@ -20,15 +20,17 @@ import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLocation;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.NormalizedEvent;
+import nl.loc.data.tagging.ContentTag;
 import nl.loc.data.tagging.TagRepository;
 import nl.loc.data.weather.WeatherRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Stores normalized events in the permissive catalog. Final publication applies the product rules later. */
 @Slf4j
 @RequiredArgsConstructor
 @Service
-public class CatalogPublicationService {
+public class CatalogImportService {
 
     private final CatalogEventTimeSlotRepository catalogEventTimeSlotRepository;
     private final CatalogEventLocationRepository catalogEventLocationRepository;
@@ -277,22 +279,33 @@ public class CatalogPublicationService {
         catalogEventCategoryRepository.saveAll(toSave);
     }
 
+    /** Local tags need no API call, so every event gets them from its categories and source classification. */
+    private void syncLocalTags(CatalogEvent event, List<Category> categories, List<ContentTag> sourceTags) {
+        Set<ContentTag> tags = new java.util.LinkedHashSet<>();
+        for (Category category : CategoryAssignment.resolve(categories)) {
+            ContentTag.fromCategory(category).ifPresent(tags::add);
+        }
+        if (sourceTags != null) tags.addAll(sourceTags);
+        tagRepository.replaceCategoryTags(event.getId(), List.copyOf(tags));
+    }
+
     @Transactional
-    public CatalogEvent publish(NormalizedEvent event, Instant collectedAt, String contentHash) {
+    public CatalogEvent importEvent(NormalizedEvent event, Instant collectedAt, String contentHash) {
         sourceLock.acquire(event.source());
-        log.debug("Publishing catalog event source={} externalId={} rawObjectKey={}",
+        log.debug("Importing catalog event source={} externalId={} rawObjectKey={}",
                 event.source(), event.externalId(), event.rawObjectKey());
         Optional<CatalogEvent> existing = catalogEventRepository.findBySourceAndExternalId(
                 event.source(),
                 event.externalId()
         );
-        String previousText = null;
         if (existing.isPresent()) {
             CatalogEvent storedEvent = existing.get();
-            previousText = TagRepository.fingerprint(storedEvent.getTitle(), storedEvent.getDescription());
             if (storedEvent.getSourceUpdatedAt() != null
                     && (event.sourceUpdatedAt() == null
-                    || event.sourceUpdatedAt().isBefore(storedEvent.getSourceUpdatedAt()))) {
+                    || event.sourceUpdatedAt().isBefore(storedEvent.getSourceUpdatedAt())
+                    || (event.sourceUpdatedAt().equals(storedEvent.getSourceUpdatedAt())
+                    && storedEvent.getCollectedAt() != null
+                    && (collectedAt == null || collectedAt.isBefore(storedEvent.getCollectedAt()))))) {
                 log.info("Skipping outdated snapshot source={} externalId={} incomingSourceUpdatedAt={} storedSourceUpdatedAt={} rawObjectKey={}",
                         event.source(), event.externalId(), event.sourceUpdatedAt(),
                         storedEvent.getSourceUpdatedAt(), event.rawObjectKey());
@@ -326,13 +339,10 @@ public class CatalogPublicationService {
         clearOutdatedWeather(catalogEvent, slotSync, locationMoved);
         syncImages(catalogEvent, event.images());
         syncCategories(catalogEvent, event.categories());
-        // Gemini describes the title and description. A location or schedule change keeps that result.
-        String incomingText = TagRepository.fingerprint(event.title(), event.description());
-        if (previousText != null && !previousText.equals(incomingText)) {
-            tagRepository.invalidate(catalogEvent.getId());
-        }
+        // Gemini output is kept when the title or description changes; each event is sent to Gemini once.
         // Flush child changes before presence checks query the event's country and dates.
         catalogEventRepository.flush();
+        syncLocalTags(catalogEvent, event.categories(), event.sourceTags());
         presenceService.refresh(catalogEvent);
         return catalogEvent;
     }

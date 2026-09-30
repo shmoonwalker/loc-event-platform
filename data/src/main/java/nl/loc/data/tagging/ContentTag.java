@@ -55,7 +55,8 @@ public enum ContentTag {
     BUSINESS("business"),
     TECHNOLOGY("technology"),
     LEARNING("learning"),
-    NATURE("nature");
+    NATURE("nature"),
+    OTHER("other");
 
     private final String slug;
 
@@ -69,17 +70,17 @@ public enum ContentTag {
 
     public boolean geminiAllowed() {
         return switch (this) {
-            case ARTS, SPORTS, BUSINESS, TECHNOLOGY, LEARNING, NATURE -> false;
+            case ARTS, SPORTS, BUSINESS, TECHNOLOGY, LEARNING, NATURE, OTHER -> false;
             default -> true;
         };
     }
 
-    /** One honest tag from a category we already assigned. Other has none. */
+    /** One honest tag from a category we already assigned. */
     public static Optional<ContentTag> fromCategory(Category category) {
         if (category == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(switch (category) {
+        return Optional.of(switch (category) {
             case MUSIC_AND_NIGHTLIFE -> LIVE_MUSIC;
             case ARTS_AND_CULTURE -> ARTS;
             case SPORTS -> ContentTag.SPORTS;
@@ -87,7 +88,7 @@ public enum ContentTag {
             case TECHNOLOGY_AND_SCIENCE -> TECHNOLOGY;
             case LEARNING_AND_SKILLS -> LEARNING;
             case NATURE_AND_SUSTAINABILITY -> NATURE;
-            case OTHER -> null;
+            case OTHER -> ContentTag.OTHER;
         });
     }
 

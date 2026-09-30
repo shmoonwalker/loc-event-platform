@@ -62,7 +62,9 @@ public class RvoEventMapper implements SourceEventMapper {
                 mapTimeSlots(root, rawObjectKey),
                 EventLifecycle.UNKNOWN,
                 List.of(),
-                RvoCategoryMapper.map(root)
+                RvoCategoryMapper.map(root),
+                List.of(),
+                RvoCategoryMapper.tags(root)
         ));
     }
 
@@ -116,19 +118,40 @@ public class RvoEventMapper implements SourceEventMapper {
                 text(root, "country"),
                 latitude,
                 longitude,
-                null, countryCode(text(root, "country")), evidence
+                null, type == LocationType.PHYSICAL ? countryCode(text(root, "country")) : null, evidence
         );
     }
 
+    /**
+     * RVO sends official Dutch names such as "Bondsrepubliek Duitsland" and omits the country for
+     * events in the Netherlands. The longest Dutch short name contained in the value wins.
+     */
     private static String countryCode(String country) {
-        if (country == null) return null;
-        String value = country.strip().toUpperCase(java.util.Locale.ROOT);
-        if (value.length() == 2) return value;
-        return switch (value) {
-            case "NEDERLAND", "NETHERLANDS", "THE NETHERLANDS" -> "NL";
-            default -> null;
-        };
+        if (country == null) return "NL";
+        String value = country.strip().toLowerCase(DUTCH);
+        if (value.length() == 2) return value.toUpperCase(java.util.Locale.ROOT);
+        if (value.contains("nederland")) return "NL";
+        for (var alias : COUNTRY_ALIASES.entrySet()) {
+            if (value.contains(alias.getKey())) return alias.getValue();
+        }
+        String match = null;
+        int matchLength = 0;
+        for (String code : java.util.Locale.getISOCountries()) {
+            String name = java.util.Locale.of("", code).getDisplayCountry(DUTCH).toLowerCase(DUTCH);
+            if (name.length() > matchLength && value.contains(name)) {
+                match = code;
+                matchLength = name.length();
+            }
+        }
+        return match;
     }
+
+    private static final java.util.Locale DUTCH = java.util.Locale.of("nl");
+
+    /** Official names that use an adjective or a spelling the JDK's Dutch country names do not. */
+    private static final java.util.Map<String, String> COUNTRY_ALIASES = java.util.Map.of(
+            "portugese", "PT", "argentijnse", "AR", "franse", "FR", "tsjechische", "CZ",
+            "italiaanse", "IT", "mexicaanse", "MX", "saudi-arabië", "SA", "republiek korea", "KR");
 
     private static LocationType locationType(JsonNode isOnline) {
         if (isOnline == null || isOnline.isNull() || !isOnline.isBoolean()) {

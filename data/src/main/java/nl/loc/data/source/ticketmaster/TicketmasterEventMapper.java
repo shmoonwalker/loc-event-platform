@@ -63,7 +63,8 @@ public class TicketmasterEventMapper implements SourceEventMapper {
                 // Discovery does not provide a documented event modification timestamp.
                 null, null, mapLocation(venue), TicketmasterTimeMapper.map(root, venue),
                 mapLifecycle(root), mapImages(root),
-                TicketmasterCategoryMapper.map(root), issues.stream().distinct().toList()));
+                TicketmasterCategoryMapper.map(root), issues.stream().distinct().toList(),
+                TicketmasterCategoryMapper.tags(root)));
     }
 
     private JsonNode readObject(String json) {
