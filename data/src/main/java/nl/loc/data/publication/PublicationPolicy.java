@@ -38,7 +38,7 @@ public class PublicationPolicy {
         this.includeSeasonPasses = includeSeasonPasses;
     }
 
-    public String version() { return "loc-v1:" + countries + ":" + maxAge + ":rvo=" + rvoMaxAge
+    public String version() { return "loc-v2:" + countries + ":" + maxAge + ":rvo=" + rvoMaxAge
             + ":ticketmaster=" + ticketmasterMaxAge + ":" + checkInterval + ":passes=" + includeSeasonPasses; }
 
     private Duration maxAge(JsonNode event) {
@@ -83,11 +83,15 @@ public class PublicationPolicy {
             reasons.add("INVALID_TITLE");
         }
         if (!publicUrl(text(event, "source_url"))) reasons.add("INVALID_SOURCE_URL");
-        if (nl.loc.data.text.HtmlPlainText.convert(text(event, "description")) == null) warnings.add("MISSING_DESCRIPTION");
+        String description = nl.loc.data.text.HtmlPlainText.convert(text(event, "description"));
+        if (description == null) warnings.add("MISSING_DESCRIPTION");
+        // An event with a real description is published once Gemini has tagged it; others use local tags.
+        String taggingStatus = input.path("tagging").path("gemini_status").asText("");
+        if (nl.loc.data.tagging.TagTarget.needsGemini(description)
+                && !Set.of("SUCCEEDED", "GAVE_UP").contains(taggingStatus)) reasons.add("AWAITING_TAGS");
         if (input.path("images").isEmpty()) warnings.add("MISSING_IMAGE");
         if (input.path("categories").isEmpty()
                 || (input.path("categories").size() == 1 && "Other".equals(input.path("categories").get(0).asText()))) warnings.add("CATEGORY_OTHER");
-        if (!hasUserVisibleTag(input)) reasons.add("NO_USER_TAGS");
         if (!event.path("source_active").asBoolean()) reasons.add("SOURCE_ABSENT");
         Instant lastSeen = instant(event, "last_seen_at");
         if (lastSeen == null) reasons.add("SOURCE_NOT_VERIFIED");
@@ -144,7 +148,7 @@ public class PublicationPolicy {
             String timeStatus = slot.path("start_time_status").asText("UNKNOWN");
             if ("KNOWN".equals(timeStatus) && start == null) reasons.add("UNRESOLVED_START_TIME");
             if (!"KNOWN".equals(timeStatus)) {
-                warnings.add("START_TIME_UNKNOWN");
+                reasons.add("START_TIME_UNKNOWN");
                 if (start != null || time != null) reasons.add("CONFLICTING_START_TIME");
             }
             if (!"KNOWN".equals(slot.path("end_time_status").asText()) && (end != null || endTime != null)) {
@@ -226,20 +230,6 @@ public class PublicationPolicy {
                     && !host.contains(":") && !host.endsWith(".localhost") && !host.endsWith(".local")
                     && !host.endsWith(".internal") && !host.endsWith(".test") && !host.endsWith(".invalid");
         } catch (IllegalArgumentException exception) { return false; }
-    }
-
-    private static boolean hasUserVisibleTag(JsonNode input) {
-        for (JsonNode tag : input.path("tags")) {
-            String value = tag.path("tag").asText("").trim();
-            if (!value.isEmpty()) return true;
-        }
-        for (JsonNode categoryName : input.path("categories")) {
-            for (nl.loc.data.event.Category category : nl.loc.data.event.Category.values()) {
-                if (category.catalogName().equals(categoryName.asText())
-                        && nl.loc.data.tagging.ContentTag.fromCategory(category).isPresent()) return true;
-            }
-        }
-        return false;
     }
 
     static String text(JsonNode node, String field) {

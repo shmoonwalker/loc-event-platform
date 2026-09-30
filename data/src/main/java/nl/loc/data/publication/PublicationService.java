@@ -27,6 +27,8 @@ public class PublicationService {
             "DETAILS_NOT_VERIFIED", "INVALID_OBSERVATION_TIME", "INVALID_COLLECTION_TIME");
     private static final Duration PRESENCE_RETRY = Duration.ofHours(6);
     private static final Duration STRUCTURAL_RETRY = Duration.ofHours(24);
+    /** Forecasts refresh every one to three days, so this hides only a forecast whose refreshes stopped. */
+    private static final Duration FORECAST_MAX_AGE = Duration.ofDays(4);
 
     private final JdbcTemplate jdbc;
     private final PublicationPolicy policy;
@@ -41,33 +43,17 @@ public class PublicationService {
         public boolean eligible() { return retryAt == null; }
     }
 
-    /** True when at least one active occurrence would be published. */
+    /** True when missing Gemini tags are the only thing keeping an active occurrence out of the product. */
     @Transactional(readOnly = true)
-    public Readiness readiness(long eventId) {
+    public boolean readyForTagging(long eventId) {
         JsonNode input = load(eventId);
+        if (input == null) return false;
         Instant now = Instant.now();
-        if (input == null) return held(now, false, null, List.of("MISSING_EVENT"));
-        boolean eligible = false;
-        boolean presenceOnly = false;
-        Instant presenceNext = null;
-        Set<String> blocking = new TreeSet<>();
-        List<JsonNode> active = new ArrayList<>();
-        input.path("slots").forEach(slot -> { if (!slot.path("retired").asBoolean()) active.add(slot); });
-        if (active.isEmpty()) active.add(null);
-        for (JsonNode slot : active) {
-            PublicationPolicy.Decision result = policy.evaluate(input, slot, now);
-            if (result.eligible()) eligible = true;
-            else {
-                blocking.addAll(result.reasons());
-                if (PRESENCE_REASONS.containsAll(result.reasons())) {
-                    presenceOnly = true;
-                    presenceNext = presenceNext == null || result.nextCheck().isBefore(presenceNext)
-                            ? result.nextCheck() : presenceNext;
-                }
-            }
+        for (JsonNode slot : input.path("slots")) {
+            if (slot.path("retired").asBoolean()) continue;
+            if (policy.evaluate(input, slot, now).reasons().equals(List.of("AWAITING_TAGS"))) return true;
         }
-        if (eligible) return new Readiness(null, List.of());
-        return held(now, presenceOnly, presenceNext, List.copyOf(blocking));
+        return false;
     }
 
     /** True when this occurrence itself would be published. */
@@ -122,6 +108,10 @@ public class PublicationService {
         UUID publicEvent = jdbc.queryForObject("SELECT loc_event_id FROM publication.event_identity WHERE source=? AND external_id=?",
                 UUID.class, source, externalId);
         String revision = hash(input.toString() + policy.version());
+        List<Boolean> unchanged = jdbc.query("""
+                SELECT input_revision = ? AND next_evaluation_at > ? FROM publication.decision WHERE subject_id = ?
+                """, (rs, row) -> rs.getBoolean(1), revision, utc(now), publicEvent);
+        if (!unchanged.isEmpty() && unchanged.getFirst()) return;
         List<JsonNode> slots = new ArrayList<>();
         input.path("slots").forEach(slots::add);
         boolean anyEligible = false;
@@ -191,8 +181,10 @@ public class PublicationService {
                                        FROM catalog.event_image i WHERE i.event_id=e.id), '[]'::jsonb),
                     'tags', COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.tag) FROM catalog.event_tag t
                                      WHERE t.event_id=e.id), '[]'::jsonb),
-                    'tagging', (SELECT to_jsonb(t) FROM catalog.event_tagging t WHERE t.event_id=e.id),
-                    'weather', COALESCE((SELECT jsonb_agg(to_jsonb(w) ORDER BY w.time_slot_id)
+                    'tagging', (SELECT jsonb_build_object('gemini_status', t.gemini_status)
+                                FROM catalog.event_tagging t WHERE t.event_id=e.id),
+                    'weather', COALESCE((SELECT jsonb_agg(to_jsonb(w) - 'next_check_at' - 'last_attempt_at'
+                                                          - 'attempts' - 'last_error' ORDER BY w.time_slot_id)
                                         FROM catalog.event_weather w JOIN catalog.event_time_slot s ON s.id=w.time_slot_id
                                         WHERE s.event_id=e.id AND NOT s.retired), '[]'::jsonb)
                 )::text
@@ -290,20 +282,14 @@ public class PublicationService {
         output.set("organizers", event.path("organizer_names"));
         output.set("categories", input.path("categories").isEmpty() ? json.valueToTree(List.of("Other")) : input.path("categories"));
         Set<String> tags = new TreeSet<>();
-        for (JsonNode name : input.path("categories")) {
-            for (nl.loc.data.event.Category category : nl.loc.data.event.Category.values()) {
-                if (category.catalogName().equals(name.asText())) nl.loc.data.tagging.ContentTag.fromCategory(category)
-                        .ifPresent(tag -> tags.add(tag.slug()));
-            }
+        boolean geminiSucceeded = "SUCCEEDED".equals(input.path("tagging").path("gemini_status").asText());
+        for (JsonNode tag : input.path("tags")) {
+            String origin = tag.path("origin").asText();
+            if ("CATEGORY".equals(origin) || ("GEMINI".equals(origin) && geminiSucceeded)) tags.add(tag.path("tag").asText());
         }
-        String fingerprint = nl.loc.data.tagging.TagRepository.fingerprint(
-                PublicationPolicy.text(event, "title"), PublicationPolicy.text(event, "description"));
-        if ("SUCCEEDED".equals(input.path("tagging").path("gemini_status").asText())
-                && fingerprint.equals(input.path("tagging").path("content_fingerprint").asText())) {
-            for (JsonNode tag : input.path("tags")) {
-                if ("GEMINI".equals(tag.path("origin").asText())) tags.add(tag.path("tag").asText());
-            }
-        }
+        String other = nl.loc.data.tagging.ContentTag.OTHER.slug();
+        if (tags.size() > 1) tags.remove(other);
+        if (tags.isEmpty()) tags.add(other);
         output.set("tags", json.valueToTree(tags));
         output.set("sourceVerifiedAt", event.path("collected_at"));
         ObjectNode schedule = output.putObject("schedule");
@@ -330,7 +316,7 @@ public class PublicationService {
             for (JsonNode weather : input.path("weather")) {
                 Instant fetched = PublicationPolicy.instant(weather, "forecast_fetched_at");
                 if (weather.path("time_slot_id").asLong() != slot.path("id").asLong() || fetched == null
-                        || fetched.isBefore(Instant.now().minusSeconds(21600))) continue;
+                        || fetched.isBefore(Instant.now().minus(FORECAST_MAX_AGE))) continue;
                 Instant start = PublicationPolicy.instant(slot, "starts_at");
                 Instant requested = PublicationPolicy.instant(weather, "requested_for_hour");
                 if (start == null || requested == null || !requested.equals(start.truncatedTo(java.time.temporal.ChronoUnit.HOURS))
