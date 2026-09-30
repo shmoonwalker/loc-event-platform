@@ -41,7 +41,7 @@ public class TagRepository {
                   AND (t.event_id IS NULL
                     OR (t.prompt_version <> ? AND (t.next_check_at IS NULL OR t.next_check_at <= ?))
                     OR (t.gemini_status = 'FAILED' AND (t.next_check_at IS NULL OR t.next_check_at <= ?)))
-                ORDER BY e.id
+                ORDER BY CASE WHEN t.event_id IS NULL THEN 0 ELSE 1 END, t.next_check_at NULLS FIRST, e.id
                 LIMIT ?
                 """, (ResultSet row, int rowNumber) -> row.getLong(1), promptVersion, utc(now), utc(now), limit);
     }
@@ -136,7 +136,22 @@ public class TagRepository {
                 """, eventId, TagPrompt.VERSION, utc(nextCheckAt));
     }
 
-    /** A new source snapshot must not keep Gemini tags that describe the old text. */
+    /** Held events stay out of the Gemini queue until this time, or until a content change deletes the row. */
+    @Transactional
+    public void holdUntil(long eventId, String fingerprint, Instant nextCheckAt, String reason) {
+        jdbcTemplate.update("""
+                INSERT INTO catalog.event_tagging (event_id, content_fingerprint, prompt_version, gemini_status,
+                                                   next_check_at, last_error)
+                VALUES (?, ?, ?, 'FAILED', ?, ?)
+                ON CONFLICT (event_id) DO UPDATE SET content_fingerprint = EXCLUDED.content_fingerprint,
+                                                     prompt_version      = EXCLUDED.prompt_version,
+                                                     gemini_status       = 'FAILED',
+                                                     next_check_at       = EXCLUDED.next_check_at,
+                                                     last_error          = EXCLUDED.last_error
+                """, eventId, fingerprint, TagPrompt.VERSION, utc(nextCheckAt), reason);
+    }
+
+    /** Drop Gemini output when the title or description changed. Other catalogue changes keep it. */
     @Transactional
     public void invalidate(long eventId) {
         jdbcTemplate.update("DELETE FROM catalog.event_tag WHERE event_id = ? AND origin = 'GEMINI'", eventId);

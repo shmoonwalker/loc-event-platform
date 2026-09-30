@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import nl.loc.data.publication.PublicationService;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,6 +21,7 @@ public class WeatherEnrichmentService {
 
     private final WeatherRepository weatherRepository;
     private final OpenMeteoClient openMeteoClient;
+    private final PublicationService publicationService;
 
     /** The message carries only an id, so eligibility is decided here and not by the sender. */
     public void refresh(long timeSlotId) {
@@ -27,6 +29,14 @@ public class WeatherEnrichmentService {
         WeatherTarget target = weatherRepository.findEligible(timeSlotId, now);
         if (target == null) {
             log.debug("Skipping weather refresh timeSlotId={} reason=slot is no longer eligible", timeSlotId);
+            return;
+        }
+        PublicationService.Readiness readiness = publicationService.slotReadiness(timeSlotId);
+        if (!readiness.eligible()) {
+            weatherRepository.saveAttempt(target, readiness.retryAt(), target.attempts(), now,
+                    String.join(",", readiness.reasons()));
+            log.info("Skipping weather timeSlotId={} retryAt={} reasons={}",
+                    timeSlotId, readiness.retryAt(), readiness.reasons());
             return;
         }
         if (!WeatherSchedule.withinWindow(now, target.startsAt())) {

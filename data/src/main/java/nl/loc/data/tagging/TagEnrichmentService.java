@@ -9,12 +9,14 @@ import java.util.List;
 
 import lombok.extern.slf4j.Slf4j;
 import nl.loc.data.event.Category;
+import nl.loc.data.publication.PublicationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Category tags are written here without Gemini. Gemini runs only when the description is long
- * enough, and a failed call is stored so the queue can retry it.
+ * Category tags are written here without Gemini. Gemini runs only for an event publication would
+ * already accept, and only when the description is long enough. A failed call is stored so the
+ * queue can retry it.
  */
 @Slf4j
 @Service
@@ -26,13 +28,16 @@ public class TagEnrichmentService {
 
     private final TagRepository tagRepository;
     private final GeminiTagClient geminiTagClient;
+    private final PublicationService publicationService;
     private final int dailyLimit;
 
     public TagEnrichmentService(TagRepository tagRepository,
                                 GeminiTagClient geminiTagClient,
+                                PublicationService publicationService,
                                 @Value("${loc.tagging.daily-limit}") int dailyLimit) {
         this.tagRepository = tagRepository;
         this.geminiTagClient = geminiTagClient;
+        this.publicationService = publicationService;
         this.dailyLimit = dailyLimit;
     }
 
@@ -57,6 +62,13 @@ public class TagEnrichmentService {
                     null, 0, null, null);
             log.debug("Stored category tags only eventId={} tags={} reason=description is too thin for Gemini",
                     eventId, slugs(categoryTags));
+            return;
+        }
+
+        PublicationService.Readiness readiness = publicationService.readiness(eventId);
+        if (!readiness.eligible()) {
+            tagRepository.holdUntil(eventId, fingerprint, readiness.retryAt(), String.join(",", readiness.reasons()));
+            log.info("Skipping Gemini eventId={} retryAt={} reasons={}", eventId, readiness.retryAt(), readiness.reasons());
             return;
         }
 
