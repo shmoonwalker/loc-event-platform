@@ -35,6 +35,14 @@ public class IngestionCommand implements CommandLineRunner {
                 requireArgCount(commandArgs, 2, "process <source>");
                 ingestionRun.processPending(commandArgs[1]);
             }
+            case "process-all" -> {
+                requireArgCount(commandArgs, 1, "process-all");
+                ingestionRun.processPendingAll();
+            }
+            case "collect" -> {
+                requireArgCount(commandArgs, 2, "collect <source>");
+                ingestionRun.collect(commandArgs[1]);
+            }
             case "run-all" -> {
                 requireArgCount(commandArgs, 1, "run-all");
                 ingestionRun.runAll();

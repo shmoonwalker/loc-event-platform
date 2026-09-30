@@ -69,6 +69,17 @@ public class IngestionRun {
 
     public void run(String source) {
         SourceCollector collector = collectorFor(source);
+        collect(source);
+        if (!hasMapper(collector.source())) {
+            log.info("Processing skipped source={} reason=no mapper registered", collector.source());
+            return;
+        }
+        processPending(collector.source());
+    }
+
+    /** Collect raw source snapshots and record presence, without normalizing them yet. */
+    public void collect(String source) {
+        SourceCollector collector = collectorFor(source);
         log.info("Collecting source={}", collector.source());
         Instant startedAt = Instant.now();
         CollectionRun run = collectionRunRepository.save(
@@ -84,13 +95,6 @@ public class IngestionRun {
         run.complete(Instant.now(), collectedEvents.stream().map(CollectedEvent::externalId).distinct().toList());
         collectionRunRepository.save(run);
         log.info("Collected source={} detailCount={}", collector.source(), collectedEvents.size());
-        if (!hasMapper(collector.source())) {
-            log.info("Processing skipped source={} reason=no mapper registered storedCount={}",
-                    collector.source(), collectedEvents.size());
-            log.info("Ingestion finished source={} published=0 failed=0", collector.source());
-            return;
-        }
-        processPending(collector.source());
     }
 
     public void reprocess(String source, List<String> detailKeys) {
@@ -117,7 +121,7 @@ public class IngestionRun {
                 log.error("Skipping failed detail file source={} rawObjectKey={}", source, detailKey, exception);
             }
         }
-        log.info("Ingestion finished source={} published={} failed={}", source, published, failed);
+        log.info("Ingestion finished source={} imported={} failed={}", source, published, failed);
     }
 
     private boolean hasMapper(String source) {

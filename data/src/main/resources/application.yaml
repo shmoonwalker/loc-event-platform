@@ -51,6 +51,14 @@ loc:
     include-season-passes: ${PUBLICATION_INCLUDE_SEASON_PASSES:false}
     # Only explicitly verified Ticketmaster virtual venue IDs. No keyword guessing.
     online-venue-ids: ${PUBLICATION_ONLINE_VENUE_IDS:}
+  collection:
+    enabled: ${COLLECTION_ENABLED:true}
+    # A source is collected again once its last completed collection is this old.
+    # Keep it well under the publication freshness limit (max-detail-age).
+    interval: ${COLLECTION_INTERVAL:PT24H}
+    check-interval: PT1H
+    # Leaves the startup import and first publication pass undisturbed.
+    initial-delay: PT10M
   object-storage:
     # Enable once R2 credentials and the bucket are configured.
     enabled: ${R2_ENABLED:true}
@@ -79,6 +87,7 @@ loc:
     scan-initial-delay: PT30S
     # Upper bound on messages queued per scan, so a backlog is worked through steadily.
     scan-limit: ${WEATHER_SCAN_LIMIT:200}
+    daily-limit: ${WEATHER_DAILY_LIMIT:500}
     # How long a queued slot is left alone before it counts as due again.
     claim-ttl: PT15M
     connect-timeout: PT5S
