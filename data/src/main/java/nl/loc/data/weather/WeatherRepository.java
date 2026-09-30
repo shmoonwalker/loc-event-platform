@@ -24,29 +24,27 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WeatherRepository {
 
+    private static final String LATITUDE = "(p.payload->'location'->>'latitude')::double precision";
+    private static final String LONGITUDE = "(p.payload->'location'->>'longitude')::double precision";
+
     /**
-     * Slots that may carry a forecast. Online events, events without coordinates, slots with no
-     * known start hour, cancelled events and events the source dropped are excluded here rather
-     * than being fetched and thrown away afterwards.
+     * Only occurrences in the published product get a forecast, using the coordinates that were
+     * published. Online events and anything the publication rules hold are never fetched.
      */
     private static final String ELIGIBLE_SLOT = """
             FROM catalog.event_time_slot s
-                     JOIN catalog.event e ON e.id = s.event_id
-                     JOIN catalog.event_location l ON l.event_id = s.event_id
+                     JOIN publication.event_snapshot p ON p.loc_occurrence_id = s.occurrence_key
                      LEFT JOIN catalog.event_weather w ON w.time_slot_id = s.id
-            WHERE l.location_type = 'PHYSICAL'
+            WHERE p.discoverable
+              AND p.payload->'location'->>'type' = 'PHYSICAL'
+              AND p.payload->'location'->>'latitude' IS NOT NULL
+              AND p.payload->'location'->>'longitude' IS NOT NULL
               AND s.retired = FALSE
-              AND l.latitude IS NOT NULL
-              AND l.longitude IS NOT NULL
               AND s.starts_at IS NOT NULL
-              AND s.start_date_status = 'KNOWN'
-              AND s.start_time_status = 'KNOWN'
-              AND e.source_active = TRUE
-              AND e.lifecycle_status <> 'CANCELLED'
             """;
 
     private static final String SELECT_TARGET =
-            "SELECT s.id, l.latitude, l.longitude, s.starts_at, COALESCE(w.attempts, 0) ";
+            "SELECT s.id, " + LATITUDE + ", " + LONGITUDE + ", s.starts_at, COALESCE(w.attempts, 0) ";
 
     private static final RowMapper<WeatherTarget> TARGET = (ResultSet row, int rowNumber) -> new WeatherTarget(
             row.getLong(1),
@@ -92,6 +90,22 @@ public class WeatherRepository {
                         """,
                 target.timeSlotId(), target.latitude(), target.longitude(),
                 utc(target.requestedHour()), utc(claimUntil));
+    }
+
+    /** Reserve one real weather request. The reservation is committed before the network call. */
+    @Transactional
+    public boolean reserveWeatherAttempt(Instant now, int dailyLimit, long timeSlotId) {
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(hashtext('loc-budget-weather'))", (ResultSet row) -> { });
+        Integer used = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM catalog.enrichment_request
+                WHERE kind = 'WEATHER' AND attempted_at >= ?
+                """, Integer.class, utc(startOfUtcDay(now)));
+        if (used != null && used >= dailyLimit) return false;
+        jdbcTemplate.update("""
+                INSERT INTO catalog.enrichment_request(kind, time_slot_id, attempted_at)
+                VALUES ('WEATHER', ?, ?)
+                """, timeSlotId, utc(now));
+        return true;
     }
 
     /** Returns false when the slot moved while the forecast was being fetched. */
@@ -140,8 +154,8 @@ public class WeatherRepository {
     }
 
     /**
-     * Drops rows that no longer describe their slot, or whose slot stopped being eligible.
-     * Publication clears these directly, so this is the safety net for anything it missed.
+     * Drops rows that no longer describe their slot's hour or published place. Import clears these
+     * directly, so this is the safety net for anything it missed.
      */
     @Transactional
     public int deleteStale() {
@@ -149,17 +163,15 @@ public class WeatherRepository {
                 DELETE FROM catalog.event_weather w
                 WHERE NOT EXISTS (SELECT 1
                                   FROM catalog.event_time_slot s
-                                           JOIN catalog.event_location l ON l.event_id = s.event_id
+                                           JOIN publication.event_snapshot p ON p.loc_occurrence_id = s.occurrence_key
                                   WHERE s.id = w.time_slot_id
                                     AND s.retired = FALSE
-                                    AND l.location_type = 'PHYSICAL'
-                                    AND l.latitude IS NOT NULL
-                                    AND l.longitude IS NOT NULL
                                     AND s.starts_at IS NOT NULL
+                                    AND p.payload->'location'->>'type' = 'PHYSICAL'
                                     AND w.requested_for_hour = date_trunc('hour', s.starts_at)
-                                    AND w.requested_latitude = l.latitude
-                                    AND w.requested_longitude = l.longitude)
-                """);
+                                    AND w.requested_latitude = %s
+                                    AND w.requested_longitude = %s)
+                """.formatted(LATITUDE, LONGITUDE));
     }
 
     @Transactional
@@ -175,5 +187,9 @@ public class WeatherRepository {
 
     private static OffsetDateTime utc(Instant instant) {
         return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
+    }
+
+    private static Instant startOfUtcDay(Instant now) {
+        return now.atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 }
