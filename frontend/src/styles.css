@@ -1,0 +1,36 @@
+/* You can add global styles to this file, and also import other style files */
+:root {
+    --bg: #e7eef3;
+    --panel: #f6f7ff;
+    --ink: #1c2433;
+    --muted: #556579;
+    --line: #ddd4f2;
+    --blush: #e21878;
+    --blush-soft: #ffe4f3;
+    --on-blush: #ffffff;
+    --sky: #d7fbff;
+    --glow: rgba(226, 24, 120, 0.38);
+    --shadow: 0 14px 32px rgba(28, 36, 51, 0.08);
+    --tonight: #e21878;
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+  
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    min-height: 100vh;
+    font-family: Nunito, "Avenir Next", "Segoe UI", sans-serif;
+    background:
+      radial-gradient(520px 320px at 12% 8%, color-mix(in srgb, var(--sky) 80%, transparent), transparent 70%),
+      radial-gradient(480px 340px at 90% 90%, color-mix(in srgb, var(--blush) 18%, transparent), transparent 72%),
+      var(--bg);
+    color: var(--ink);
+    line-height: 1.45;
+  }
