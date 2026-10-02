@@ -12,7 +12,7 @@ public record NormalizedEvent(
         String title,
         String description,
         String sourceUrl,
-        List<String> organizerNames,
+        List<EventOrganizer> organizers,
         Instant sourceCreatedAt,
         Instant sourceUpdatedAt,
         EventLocation location,

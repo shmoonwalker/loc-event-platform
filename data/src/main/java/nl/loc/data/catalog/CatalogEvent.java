@@ -57,11 +57,6 @@ public class CatalogEvent {
     @Column(name = "source_url")
     private String sourceUrl;
 
-    @Getter(AccessLevel.NONE)
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "organizer_names", nullable = false)
-    private List<String> organizerNames = new ArrayList<>();
-
     @Column(name = "source_created_at")
     private Instant sourceCreatedAt;
 
@@ -106,7 +101,6 @@ public class CatalogEvent {
             String title,
             String description,
             String sourceUrl,
-            List<String> organizerNames,
             Instant sourceCreatedAt,
             Instant sourceUpdatedAt,
             Instant collectedAt,
@@ -119,7 +113,6 @@ public class CatalogEvent {
                 title,
                 description,
                 sourceUrl,
-                organizerNames,
                 sourceCreatedAt,
                 sourceUpdatedAt,
                 collectedAt,
@@ -132,7 +125,6 @@ public class CatalogEvent {
             String title,
             String description,
             String sourceUrl,
-            List<String> organizerNames,
             Instant sourceCreatedAt,
             Instant sourceUpdatedAt,
             Instant collectedAt,
@@ -142,15 +134,10 @@ public class CatalogEvent {
         this.title = normalize(title);
         this.description = normalize(description);
         this.sourceUrl = normalize(sourceUrl);
-        this.organizerNames = normalizeNames(organizerNames);
         this.sourceCreatedAt = sourceCreatedAt;
         this.sourceUpdatedAt = sourceUpdatedAt;
         this.collectedAt = collectedAt;
         this.lifecycleStatus = lifecycleStatus == null ? EventLifecycle.UNKNOWN : lifecycleStatus;
-    }
-
-    public List<String> getOrganizerNames() {
-        return List.copyOf(organizerNames);
     }
 
     public void recordContentHash(String contentHash) {
@@ -182,20 +169,6 @@ public class CatalogEvent {
     public void markAbsent(Instant checkedAt) {
         sourceActive = false;
         sourcePresenceCheckedAt = checkedAt;
-    }
-
-    private static List<String> normalizeNames(List<String> names) {
-        if (names == null || names.isEmpty()) {
-            return new ArrayList<>();
-        }
-        List<String> normalized = new ArrayList<>();
-        for (String name : names) {
-            String value = normalize(name);
-            if (value != null) {
-                normalized.add(value);
-            }
-        }
-        return normalized;
     }
 
     private static String normalize(String value) {

@@ -60,6 +60,16 @@ currently discoverable snapshots. Only that final step is called publication.
 
 List grouping by logical event is defined in the backend product API, not in publication. See [Backend guide](../backend/README.md).
 
+Published occurrences include organizer records, not a bare list of names. Each
+record has `locOrganizerId`, `name`, and optional `description` and `site` when
+the source sent them. The Loc UUID is minted in `publication.organizer_identity`
+from the source identity: Ticketmaster promoter id, or the RVO organizer name.
+The same source key keeps the same UUID when the display name changes. The same
+display name from Ticketmaster and from RVO stays two organizers. RVO does not
+send description or site; Ticketmaster sometimes sends a promoter description.
+Existing Ticketmaster catalog rows gain promoter ids on the next collection or
+an explicit `reprocess` of their raw files.
+
 An occurrence is published when it has:
 
 - a title and a public source URL

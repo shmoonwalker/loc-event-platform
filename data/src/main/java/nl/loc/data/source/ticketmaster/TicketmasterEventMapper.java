@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLifecycle;
 import nl.loc.data.event.EventLocation;
+import nl.loc.data.event.EventOrganizer;
 import nl.loc.data.event.LocationType;
 import nl.loc.data.event.NormalizedEvent;
 import nl.loc.data.processing.SourceEventMapper;
@@ -59,7 +60,7 @@ public class TicketmasterEventMapper implements SourceEventMapper {
         String sourceUrl = httpUrl(text(root, "url"));
         return List.of(new NormalizedEvent(
                 source(), id, rawObjectKey, text(root, "name"), mapDescription(root),
-                sourceUrl, promoterNames(root),
+                sourceUrl, promoters(root),
                 // Discovery does not provide a documented event modification timestamp.
                 null, null, mapLocation(venue), TicketmasterTimeMapper.map(root, venue),
                 mapLifecycle(root), mapImages(root),
@@ -145,22 +146,49 @@ public class TicketmasterEventMapper implements SourceEventMapper {
                 latitude != null && longitude != null ? "SOURCE_VENUE" : "UNKNOWN");
     }
 
-    private static List<String> promoterNames(JsonNode root) {
-        Set<String> names = new LinkedHashSet<>();
+    private static List<EventOrganizer> promoters(JsonNode root) {
+        java.util.Map<String, EventOrganizer> byId = new java.util.LinkedHashMap<>();
+        addPromoter(byId, root.path("promoter"));
         JsonNode promoters = root.path("promoters");
         if (promoters.isArray()) {
             for (JsonNode promoter : promoters) {
-                String name = text(promoter, "name");
-                if (name != null) {
-                    names.add(name);
-                }
+                addPromoter(byId, promoter);
             }
         }
-        String name = text(root.path("promoter"), "name");
-        if (name != null) {
-            names.add(name);
+        return List.copyOf(byId.values());
+    }
+
+    private static void addPromoter(java.util.Map<String, EventOrganizer> byId, JsonNode promoter) {
+        if (promoter == null || !promoter.isObject()) {
+            return;
         }
-        return List.copyOf(names);
+        String id = text(promoter, "id");
+        String name = text(promoter, "name");
+        if (id == null || name == null) {
+            return;
+        }
+        String description = text(promoter, "description");
+        String site = firstText(promoter, "url", "website", "location");
+        EventOrganizer existing = byId.get(id);
+        if (existing == null) {
+            byId.put(id, new EventOrganizer(id, name, description, site));
+            return;
+        }
+        byId.put(id, new EventOrganizer(
+                existing.externalId(),
+                existing.name(),
+                existing.description() != null ? existing.description() : description,
+                existing.site() != null ? existing.site() : site));
+    }
+
+    private static String firstText(JsonNode node, String... fields) {
+        for (String field : fields) {
+            String value = text(node, field);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static EventLifecycle mapLifecycle(JsonNode root) {

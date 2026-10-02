@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import nl.loc.data.event.EventLocation;
 import nl.loc.data.event.EventLifecycle;
+import nl.loc.data.event.EventOrganizer;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.LocationType;
 import nl.loc.data.event.NormalizedEvent;
@@ -55,7 +56,7 @@ public class RvoEventMapper implements SourceEventMapper {
                 text(root, "title"),
                 mapDescription(root),
                 absoluteUrl(text(root, "url")),
-                organizerNames(root),
+                organizers(root),
                 parseInstant(text(root, "created"), "created", rawObjectKey),
                 parseInstant(text(root, "changed"), "changed", rawObjectKey),
                 mapLocation(root),
@@ -182,23 +183,26 @@ public class RvoEventMapper implements SourceEventMapper {
         return List.copyOf(slots);
     }
 
-    private static List<String> organizerNames(JsonNode root) {
+    private static List<EventOrganizer> organizers(JsonNode root) {
         JsonNode organisers = root.get("organisers");
         if (organisers == null || !organisers.isArray() || organisers.isEmpty()) {
             return List.of();
         }
 
-        List<String> names = new ArrayList<>();
+        java.util.Map<String, EventOrganizer> byName = new java.util.LinkedHashMap<>();
         for (JsonNode organiser : organisers) {
             if (organiser == null || !organiser.isTextual()) {
                 continue;
             }
             String name = blankToNull(organiser.asText());
             if (name != null) {
-                names.add(name);
+                name = name.strip();
+                if (!name.isEmpty()) {
+                    byName.putIfAbsent(name, new EventOrganizer(name, name, null, null));
+                }
             }
         }
-        return List.copyOf(names);
+        return List.copyOf(byName.values());
     }
 
     private static String absoluteUrl(String url) {

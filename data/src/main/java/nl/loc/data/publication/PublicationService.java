@@ -179,6 +179,8 @@ public class PublicationService {
                                            WHERE ec.event_id=e.id), '[]'::jsonb),
                     'images', COALESCE((SELECT jsonb_agg(to_jsonb(i) ORDER BY i.display_order)
                                        FROM catalog.event_image i WHERE i.event_id=e.id), '[]'::jsonb),
+                    'organizers', COALESCE((SELECT jsonb_agg(to_jsonb(org) ORDER BY org.organizer_index)
+                                           FROM catalog.event_organizer org WHERE org.event_id=e.id), '[]'::jsonb),
                     'tags', COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.tag) FROM catalog.event_tag t
                                      WHERE t.event_id=e.id), '[]'::jsonb),
                     'tagging', (SELECT jsonb_build_object('gemini_status', t.gemini_status)
@@ -271,6 +273,7 @@ public class PublicationService {
     private ObjectNode payload(JsonNode input, JsonNode slot, UUID eventId, UUID occurrence,
                                PublicationPolicy.Decision result) {
         JsonNode event = input.path("event"), location = input.path("location");
+        String source = PublicationPolicy.text(event, "source");
         ObjectNode output = json.createObjectNode().put("schemaVersion", 1)
                 .put("locEventId", eventId.toString()).put("locOccurrenceId", occurrence.toString())
                 .put("discoverable", true).put("detailsCurrent", true).put("state", result.state());
@@ -279,7 +282,7 @@ public class PublicationService {
         output.set("source", event.path("source"));
         output.set("sourceUrl", event.path("source_url"));
         output.set("lifecycle", event.path("lifecycle_status"));
-        output.set("organizers", event.path("organizer_names"));
+        output.set("organizers", organizers(source, input.path("organizers")));
         output.set("categories", input.path("categories").isEmpty() ? json.valueToTree(List.of("Other")) : input.path("categories"));
         Set<String> tags = new TreeSet<>();
         boolean geminiSucceeded = "SUCCEEDED".equals(input.path("tagging").path("gemini_status").asText());
@@ -328,6 +331,34 @@ public class PublicationService {
             }
         }
         return output;
+    }
+
+    private JsonNode organizers(String source, JsonNode organizers) {
+        var published = json.createArrayNode();
+        if (source == null || !organizers.isArray()) return published;
+        for (JsonNode organizer : organizers) {
+            String externalId = PublicationPolicy.text(organizer, "external_id");
+            String name = nl.loc.data.text.HtmlPlainText.convert(PublicationPolicy.text(organizer, "name"));
+            if (externalId == null || name == null) continue;
+            UUID id = organizerId(source, externalId);
+            ObjectNode record = json.createObjectNode()
+                    .put("locOrganizerId", id.toString())
+                    .put("name", name);
+            String description = nl.loc.data.text.HtmlPlainText.convert(PublicationPolicy.text(organizer, "description"));
+            if (description != null) record.put("description", description);
+            String site = PublicationPolicy.text(organizer, "site");
+            if (site != null) record.put("site", site);
+            published.add(record);
+        }
+        return published;
+    }
+
+    private UUID organizerId(String source, String externalId) {
+        jdbc.update("INSERT INTO publication.organizer_identity(source, external_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                source, externalId);
+        return jdbc.queryForObject(
+                "SELECT loc_organizer_id FROM publication.organizer_identity WHERE source=? AND external_id=?",
+                UUID.class, source, externalId);
     }
 
     private JsonNode read(String value) {
