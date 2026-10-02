@@ -49,7 +49,6 @@ configuration for the redesign. The frontend currently shows a holding page.
 Current redesign priorities include:
 
 - rebuilding the backend product API and its own application schema
-- adding a stable organizer identity to the published data contract
 - redesigning the frontend, admin, and user experiences
 
 Discovery UX: grouped event cards on the home list and a full date/time list on event detail ([backend guide](backend/README.md)).

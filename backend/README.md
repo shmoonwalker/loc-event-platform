@@ -73,7 +73,7 @@ enriched data in the `publication` schema, not the intermediate `catalog` schema
 Catalog data includes:
 
 - events
-- organizer references (currently names; stable IDs are planned)
+- organizer records in the publication payload (`locOrganizerId` UUID, name, optional description and site)
 - categories
 - tags
 - event relationships required by the catalog
@@ -136,14 +136,17 @@ Administratively hidden events are not publicly accessible.
 
 ## Organizers
 
-Organizer identity is a planned data-owned contract. Current published
-occurrences provide organizer names but no stable organizer IDs, organizer URL,
-or profile. The data application will add stable IDs before backend organizer
-pages use them. A source-backed URL may be exposed when available; the backend
-must not infer one from the event URL or organizer name.
+Organizer identity is a data-owned publication contract. Each published
+occurrence includes organizer records with a stable `locOrganizerId` UUID (the
+same type as `loc_event_id` / `loc_occurrence_id`), the
+display name, and optional `description` and `site` when the source sent them.
+`publication.organizer_identity` reuses the same Loc UUID for the same
+source and source organizer key (Ticketmaster promoter id, or the RVO
+organizer name). A source-backed site or URL may be exposed when the source
+provides it; the backend must not infer one from the event URL or organizer name.
 
-An organizer page can show the stable ID, name, optional verified URL, and
-published events associated with that organizer. Further profile details are
+An organizer page can show the stable ID, name, optional description and site,
+and published events associated with that organizer. Further profile details are
 outside the current data contract.
 
 Organizer accounts, organizer authentication and organizer-managed pages are not part of the current product design.
@@ -220,7 +223,8 @@ Administrative behaviour can include:
 
 Administrative actions that affect visibility do not modify the source catalog record.
 
-For example, hiding an event is stored as backend-owned moderation state referencing the catalog event.
+For example, hiding an event is backend-owned state keyed by `loc_event_id`
+without modifying catalog rows or publication source snapshots.
 
 Product hiding for discovery list purposes applies at `loc_event_id` unless a future design explicitly supports hiding individual occurrences.
 
