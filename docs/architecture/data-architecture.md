@@ -377,7 +377,11 @@ Pricing
 └── pricing description?
 
 Other
-├── organizer?
+├── organizers?
+│   ├── source identity (Ticketmaster promoter id, or RVO name)
+│   ├── name
+│   ├── description?
+│   └── site? (source-provided location or website)
 ├── ticket / registration URL?
 ├── image URL?
 ├── source status?
@@ -544,6 +548,39 @@ This provides same-source idempotency without requiring cross-source fuzzy match
 
 ---
 
+## Organizer Identity
+
+Organizer identity is a data-owned publication contract, parallel to event
+identity. Same-source organizer identity uses:
+
+```text
+source + external organizer key
+```
+
+- Ticketmaster: promoter id. The display name is not the identity.
+- RVO: the organizer name as sent. Two different strings stay two organizers.
+
+`publication.organizer_identity` mints one `locOrganizerId` UUID per source
+identity — the same type as `loc_event_id` and `loc_occurrence_id` — and reuses
+it on later imports. The same display name from Ticketmaster and from
+RVO remains two organizers because the identity includes the source.
+
+Catalog import stores source organizer facts on `catalog.event_organizer`.
+Publication copies them onto each occurrence snapshot as records with:
+
+```text
+locOrganizerId   UUID, same type as loc_event_id
+name
+description?   (only when the source sent one)
+site?          (only when the source sent a location or website)
+```
+
+A bare list of names is not the product contract. Organizer profile pages and
+grouping events by organizer are backend concerns. The backend must not invent
+an organizer URL from the event URL or name.
+
+---
+
 ## Cross-Source Deduplication
 
 Cross-source fuzzy deduplication is not part of the current pipeline.
@@ -588,7 +625,7 @@ qualified product snapshots to `publication.event_snapshot`.
 `publication.discoverable_events` filters snapshots for current discovery.
 The backend reads `publication`, not intermediate `catalog` rows.
 
-Publication stores one snapshot per occurrence (`loc_occurrence_id`). Grouping multiple occurrences into one discovery list card is not a data-application responsibility; the backend derives event-level list views from occurrence snapshots that share the same `loc_event_id`.
+Publication stores one snapshot per occurrence (`loc_occurrence_id`). Grouping multiple occurrences into one discovery list card is not a data-application responsibility; the backend derives event-level list views from occurrence snapshots that share the same `loc_event_id`. Organizer pages similarly read `locOrganizerId` from those occurrence snapshots.
 
 The backend does not need to understand:
 
