@@ -3,7 +3,9 @@
 
 ## Purpose
 
-The Loc data application is responsible for collecting external event data, preserving original source payloads, transforming that data into a consistent Loc representation, enriching it where useful, and publishing usable events into the Loc catalog.
+The Loc data application collects external event data, preserves original
+payloads, normalizes and enriches them in `catalog`, and publishes qualified
+occurrences through `publication`.
 
 The data application is a separate Java application from the main Spring Boot backend.
 
@@ -60,26 +62,24 @@ The backend does not fetch, normalize, or process external event sources.
              │                      PostgreSQL
              ▼
       ┌──────────────┐
+      │ Local tags / │
+      │ AI tagging   │
+      └──────┬───────┘
+             │
+             ▼
+      ┌──────────────┐
       │ Publication  │
       └──────┬───────┘
              │
              ▼
-       ┌────────────┐
-       │ PostgreSQL │
-       │ Loc Catalog│
-       └─────┬──────┘
-             │
-             ├──────────────► Backend API
-             │
-             ▼
-       ┌──────────────┐
-       │ AI Tagging   │
-       │    Async     │
-       └──────┬───────┘
-              │
-              ▼
-         Catalog update
-````
+       ┌──────────────────────┐
+       │ PostgreSQL           │
+       │ Qualified snapshots  │
+       └──────────┬───────────┘
+                  │
+                  ▼
+              Backend API
+```
 
 ---
 
@@ -100,9 +100,9 @@ Validate
     ↓
 Identity / Deduplicate
     ↓
-Publish
+Local tags / optional async AI tagging
     ↓
-Optional async AI tagging
+Publish when qualified
 ```
 
 This is the canonical processing order for the data application.
@@ -151,28 +151,9 @@ Raw payloads are immutable.
 
 A new collection creates new raw objects instead of modifying previous ones.
 
-Retention rules may differ between sources because licensing and provider terms may impose different require
-
-```text
-raw/
-├── source-a/
-│   └── <collection-run>/
-│       └── raw payloads
-│
-├── source-b/
-│   └── <collection-run>/
-│       └── raw payloads
-│
-└── source-c/
-    └── <collection-run>/
-        └── raw payloads
-```
-
-Raw payloads are immutable.
-
-A new collection creates new raw objects instead of modifying previous ones.
-
 Retention rules may differ between sources because licensing and provider terms may impose different requirements.
+
+Raw objects are organized by source and collection run.
 
 ---
 
@@ -281,42 +262,30 @@ The rest of the processing pipeline should not depend on how the source was fetc
 
 ---
 
-## Initial MVP Sources
+## Current Sources
 
-The data MVP targets multiple external providers with different shapes and
-collection styles:
+The implemented pipeline handles two external providers with different shapes
+and collection styles:
 
 | Source          | Role                                                                                    |
 | --------------- | --------------------------------------------------------------------------------------- |
-| RVO Events      | Intended first collect source — government events (networking, workshops, learning)     |
+| RVO Events      | Government events (networking, workshops, learning)     |
 | Ticketmaster NL | National event source with rich event, venue, classification, and lifecycle data        |
 
-The goal is a multi-source architecture rather than a provider-specific importer.
-These are MVP sources, not the final set of Loc data providers. Additional
-sources can be added later through new adapters.
+Additional sources can be added later through new adapters.
 
-Today the data application provides object storage (R2) and the Spring
-application shell. Collectors are not implemented yet; RVO is the planned first
-source adapter.
+RVO and Ticketmaster collection and processing are implemented. See
+`data/README.md` for their current commands and schedules.
 
 ---
 
 ## Collection Does Not Mean Publication
 
-Collecting a source record does not automatically mean that record becomes a Loc event.
-
-Processing may:
-
-```text
-publish
-reject
-defer
-exclude
-```
-
-a collected record according to catalog rules.
-
-Source-specific publication rules belong to the implementation of that source rather than to the general architecture.
+Collecting a source record does not automatically make it public. Catalog
+import retains normalized source records permissively. A separate publication
+decision qualifies each occurrence for the product, holds it for missing
+requirements, or withdraws it when it no longer qualifies. Source mapping
+rules stay in the source adapters; final product qualification is shared.
 
 ---
 
@@ -325,14 +294,13 @@ Source-specific publication rules belong to the implementation of that source ra
 Loc currently uses the following top-level event categories:
 
 ```text
-Music
-Nightlife
-Cinema & Theatre
-Festivals
+Music & Nightlife
+Arts & Culture
 Sports
-Community
-Networking
-Workshops & Learning
+Business & Careers
+Technology & Science
+Learning & Skills
+Nature & Sustainability
 Other
 ```
 
@@ -578,7 +546,7 @@ This provides same-source idempotency without requiring cross-source fuzzy match
 
 ## Cross-Source Deduplication
 
-Cross-source deduplication is intentionally not fully designed for the first MVP.
+Cross-source fuzzy deduplication is not part of the current pipeline.
 
 The same real-world event may eventually appear in multiple providers.
 
@@ -615,9 +583,12 @@ Individual records may instead be rejected or deferred while valid records conti
 
 Publication is an explicit responsibility of the data application.
 
-The data application writes usable normalized events into the Loc catalog.
+The data application stores normalized source data in `catalog`, then writes
+qualified product snapshots to `publication.event_snapshot`.
+`publication.discoverable_events` filters snapshots for current discovery.
+The backend reads `publication`, not intermediate `catalog` rows.
 
-The backend consumes published catalog data.
+Publication stores one snapshot per occurrence (`loc_occurrence_id`). Grouping multiple occurrences into one discovery list card is not a data-application responsibility; the backend derives event-level list views from occurrence snapshots that share the same `loc_event_id`.
 
 The backend does not need to understand:
 
@@ -651,7 +622,9 @@ Source-specific lifecycle interpretation belongs to processing logic.
 
 Repeated collection and idempotent publication allow catalog records to be updated instead of duplicated.
 
-Detailed cancellation, deletion, and stale-event behaviour is deferred to implementation design.
+Current publication rules withdraw cancelled, postponed, stale, or absent
+occurrences from discovery while retaining snapshots that were published before.
+See `data/README.md` for the implemented qualification rules.
 
 ---
 
@@ -661,9 +634,14 @@ AI-generated tags are a catalog enrichment owned by the data application.
 
 They are generated only after the event has been normalized into a clean Loc representation.
 
-AI tagging is asynchronous and must not block publication.
-
-An event without generated tags remains a valid published event.
+Local tags are assigned during import. An event with a description of at least
+80 characters waits for asynchronous Gemini tagging before final publication.
+While tagging is pending, the publication decision is held with `AWAITING_TAGS`.
+After Gemini succeeds, publication can proceed even if Gemini returned no tags.
+After five failed attempts, tagging is marked `GAVE_UP` and publication can
+proceed with local tags. Events with shorter or missing descriptions use local
+tags without a Gemini request. The published payload always has at least one
+tag; `other` is the final fallback. Other publication rules still apply.
 
 Generated tags may describe characteristics such as:
 
@@ -699,7 +677,7 @@ source tags
 
 The data application owns writing generated tags back to the event catalog.
 
-The backend reads them as optional catalog metadata.
+The backend reads the final published tags as catalog metadata.
 
 ---
 
@@ -723,7 +701,7 @@ If a message is lost, PostgreSQL state must still allow the system to determine 
 
 Queue names, routing keys, exchanges, retry counts, and other message contracts belong to implementation design.
 
-RabbitMQ does not need to orchestrate every stage of the first MVP.
+RabbitMQ does not orchestrate every stage of the pipeline.
 
 ---
 
@@ -742,14 +720,13 @@ Backend owns
 ├── users
 ├── authentication/session data
 ├── saved events
-├── going/attendance
 ├── comments
-├── notifications
-├── messaging state
+├── notification state (design pending)
 └── other product/user behaviour
 ```
 
-The backend may read the published catalog.
+The backend reads the qualified publication contract. It does not use
+intermediate catalog rows as product event data.
 
 The data application must not modify backend-owned user or product state.
 
@@ -781,7 +758,7 @@ Object storage and PostgreSQL therefore serve different responsibilities.
 
 ## Redis
 
-Redis is not required by the first data MVP.
+The current data worker does not require Redis.
 
 It may be used later if the data application develops a concrete need for temporary infrastructure such as:
 
@@ -875,13 +852,12 @@ Examples of backend-owned behaviour include:
 
 ```text
 search API
+event-granular discovery list (grouped by loc_event_id)
 saved events
-going/attendance
 comments
-notifications
+notifications (design pending)
 admin workflows
 user accounts
-messaging
 ```
 
 ---
@@ -898,8 +874,7 @@ loc-event-platform/
 └── docs/
     └── architecture/
         ├── system-architecture.md
-        ├── data-architecture.md
-        └── backend-architecture.md
+        └── data-architecture.md
 ```
 
 `data/README.md` should document how developers build, configure, run, and operate the data application.
@@ -932,39 +907,24 @@ The data architecture follows these principles:
 
 ## Deferred Implementation Decisions
 
-The following are intentionally not finalized here:
+These future decisions may evolve independently of this architecture document:
 
 ```text
-exact event database schema
-Java package structure
-Java classes and interfaces
-source-to-Loc field mappings
-category mapping rules
-database table names
-indexes
-raw object key format
-processing trigger implementation
-scheduler configuration
-queue and exchange names
-retry counts
-dead-letter configuration
-concurrency limits
 cross-source fuzzy deduplication
-detailed validation rules
-source-specific publication rules
-cancellation and stale-event policy
 raw retention duration per provider
-exact enrichment strategies
-AI tagging model/provider/prompts
+future enrichment strategies
+future provider adapters
 ```
 
-These decisions belong to detailed design and implementation work.
+Implemented rules, mappings, tables, and schedules are documented in
+`data/README.md` and the data application code.
 
 ---
 
-## MVP Goal
+## Next Integration Goal
 
-The first data MVP should prove the full architecture:
+Data collection and publication are implemented. The next integration step is
+the redesigned backend reading qualified publication data:
 
 ```text
 External sources
@@ -975,11 +935,10 @@ Raw storage
       ↓
 Processing
       ↓
-Catalog publication
+Qualified publication
       ↓
-Backend reads catalog
+Backend reads `publication`
 ```
 
-The goal is not maximum event-source coverage.
-
-The goal is a reliable, understandable, replayable multi-source pipeline that can support additional providers without redesigning the entire system.
+Additional sources can use the same collection, replay, and publication
+boundaries without changing the backend's product read contract.

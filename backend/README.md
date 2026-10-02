@@ -1,365 +1,354 @@
-# Final Project Backend
+# Backend Architecture
 
-A Spring Boot REST API template for the HackYourFuture final project.
+## Purpose
 
-**Stack:** Java 25 · Spring Boot 4.1 · PostgreSQL · Flyway · Spring Security · springdoc-openapi (Scalar) · Lombok ·
-Maven
+The Loc backend is the product API between the frontend and the event catalog.
 
-## Quick start
+It serves public event discovery and owns application-specific behaviour such as users, saved events, comments, moderation and administration.
 
-You need **JDK 25** and a PostgreSQL database — in Docker, in the cloud, or installed locally. Running the tests
-additionally needs Docker, which starts its own throwaway database.
+The backend does not collect or normalize external event data.
 
-### 1. Start a database
-
-With the default `admin` / `password` credentials. Do not use those credentials in production!
-
-```bash
-docker run --name hyf-postgres -e POSTGRES_DB=project_db -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=password -p 5432:5432 -d postgres:18.4-alpine
-```
-
-> For a production-like setup instead, [`db-setup.py`](../scripts/db-setup.py) creates the `project_db` database with an
-`app` and an `analytics` schema and one least-privilege role for each. Then run the app with `DB_SCHEMA=app`,
-`DB_USER=app_user` and the password the script prints.
-
-### 2. Set up configuration
-
-The database settings in [`application.yaml`](src/main/resources/application.yaml) have local-development defaults that
-match the container above. Event image uploads use ImageKit and require an `IMAGEKIT_PRIVATE_KEY`; ask the backend team
-for the shared development value through a private channel.
-
-Set `IMAGEKIT_PRIVATE_KEY` and any non-default [`DB_*` variables](#environment-variables) in your IDE's run
-configuration, in your shell, or by copying [`.env.example`](.env.example) to `.env` and loading it (
-`set -a; source .env`, an IDE plugin, or `--env-file`). Spring Boot does not read `.env` by itself. Never commit the
-private key.
-
-### 3. Start the application
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-```
-
-On Windows use `mvnw.cmd`. No profile is active unless you ask for one, so pass `dev` here or set it as the active
-profile in your IDE's run configuration.
-
-Open the API docs at **http://localhost:8080/api/docs**
+**Implementation status:** the old controllers, services, repositories, and
+database migrations have been removed. The current application is a Spring
+Boot shell with OpenAPI metadata, request validation error handling, and a
+default-deny security configuration. Product endpoints, authentication,
+database access, and the backend-owned schema will be implemented during the
+redesign. The sections below describe intended product behaviour.
 
 ---
 
-## API docs
+## System Boundary
 
-Spring Boot auto-generates an OpenAPI document that fully lists all your endpoints and objects in a standard,
-well-known format. It is assembled at runtime rather than kept in the repo (
-see [How the docs are generated](#how-the-docs-are-generated)).
-Many tools read this format, and Scalar turns it into a nice HTML page with all your API endpoints.
+```text
+External Event Sources
+        ↓
+Data Application
+        ↓
+Published Event Catalog
+        ↓
+Backend API
+        ↓
+Frontend
+```
 
-|                                           | URL                                         |
-|-------------------------------------------|---------------------------------------------|
-| **Scalar UI** — browse and try endpoints  | http://localhost:8080/api/docs              |
-| **OpenAPI spec** — for tools like Postman | http://localhost:8080/api/docs/openapi.yaml |
+The frontend communicates only with the backend API.
 
-Both are public (see [`SecurityConfig`](src/main/java/nl/hackyourfuture/project/backend/config/SecurityConfig.java)).
-Change a controller, restart, refresh — your endpoint is there.
-
-### Feature docs
-
-| Topic                      | Doc                                                    |
-|----------------------------|--------------------------------------------------------|
-| Event similarity           | [`docs/event-similarity.md`](docs/event-similarity.md) |
-| Notifications              | [`docs/notifications.md`](docs/notifications.md)       |
-| Event list & detail        | [`docs/events.md`](docs/events.md)                     |
-| Authentication             | [`docs/auth.md`](docs/auth.md) |
-| Google Sign-In             | [`docs/auth-google.md`](docs/auth-google.md) |
-| Password Recovery & Change | [`docs/auth-password-reset.md`](docs/auth-password-reset.md) |
-| Personal Account           | [`docs/personal-account.md`](docs/personal-account.md) |
-| Feedback                   | [`docs/feedback.md`](docs/feedback.md) |
-| Location Autocomplete      | [`docs/location.md`](docs/location.md) |
-| Weather Forecast           | [`docs/weather.md`](docs/weather.md) |
-| AI Event Assistant         | [`docs/event-chat.md`](docs/event-chat.md) |
+The data application and backend have separate responsibilities and data ownership.
 
 ---
 
-## Building
+## Responsibilities
 
-### Build an executable
+The backend is responsible for:
 
-Build a runnable JAR into `target/`:
+- public event discovery
+- event search and filtering
+- event detail
+- organizer pages
+- related event discovery
+- authentication and user accounts
+- saved events
+- comments
+- administration and moderation
+- application-owned state
 
-```bash
-./mvnw clean package
-```
+The backend is not responsible for:
 
-Run it:
+- collecting events from external sources
+- parsing provider-specific event data
+- normalizing external events
+- enriching external event data
+- publishing or modifying catalog-owned event data
 
-```bash
-java -jar target/backend-1.0.0-SNAPSHOT.jar
-```
-
-Run the tests:
-
-```bash
-./mvnw test
-```
-
-> `BackendApplicationTests.contextLoads()` boots the whole Spring context, but not against your own database: [
-`TestcontainersConfiguration`](src/test/java/nl/hackyourfuture/project/backend/TestcontainersConfiguration.java) starts
-> a throwaway `postgres:18.4-alpine` container for the run. So Docker has to be running, and the `DB_*` variables are
-> ignored here.
-
-Check code style with Checkstyle ([`checkstyle.xml`](checkstyle.xml)):
-
-```bash
-./mvnw checkstyle:check
-```
-
-### Docker build
-
-The [`Dockerfile`](Dockerfile) is multi-stage, so you need neither Java nor Maven installed:
-
-```bash
-docker build -t hyf-backend .
-```
-
-Stage 1 compiles the JAR in a Maven image; stage 2 copies just that JAR into a slim JRE image, leaving the source and
-build tools behind.
+These responsibilities belong to the data application.
 
 ---
 
-## Running the published image
+## Event Catalog
 
-Pull the published image from GitHub Container Registry:
+The data application owns event collection, the permissive normalized catalog,
+and final publication. The backend's event read contract is the qualified,
+enriched data in the `publication` schema, not the intermediate `catalog` schema.
 
-```bash
-docker pull ghcr.io/<org>/<repo>/backend:latest
-```
+Catalog data includes:
 
-Run it, pointing at your database:
+- events
+- organizer references (currently names; stable IDs are planned)
+- categories
+- tags
+- event relationships required by the catalog
 
-```bash
-docker run -p 8080:8080 --env-file secrets.env ghcr.io/<org>/<repo>/backend:latest
-```
+The backend treats catalog data as read-only.
 
-Two things to watch:
+Changes to catalog data are made through the data application rather than through backend product APIs.
 
-- **`localhost` inside a container means the container itself.** To reach a database on your own machine, use
-  `host.docker.internal`.
-- **Don't put real credentials in a `docker run` command.** Use `--env-file secrets.env` (gitignored), or your host's
-  secret manager.
-
-The image sets `SPRING_PROFILES_DEFAULT=prod`, so it runs with the `prod` profile unless you set
-`SPRING_PROFILES_ACTIVE` yourself.
-
----
-
-## Environment variables
-
-All configuration lives in [`application.yaml`](src/main/resources/application.yaml). Database values have
-local-development defaults, while sensitive integrations such as ImageKit require an environment variable.
-
-| Variable                 | Default      | Description                                                                                            |
-|--------------------------|--------------|--------------------------------------------------------------------------------------------------------|
-| `DB_HOST`                | `localhost`  | Database host (server name or IP address)                                                              |
-| `DB_PORT`                | `5432`       | Database port                                                                                          |
-| `DB_NAME`                | `project_db` | Database name                                                                                          |
-| `DB_SCHEMA`              | `app`        | Database schema                                                                                        |
-| `DB_USER`                | `admin`      | Database username                                                                                      |
-| `DB_PASSWORD`            | `password`   | Database password                                                                                      |
-| `IMAGEKIT_PRIVATE_KEY`   | —            | Private ImageKit API key used for event image uploads; share it only through a secure private channel  |
-| `SPRING_PROFILES_ACTIVE` | —            | Active profile: `dev` or `prod`. None is active unless you set it; the Docker image defaults to `prod` |
-
-[`.env.example`](.env.example) lists the same variables as a starting point — copy it to `.env` (gitignored) and load it
-as described in [Quick start](#quick-start) step 2.
-
-`application-dev.yaml` and `application-prod.yaml` layer on top when the matching profile is active. They only set
-logging levels right now — put anything environment-specific there.
-
-> **The `DB_*` defaults are for local development.** In production, point them at a secure database with credentials of
-> its own, and never commit those credentials.
-
-Any Spring property can be set this way: upper-case it and replace `.` with `_`, so `server.port` becomes `SERVER_PORT`.
+Data retains snapshots of previously published occurrences after they end or
+are withdrawn. The backend can use those snapshots for event detail and
+user-owned historical references. Events that never qualified for publication
+have no public detail snapshot.
 
 ---
 
-## Architecture
+## Public Event Discovery
 
-The project is organised **by feature**, not by layer. Everything about users lives in `user/`; add orders and
-everything about them goes in `order/` beside it.
+Anonymous users can browse and search published events without creating an account.
 
-```
-src/main/java/nl/hackyourfuture/project/backend/
-├── BackendApplication.java        ← entry point
-├── user/                          ← one folder per feature
-│   ├── UserController.java        ← HTTP layer
-│   ├── UserService.java           ← business logic
-│   ├── UserRepository.java        ← database access
-│   ├── User.java                  ← model
-│   └── dto/
-│       ├── UserRequest.java       ← what the client sends
-│       └── UserResponse.java      ← what we send back
-└── config/                        ← cross-cutting setup
-    ├── SecurityConfig.java
-    ├── GlobalExceptionHandler.java
-    └── OpenApiConfig.java
+Public discovery can use catalog attributes such as:
 
-src/main/resources/
-├── application.yaml               ← all configuration
-├── application-dev.yaml           ← extras for the dev profile
-├── application-prod.yaml          ← extras for the prod profile
-└── db/migration/                  ← Flyway migrations
-```
+- search text
+- category
+- tags
+- location
+- date and time
 
-Requests flow down, data flows back up, and each layer only talks to the one below it:
+Public discovery reads `publication.discoverable_events`, which contains only
+currently qualified occurrences. The backend also applies any backend-owned
+moderation visibility rules.
 
-```
-HTTP request → Controller → Service → Repository → PostgreSQL
-```
+Past, cancelled or administratively hidden events are excluded from normal discovery and search results.
 
-**Controller** — maps URLs to methods, validates input with `@Valid`, returns status codes. No business logic: each
-method should be a one-line delegation to the service. The OpenAPI annotations live here.
+Discovery list results are grouped by `loc_event_id`: the home and default browse UI show one card per logical event, not one card per occurrence. A card represents an event that has at least one currently discoverable occurrence after backend moderation rules. The list response includes shared event fields (title, location, categories, tags, primary image) plus summary scheduling such as the next upcoming start and the count of upcoming discoverable occurrences, and optionally the last upcoming start or a short date range. Pagination and total counts refer to distinct events, not occurrence snapshots. Sorting (for example soonest) uses the earliest upcoming discoverable occurrence per event.
 
-**Service** — the business logic. Knows nothing about HTTP, which is what makes it easy to test.
+Occurrence-level filters (such as a date range or "this weekend") are applied to occurrences first. Results are then collapsed to events that retain at least one matching occurrence. The card's summary scheduling must reflect only the matched occurrences, not every occurrence of the event.
 
-**Repository** — database access only. This project uses `JdbcClient` with **plain SQL** (no JPA/Hibernate), so the
-query you write is the query that runs. A `RowMapper` turns a result row into a model. Always use named parameters (
-`:email`) as the existing code does — never concatenate user input into SQL.
+If some occurrences are withdrawn or cancelled but at least one remains discoverable, the event still appears as one card. Partial discoverability is reflected on the detail page, not by duplicating cards on the list.
 
-**Model** — a plain object mirroring a table row, with Lombok generating the getters and builder.
+Weather on grouped list cards must never blend forecasts across dates. By default, weather is omitted from the list card and shown per date on event detail. If a list card shows weather, it may only be the next occurrence's forecast and only when that date falls inside the data pipeline's forecast window.
 
-**DTOs** — records defining what crosses the network. Don't return the model directly: it may hold fields you don't want
-to expose, the input and output shapes differ (the client sends an email but never an id), and DTOs let you rename a
-column without breaking the frontend. `UserRequest` carries the validation rules; `UserResponse` has a `from(User)`
-factory.
-
-### Members vs admin
-
-There are two app roles: **member** (`user`) and **admin**. Admin is `ROLE_ADMIN` only — it does not also have
-`ROLE_USER`.
-
-| Who    | Can do                                                                           | Inbox                                       |
-|--------|----------------------------------------------------------------------------------|---------------------------------------------|
-| Member | Save, Going, member comments, and `GET /api/users/me/saved` + `/going`           | Event cancel/update/reminder, comment reply |
-| Admin  | Admin APIs (events, admin replies, feedback). Not Save / Going / member comments | `NEW_FEEDBACK` only                         |
-
-`UserEventService` and `EventCommentService` refuse admin even if a route is only `.authenticated()`, so those
-member actions still return 403. Cancel/update recipients and 24h reminders skip `users.role = 'admin'`, so leftover
-staff Save/Going rows do not create event notifications.
-
-See [`docs/notifications.md`](docs/notifications.md) and [`docs/events.md`](docs/events.md).
-
-### The `config` folder
-
-**[`SecurityConfig`](src/main/java/nl/hackyourfuture/project/backend/config/SecurityConfig.java)** — the filter chain
-every request passes through *before* reaching a controller. `/api/users/**`, `/api/docs/**` and `/error` are open;
-everything else needs authentication. CSRF, HTTP Basic and form login are off because this is a stateless JSON API. Note
-that a 401/403 raised here never reaches `GlobalExceptionHandler`.
-
-**[`GlobalExceptionHandler`](src/main/java/nl/hackyourfuture/project/backend/config/GlobalExceptionHandler.java)** — a
-`@RestControllerAdvice` catching exceptions from any controller, so you don't write try/catch everywhere. A failed
-`@Valid` check becomes a 400 with an RFC 9457 `ProblemDetail` listing the invalid fields. For a new error case add
-another `@ExceptionHandler(YourException.class)` method; Spring picks the closest matching type.
-
-**[`OpenApiConfig`](src/main/java/nl/hackyourfuture/project/backend/config/OpenApiConfig.java)** — the title, version
-and server list shown in the docs, plus a customizer that sorts endpoints so the spec doesn't reshuffle between builds.
+Occurrence-level rows in `publication.discoverable_events` remain the storage truth; grouping is computed in the product API.
 
 ---
 
-## How the docs are generated
+## Event Detail
 
-**There is no `openapi.yaml` file in this repo, and you should never write one by hand.**
+An event detail page provides the available public information for a single event.
 
-The spec is built at runtime: on startup springdoc scans every `@RestController`, reads the Spring and OpenAPI
-annotations, derives JSON schemas from your DTO records, and assembles the document in memory. `/api/docs/openapi.yaml`
-serves it; `/api/docs` renders it with Scalar.
+Event detail is keyed by `loc_event_id`. The page shows shared event information once and lists all relevant occurrences: upcoming discoverable times plus, where policy allows, past or cancelled occurrences still available through `publication.event_snapshot`. Each occurrence entry includes its `loc_occurrence_id`, schedule, state, and optional weather for that date when the data pipeline attached it. The primary entry from the discovery list is the event id; a deep link to a single occurrence may be supported as a secondary route.
 
-So **your code is the source of truth** — no generation step, no file that can drift. But a missing annotation shows up
-as a gap in the docs immediately.
+An occurrence that was previously published may remain directly accessible
+after it has ended or been cancelled through `publication.event_snapshot`.
 
-- **Free:** paths, methods, parameter names and types, DTO schemas, `required` from `@NotBlank`, lengths from `@Size`,
-  format from `@Email`.
-- **You write:** `@Operation`, `@ApiResponse`, `@Parameter`, and `@Schema` descriptions and examples.
+The API should expose its current state clearly so the frontend can communicate that the event is past or cancelled.
 
-Copy the pattern from [`UserController`](src/main/java/nl/hackyourfuture/project/backend/user/UserController.java).
-Document every status code your endpoint can return, not just the happy path.
+Administratively hidden events are not publicly accessible.
 
-To hand the spec to the frontend team, grab it while the app runs:
+---
 
-```bash
-curl http://localhost:8080/api/docs/openapi.yaml -o openapi.yaml
+## Organizers
+
+Organizer identity is a planned data-owned contract. Current published
+occurrences provide organizer names but no stable organizer IDs, organizer URL,
+or profile. The data application will add stable IDs before backend organizer
+pages use them. A source-backed URL may be exposed when available; the backend
+must not infer one from the event URL or organizer name.
+
+An organizer page can show the stable ID, name, optional verified URL, and
+published events associated with that organizer. Further profile details are
+outside the current data contract.
+
+Organizer accounts, organizer authentication and organizer-managed pages are not part of the current product design.
+
+---
+
+## Related Events
+
+The backend provides related-event discovery using available catalog information such as:
+
+- categories
+- tags
+- location
+- schedule
+- other relevant event attributes
+
+The exact similarity and ranking implementation may evolve independently of the public product behaviour.
+
+---
+
+## Authentication and Users
+
+Loc supports user registration and JWT-based authentication.
+
+Authentication is not required for public event discovery.
+
+Authenticated users can access account-specific functionality including:
+
+- saving events
+- viewing their saved events
+- commenting on events
+
+User-specific state belongs to the backend.
+
+---
+
+## Saved Events
+
+Saving an event creates backend-owned user state referencing a stable published
+Loc event or occurrence identity. The choice of event versus occurrence for
+each user action belongs to the backend design.
+
+Saved events remain available in the user's account even when the event later becomes:
+
+- past
+- cancelled
+
+The event's current status should still be visible to the user.
+
+Saving an event does not modify the catalog event itself.
+
+---
+
+## Comments
+
+Authenticated users can comment on events.
+
+Comments and their moderation state are owned by the backend.
+
+Comment functionality is separate from catalog ownership and does not modify event data.
+
+---
+
+## Administration
+
+Administrators use a separate administration interface from normal users.
+
+Administrative behaviour can include:
+
+- responding to platform messages
+- moderating comments
+- reviewing reports
+- hiding an event from the Loc product when necessary
+
+Administrative actions that affect visibility do not modify the source catalog record.
+
+For example, hiding an event is stored as backend-owned moderation state referencing the catalog event.
+
+Product hiding for discovery list purposes applies at `loc_event_id` unless a future design explicitly supports hiding individual occurrences.
+
+---
+
+## Data Ownership
+
+The platform separates catalog data from application data.
+
+### Data application owns
+
+- external event collection
+- normalization
+- enrichment
+- event publication
+- organizers
+- categories
+- tags
+- catalog event state
+
+### Backend owns
+
+- users
+- authentication
+- saved events
+- comments
+- reports
+- moderation
+- administrative product state
+
+Notifications are planned, but their triggers, channels, and persistence model
+have not been decided. Attendance or "going" is not part of the current backend
+scope.
+
+---
+
+## PostgreSQL
+
+Loc uses one PostgreSQL database with separate ownership boundaries.
+
+Conceptually:
+
+```text
+PostgreSQL
+├── catalog
+│   └── intermediate normalized data owned by the data application
+├── publication
+│   └── qualified product read contract owned by the data application
+│
+└── backend-owned schema (to be created)
+    └── owned by the redesigned backend
 ```
 
----
+The data application has write access to catalog data.
 
-## DB Migrations
+The backend will read qualified publication data and have read/write access to
+its own application data when that schema is created. The current shell has no
+database connection. Product event reads will not rely on intermediate catalog
+rows.
 
-The schema is managed by **Flyway** in [`db/migration`](src/main/resources/db/migration). On startup it applies any
-migration that hasn't run yet, tracking them in a `flyway_schema_history` table — so everyone's schema matches,
-including production.
-
-Name files `V<number>__<description>.sql` (**two** underscores): after `V1__init_schema.sql` comes
-`V2__add_orders_table.sql`.
-
-**Never edit a migration that has already run.** Flyway checksums each applied file and startup fails if one changes.
-Need a change? Add a new migration. If your local database is in a mess, drop it and let Flyway rebuild it.
+This keeps service responsibilities separate without requiring separate databases.
 
 ---
 
-## CI/CD
+## RabbitMQ
 
-Every pull request touching `backend/**` runs [`backend-ci-cd.yaml`](../.github/workflows/backend-ci-cd.yaml), and so
-does every push to `main` that touches it:
+RabbitMQ is used for asynchronous work where components need to react to events or changes.
 
-1. **`lint-and-test`** — `./mvnw checkstyle:check` then `./mvnw test`. Both must pass.
-2. **`build`** — builds the Docker image; only pushes to GHCR when the change lands on `main`.
+It is not the source of truth for the event catalog and is not required for normal event reads.
 
-Images are tagged `latest`, `1.0.<run number>`, and `main-sha-<short sha>`.
+Normal product reads follow:
 
----
+```text
+Backend
+   ↓
+Qualified Publication
+```
 
-## Adding a feature
-
-Adding products, bottom-up:
-
-1. Migration — `V2__create_products_table.sql`
-2. Create the `product/` package next to `user/`
-3. `Product.java` mirroring the table
-4. `ProductRepository.java` with a `RowMapper` and your SQL
-5. `dto/ProductRequest.java` (validation annotations) and `dto/ProductResponse.java` (`from` factory)
-6. `ProductService.java` for the logic
-7. `ProductController.java` with `@RestController`, `@RequestMapping("/api/products")` and OpenAPI annotations
-8. Add the path to `SecurityConfig` if it should be public
-9. Restart and check http://localhost:8080/api/docs
-
-The `user` package is your reference — deliberately small and complete.
+RabbitMQ may later carry messages such as catalog changes when asynchronous backend behaviour needs them.
 
 ---
 
-## Good to know
+## Backend Structure
 
-- **Lombok** generates boilerplate at compile time, which is why `UserService` has no visible constructor. Your IDE
-  needs the Lombok plugin or it will flag code that compiles fine.
-- **Constructor injection** via `@RequiredArgsConstructor` and `private final` fields. Prefer it to `@Autowired` on
-  fields.
-- **DevTools** restarts the app when you rebuild — in IntelliJ, Recompile (⇧⌘F9 / Ctrl+Shift+F9) is enough.
-- **Keep classes under `nl.hackyourfuture.project.backend`.** Spring only scans below the package holding
-  `BackendApplication`; anything outside is silently ignored.
-- **Use correct status codes** — `200` read/update, `201` create (see `@ResponseStatus(HttpStatus.CREATED)`), `400`
-  invalid input, `404` not found — then document them with `@ApiResponse`.
-- **Validate at the edge:** constraints on the request DTO, `@Valid` on the controller parameter.
-- **Before opening a PR,** run `./mvnw checkstyle:check` and `./mvnw test` locally — CI runs the same checks and blocks
-  the PR if either fails.
+The backend is organized primarily by feature.
 
-### Troubleshooting
+Conceptually:
 
-| Symptom                                                                              | Cause                                                                                                                                                                         |
-|--------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Failed to configure a DataSource: 'url' attribute is not specified`                 | Config files missing from `target/classes`. Run `./mvnw clean package`, or Rebuild Project in IntelliJ — recompiling a single class doesn't copy resources                    |
-| `Connection refused` on port 5432                                                    | PostgreSQL isn't running — start the container from [Quick start](#quick-start)                                                                                               |
-| `FATAL: database "project_db" does not exist`                                        | The database was created under another name. Create `project_db`, or set `DB_NAME` to the name you have                                                                       |
-| `password authentication failed for user "admin"`                                    | Wrong `DB_USER` / `DB_PASSWORD` for this database                                                                                                                             |
-| `relation "users" does not exist`, or Flyway hits `permission denied for schema app` | `DB_SCHEMA` names a schema your `DB_USER` may not write to — the repository SQL uses unqualified table names and resolves them through it. Point it at a schema the user owns |
-| `Could not find a valid Docker environment` while running `./mvnw test`              | Docker isn't running — the tests start their own database container                                                                                                           |
-| `Migration checksum mismatch`                                                        | An applied migration was edited. Revert it and add a new `V…` file                                                                                                            |
-| `403 Forbidden` on your new endpoint                                                 | Not listed in `SecurityConfig`; anything unlisted requires authentication                                                                                                     |
-| Endpoint missing from `/api/docs`                                                    | Not annotated `@RestController`, or outside the base package                                                                                                                  |
-| IDE errors on `@Getter`/`@Builder` but Maven builds fine                             | Lombok plugin not installed in the IDE                                                                                                                                        |
-| Checkstyle fails in CI but not locally                                               | Run `./mvnw checkstyle:check` before pushing — it's the same check CI runs                                                                                                    |
+```text
+backend
+├── event
+├── organizer
+├── category
+├── user
+├── comment
+├── admin
+└── config
+```
+
+Each feature owns the controller, business logic, persistence and DTOs required for that area.
+
+Cross-cutting infrastructure belongs outside individual product features.
+
+---
+
+## API Principles
+
+Backend APIs should:
+
+- expose product behaviour rather than provider-specific external data
+- keep HTTP concerns in controllers
+- keep business rules in services
+- keep persistence concerns in repositories
+- use DTOs as the public API contract
+- validate input at the API boundary
+- return explicit event state where it affects product behaviour
+- preserve clear ownership between catalog data and backend-owned state
+
+As backend endpoints are implemented, their generated OpenAPI specification
+will describe the actual request and response structures. The current shell
+has no product endpoints or authentication scheme to document yet.
+
+This document defines high-level backend behaviour and ownership rather than individual endpoint implementation.
+
+---
+
+## Documentation Rule
+
+High-level documentation should describe stable product behaviour and ownership boundaries.
+
+Implementation-specific details should only be documented when they are actively maintained.

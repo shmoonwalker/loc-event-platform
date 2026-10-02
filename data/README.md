@@ -54,8 +54,11 @@ Optional commands via `-Dspring-boot.run.arguments="..."`:
 
 The catalog import (`CatalogImportService`) is deliberately permissive: a normalized event is
 stored even when it will not pass final publication. `PublicationService` applies the product
-rules afterwards and writes `publication.event_snapshot`, `publication.discoverable_events` and
-`publication.change_log`. Only that final step is called publication.
+rules afterwards and writes `publication.event_snapshot` and
+`publication.change_log`. `publication.discoverable_events` is a view over
+currently discoverable snapshots. Only that final step is called publication.
+
+List grouping by logical event is defined in the backend product API, not in publication. See [Backend guide](../backend/README.md).
 
 An occurrence is published when it has:
 
@@ -181,7 +184,9 @@ docker compose up -d rabbitmq
 | `RABBITMQ_USER`        | Broker user                                          | `guest`    |
 | `RABBITMQ_PASSWORD`    | Broker password                                      | `guest`    |
 
-Set `WEATHER_ENABLED=false` to keep the previous one-pass behaviour, which needs no broker.
+Set `WEATHER_ENABLED=false` to disable weather scans and their queue listener.
+Tagging has its own `TAGGING_ENABLED` setting and may still require RabbitMQ;
+collection and publication schedules are controlled separately.
 
 The scan limit and the listener concurrency together bound the request rate. Open-Meteo needs
 no API key but is fair-use, so a backlog is worked through over several scans instead of being
