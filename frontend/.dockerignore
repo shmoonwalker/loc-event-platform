@@ -1,2 +1,9 @@
-docker build -t loc-frontend frontend
-docker run --rm -p 3000:3000 loc-frontend
+node_modules/
+.angular/
+dist/
+coverage/
+.git/
+.env
+.env.*
+*.log
+.DS_Store

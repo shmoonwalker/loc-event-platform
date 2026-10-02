@@ -41,15 +41,18 @@ More focused architecture documents will be added only when a part of the system
 
 ## Project Status
 
-The existing application remains the working foundation while the architecture is redesigned incrementally.
+The data worker now collects RVO and Ticketmaster events and publishes qualified
+occurrences through the `publication` schema. The old backend implementation
+has been removed; a small Spring Boot shell retains security and OpenAPI
+configuration for the redesign. The frontend currently shows a holding page.
 
 Current redesign priorities include:
 
-- separating data ingestion from the product API
-- supporting multiple external event sources
-- clarifying catalog and product-data ownership
-- improving backend architecture and security
-- redesigning admin and user experiences
+- rebuilding the backend product API and its own application schema
+- adding a stable organizer identity to the published data contract
+- redesigning the frontend, admin, and user experiences
+
+Discovery UX: grouped event cards on the home list and a full date/time list on event detail ([backend guide](backend/README.md)).
 
 ## Background
 

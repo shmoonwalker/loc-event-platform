@@ -30,29 +30,15 @@ services:
       retries: 10
 
   backend:
+    profiles: ["backend-preview"]
     build: ./backend
-    environment:
-      DB_HOST: db
-      DB_PORT: "5432"
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_SCHEMA: app
-      IMAGEKIT_PRIVATE_KEY: ${IMAGEKIT_PRIVATE_KEY}
     ports:
       - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
 
   frontend:
     build: ./frontend
-    environment:
-      BACKEND_API_URL: http://backend:8080
     ports:
       - "3000:3000"
-    depends_on:
-      - backend
 
 volumes:
   db-data:

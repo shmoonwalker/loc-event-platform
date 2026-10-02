@@ -4,6 +4,10 @@
 
 This document defines the high-level architecture for the personal redesign of Loc.
 
+The data worker and its `catalog` and `publication` schemas are implemented.
+The backend product API and frontend experience below are the redesign target;
+the current backend is a minimal shell and the frontend is a holding page.
+
 It describes the major system components, ownership boundaries, data flow, and architecture principles.
 
 Implementation details, delivery steps, source-specific ingestion logic, database schemas, queue definitions, and feature-specific designs are intentionally kept out of this document. Those belong in focused design documents and implementation tickets.
@@ -45,11 +49,12 @@ The architecture should support multiple external event sources over time withou
               ┌───────────────────────────────┐
               │ PostgreSQL                    │
               │                               │
-              │ Catalog / data-owned data     │
-              │ Product / backend-owned data  │
+              │ catalog: normalized data      │
+              │ publication: product snapshots│
+              │ backend-owned product data    │
               └──────────────┬────────────────┘
                              │
-                      read published catalog
+                      read publication snapshots
                              ▼
                     ┌─────────────────┐
                     │ Backend API     │
@@ -86,7 +91,7 @@ It does not communicate directly with PostgreSQL, RabbitMQ, Redis, object storag
 
 | Component | Responsibility |
 |---|---|
-| **Backend API** | Public/product HTTP API. Reads the published event catalog. Owns product and user operations, security, caching, and product-side asynchronous messaging. |
+| **Backend API** | Public/product HTTP API. Reads qualified `publication` snapshots. Owns product and user operations, security, caching, and product-side asynchronous messaging. |
 | **Data worker** | Scheduled external data collection. Fetches source data, stores raw payloads, processes data, and publishes catalog data into PostgreSQL. It exposes no public product API. |
 | **Frontend** | User interface. Communicates only with the backend API over HTTPS. |
 | **PostgreSQL** | System of record for published catalog data and product/application data. One database with clear logical ownership boundaries. |
@@ -131,6 +136,8 @@ The backend does **not** publish ingestion-owned catalog data.
 
 The frontend owns the user interface and communicates only with the backend API.
 
+Discovery UX treats `loc_event_id` as the list unit (one card per logical event) and `loc_occurrence_id` as the schedule unit on event detail. The backend discovery API performs grouping; the frontend does not read `publication` directly.
+
 ### Shared Contracts
 
 The data and backend applications share only the contracts required to interact safely, primarily:
@@ -138,6 +145,8 @@ The data and backend applications share only the contracts required to interact 
 - published catalog structure
 - identifiers and shared domain concepts
 - optional asynchronous event or signal definitions
+
+Published snapshots remain occurrence-granular in `publication`; the backend may expose an event-granular discovery list DTO derived from those snapshots. Identifier semantics: `loc_event_id` is the logical event (list unit); `loc_occurrence_id` is one dated instance (schedule unit). See [Backend direction](../../backend/README.md) for discovery grouping rules.
 
 A shared Java library should only be introduced later if real duplication or contract-management needs justify it.
 
@@ -158,7 +167,8 @@ PostgreSQL
     └── written by Backend
 ```
 
-The backend may read published catalog data.
+The backend reads qualified data from `publication`; `catalog` is the data
+worker's intermediate normalized store.
 
 The data worker should not modify backend-owned product or user data.
 
@@ -190,7 +200,7 @@ Frontend
 
 Raw external payloads are not consumed directly by the product API.
 
-Only processed and published catalog data becomes product-facing.
+Only qualified publication snapshots become product-facing.
 
 ---
 
@@ -285,7 +295,7 @@ A shared library should not be introduced unless a concrete need appears.
 - RabbitMQ carries asynchronous work and events, not authoritative state.
 - Data owns catalog publication.
 - Backend owns product and user operations.
-- Backend may read the published catalog but does not own ingestion publication.
+- Backend reads qualified publication snapshots but does not own publication.
 - Data does not write backend-owned user or product data.
 - Frontend communicates only with the backend API.
 - Raw external payloads are never directly exposed as the product catalog.
@@ -301,16 +311,15 @@ This document intentionally stays high-level.
 Focused architecture documents:
 
 - [Data Architecture](data-architecture.md) — data worker runtime, pipeline, sources, catalog contract, and publication
-- Backend architecture — add when the product API needs a focused design
+- [Backend direction](../../backend/README.md) — product API behaviour and ownership
 
 ```text
 docs/architecture/
 ├── system-architecture.md
-├── data-architecture.md
-└── backend-architecture.md
+└── data-architecture.md
 ```
 
 Application-specific operational instructions belong in the corresponding application README, for example:
 
 - `data/README.md` — how to build, configure, test, and run the data worker
-- `backend/README.md` — how to build, configure, test, and run the backend
+- `backend/README.md` — current product direction for the backend redesign
