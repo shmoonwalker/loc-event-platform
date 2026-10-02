@@ -18,6 +18,7 @@ import nl.loc.data.event.Category;
 import nl.loc.data.event.CategoryAssignment;
 import nl.loc.data.event.EventImage;
 import nl.loc.data.event.EventLocation;
+import nl.loc.data.event.EventOrganizer;
 import nl.loc.data.event.EventTimeSlot;
 import nl.loc.data.event.NormalizedEvent;
 import nl.loc.data.tagging.ContentTag;
@@ -36,6 +37,7 @@ public class CatalogImportService {
     private final CatalogEventLocationRepository catalogEventLocationRepository;
     private final CatalogEventRepository catalogEventRepository;
     private final CatalogEventImageRepository catalogEventImageRepository;
+    private final CatalogEventOrganizerRepository catalogEventOrganizerRepository;
     private final CatalogCategoryRepository catalogCategoryRepository;
     private final CatalogEventCategoryRepository catalogEventCategoryRepository;
     private final WeatherRepository weatherRepository;
@@ -53,7 +55,6 @@ public class CatalogImportService {
                     event.title(),
                     event.description(),
                     event.sourceUrl(),
-                    event.organizerNames(),
                     event.sourceCreatedAt(),
                     event.sourceUpdatedAt(),
                     collectedAt,
@@ -67,7 +68,6 @@ public class CatalogImportService {
                     event.title(),
                     event.description(),
                     event.sourceUrl(),
-                    event.organizerNames(),
                     event.sourceCreatedAt(),
                     event.sourceUpdatedAt(),
                     collectedAt,
@@ -220,6 +220,30 @@ public class CatalogImportService {
     private record SlotSync(List<Long> savedSlotIds, Set<Long> rescheduledSlotIds) {
     }
 
+    private void syncOrganizers(CatalogEvent event, List<EventOrganizer> organizers) {
+        List<EventOrganizer> incoming = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        if (organizers != null) {
+            for (EventOrganizer organizer : organizers) {
+                if (organizer == null || organizer.externalId() == null || organizer.externalId().isBlank()
+                        || organizer.name() == null || organizer.name().isBlank()) {
+                    continue;
+                }
+                if (seen.add(organizer.externalId().strip())) {
+                    incoming.add(organizer);
+                }
+            }
+        }
+        catalogEventOrganizerRepository.deleteAll(
+                catalogEventOrganizerRepository.findByEventOrderByOrganizerIndex(event));
+        catalogEventOrganizerRepository.flush();
+        List<CatalogEventOrganizer> toSave = new ArrayList<>();
+        for (int index = 0; index < incoming.size(); index++) {
+            toSave.add(new CatalogEventOrganizer(event, index, incoming.get(index)));
+        }
+        catalogEventOrganizerRepository.saveAll(toSave);
+    }
+
     private void syncImages(CatalogEvent event, List<EventImage> images) {
         List<EventImage> incoming = images == null ? List.of() : images;
         List<CatalogEventImage> existing = catalogEventImageRepository
@@ -337,6 +361,7 @@ public class CatalogImportService {
         boolean locationMoved = upsertLocation(catalogEvent, event.location());
         SlotSync slotSync = syncTimeSlots(catalogEvent, event.timeSlots());
         clearOutdatedWeather(catalogEvent, slotSync, locationMoved);
+        syncOrganizers(catalogEvent, event.organizers());
         syncImages(catalogEvent, event.images());
         syncCategories(catalogEvent, event.categories());
         // Gemini output is kept when the title or description changes; each event is sent to Gemini once.
