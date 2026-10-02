@@ -1,32 +1,12 @@
 spring:
   application:
-    name: hyf-project-backend
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:project_db}?currentSchema=${DB_SCHEMA:app}
-    username: ${DB_USER:admin}
-    password: ${DB_PASSWORD:password}
-  flyway:
-    schemas: ${DB_SCHEMA:app}
-  servlet:
-    multipart:
-      max-file-size: 5MB
-      max-request-size: 6MB
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
+    name: loc-backend
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
 
 server:
   port: 8080
 
-# API Docs
 springdoc:
   api-docs:
     path: /api/docs/openapi.yaml
@@ -34,19 +14,3 @@ scalar:
   enabled: true
   path: /api/docs
   url: ${springdoc.api-docs.path}
-
-image:
-  private-key: ${IMAGEKIT_PRIVATE_KEY}
-
-gemini:
-  api-key: ${GEMINI_API_KEY:}
-
-google:
-  client-id: ${GOOGLE_CLIENT_ID:}
-  client-secret: ${GOOGLE_CLIENT_SECRET:}
-  redirect-uri: ${GOOGLE_REDIRECT_URI:}
-frontend:
-  base-url: ${FRONTEND_BASE_URL:}
-
-
-

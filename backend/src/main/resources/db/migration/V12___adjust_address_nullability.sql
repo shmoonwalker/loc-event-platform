@@ -1,4 +1,0 @@
-ALTER TABLE addresses ALTER COLUMN house_number DROP NOT NULL;
-
-ALTER TABLE addresses ALTER COLUMN latitude SET NOT NULL;
-ALTER TABLE addresses ALTER COLUMN longitude SET NOT NULL;
