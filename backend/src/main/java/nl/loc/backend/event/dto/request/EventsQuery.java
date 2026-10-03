@@ -103,7 +103,8 @@ public record EventsQuery(
         @Parameter(description = "Inclusive local start time HH:mm. Requires timeTo. Applies on each selected date.", example = "18:00")
         String timeFrom,
 
-        @Parameter(description = "Exclusive local start time HH:mm. Earlier than timeFrom means overnight; equal times are invalid.", example = "23:00")
+        @Parameter(description = "Exclusive local start time HH:mm. Earlier than timeFrom means overnight; "
+                + "equal times are invalid.", example = "23:00")
         String timeTo
 ) {
 }
