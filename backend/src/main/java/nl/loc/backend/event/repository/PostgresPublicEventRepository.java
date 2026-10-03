@@ -107,14 +107,10 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
 
     private long count(BrowseCriteria criteria, TimeWindow.Range range) {
         String sql = """
-                WITH next_occurrence AS (
-                    SELECT DISTINCT ON (s.loc_event_id) s.loc_event_id
-                    FROM publication.discoverable_events s
-                    WHERE %s
-                    ORDER BY s.loc_event_id, %s, s.loc_occurrence_id
-                )
-                SELECT count(*) FROM next_occurrence
-                """.formatted(occurrenceFilter(criteria), STARTS);
+                SELECT count(DISTINCT s.loc_event_id)
+                FROM publication.discoverable_events s
+                WHERE %s
+                """.formatted(occurrenceFilter(criteria));
         Long total = bind(jdbc.sql(sql), criteria, range).query(Long.class).single();
         return total == null ? 0 : total;
     }
