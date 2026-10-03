@@ -10,19 +10,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import nl.loc.backend.event.model.TimeWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestConstructor;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -39,10 +44,23 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@Import(PublicEventsHttpTest.FixedTime.class)
 @AutoConfigureMockMvc
 @Testcontainers
 @Sql(scripts = "/db/publication-discoverable-events.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class PublicEventsHttpTest {
+
+    private static final Instant NOW = Instant.parse("2030-06-07T10:00:00Z");
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class FixedTime {
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(NOW, ZoneOffset.UTC);
+        }
+    }
 
     private static final Set<String> PAGE_KEYS = Set.of("page", "size", "totalElements", "totalPages", "items");
     private static final Set<String> CARD_KEYS = Set.of(
@@ -98,21 +116,13 @@ class PublicEventsHttpTest {
         jdbc.sql("DELETE FROM publication.event_snapshot").update();
         hiddenOccurrenceIds.clear();
         discoverable.clear();
-        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-        Instant validUntil = now.plus(Duration.ofDays(400));
-        TimeWindow.Range tonight = TimeWindow.tonight(now);
-        TimeWindow.Range weekend = TimeWindow.weekend(now);
-
-        Instant musicStart = soon(tonight, now, Duration.ofMinutes(2));
-        Instant sportsStart = soon(tonight, now, Duration.ofMinutes(20));
-        if (!sportsStart.isAfter(musicStart)) {
-            sportsStart = musicStart.plusSeconds(1);
-            if (!sportsStart.isBefore(tonight.startsBefore())) {
-                sportsStart = musicStart;
-            }
-        }
-        Instant artsStart = inWeekend(now, tonight, weekend);
-        Instant onlineStart = upcomingWeekday(now);
+        Instant now = NOW;
+        // The publication view uses database CURRENT_TIMESTAMP, independently of the application clock.
+        Instant validUntil = Instant.parse("9999-01-01T00:00:00Z");
+        Instant musicStart = now.plus(Duration.ofMinutes(2));
+        Instant sportsStart = now.plus(Duration.ofMinutes(20));
+        Instant artsStart = Instant.parse("2030-06-08T13:00:00Z");
+        Instant onlineStart = Instant.parse("2030-06-10T13:00:00Z");
         tieStart = now.plus(Duration.ofDays(3));
         Instant laterStart = now.plus(Duration.ofDays(40));
 
@@ -133,7 +143,7 @@ class PublicEventsHttpTest {
         insert(WITHDRAWN_ID, "Withdrawn Secret Show", musicStart, "Other", "other",
                 "PHYSICAL", "Amsterdam", "Paradiso", null, false, validUntil);
         insert(EXPIRED_ID, "Expired Secret Show", musicStart, "Other", "other",
-                "PHYSICAL", "Amsterdam", "Paradiso", null, true, now.minus(Duration.ofDays(2)));
+                "PHYSICAL", "Amsterdam", "Paradiso", null, true, Instant.parse("2000-01-01T00:00:00Z"));
         discoverable.add(music);
         discoverable.add(sports);
         discoverable.add(arts);
@@ -291,6 +301,97 @@ class PublicEventsHttpTest {
                 .andExpect(jsonPath("$.items", hasSize(0)));
     }
 
+    @ParameterizedTest
+    @CsvSource({"page,-1", "page,51", "page,abc", "size,0", "size,21", "when,yesterday",
+            "place,moon", "sort,random", "category,unknown", "tag,unknown", "city,bad city"})
+    void invalidParametersReturnBadRequest(String parameter, String value) throws Exception {
+        mockMvc.perform(events().param(parameter, value)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void longSearchQueriesReturnBadRequest() throws Exception {
+        mockMvc.perform(events().param("q", "x".repeat(101))).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/cities").param("q", "x".repeat(101))).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void homeUsesPhysicalFacetsAndScopesOnlyNearYouToCity() throws Exception {
+        mockMvc.perform(get("/api/home").param("city", "rotterdam"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nearYouCity.slug").value("rotterdam"))
+                .andExpect(jsonPath("$.nearYou.items", hasSize(1)))
+                .andExpect(jsonPath("$.nearYou.items[0].id").value(sports.id().toString()))
+                .andExpect(jsonPath("$.tonight.items[*].id", hasItem(music.id().toString())))
+                .andExpect(jsonPath("$.online.items[0].id").value(online.id().toString()))
+                .andExpect(jsonPath("$.categories[*].slug", not(hasItem("technology-science"))))
+                .andExpect(jsonPath("$.tags[*].slug", not(hasItem("meetup"))));
+        mockMvc.perform(get("/api/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nearYouCity.slug").value("amsterdam"));
+        mockMvc.perform(get("/api/home").param("city", "bad city")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void homeReflectsPublicationChangesOnTheNextRequest() throws Exception {
+        mockMvc.perform(get("/api/home")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.tonight.items[*].id", hasItem(music.id().toString())));
+        jdbc.sql("UPDATE publication.event_snapshot SET discoverable = false WHERE loc_event_id = :id")
+                .param("id", music.id()).update();
+        mockMvc.perform(get("/api/home")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.tonight.items[*].id", not(hasItem(music.id().toString()))));
+    }
+
+    @Test
+    void citiesDefaultToAmsterdamAndSupportFiltering() throws Exception {
+        mockMvc.perform(get("/api/cities")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].slug").value("amsterdam"));
+        mockMvc.perform(get("/api/cities").param("q", "rotter")).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].slug").value("rotterdam"));
+    }
+
+    @Test
+    void repeatedTagsRequireEveryTag() throws Exception {
+        jdbc.sql("UPDATE publication.event_snapshot SET payload = jsonb_set(payload, '{tags}', '[\"coding\",\"jazz\"]'::jsonb) "
+                + "WHERE loc_event_id = :id").param("id", music.id()).update();
+        mockMvc.perform(events().param("tag", "coding", "jazz")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id").value(music.id().toString()));
+    }
+
+    @Test
+    void fullTextSearchFindsMatchingEvents() throws Exception {
+        mockMvc.perform(events().param("q", "jazz")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id").value(music.id().toString()));
+        mockMvc.perform(events().param("q", "nonexistentword")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void relevanceRanksStrongerMatchesBeforeEarlierEvents() throws Exception {
+        jdbc.sql("UPDATE publication.event_snapshot SET payload = jsonb_set(payload, '{title}', to_jsonb(CAST(:title AS text))) "
+                + "WHERE loc_event_id = :id")
+                .param("title", "jazz jazz jazz jazz jazz").param("id", online.id()).update();
+        mockMvc.perform(events().param("q", "jazz")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(online.id().toString()));
+        mockMvc.perform(events().param("q", "jazz").param("sort", "start_time")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(music.id().toString()));
+    }
+
+    @Test
+    void multipleOccurrencesCollapseAfterDateFiltering() throws Exception {
+        Instant saturday = Instant.parse("2030-06-08T15:00:00Z");
+        insert(MUSIC_ID, "Late night jazz", saturday, "Music & Nightlife", "jazz", "PHYSICAL",
+                "Amsterdam", "Paradiso", null, true, Instant.parse("9999-01-01T00:00:00Z"));
+        mockMvc.perform(events().param("tag", "jazz")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.items[0].startAt").value(music.start().toString()));
+        mockMvc.perform(events().param("tag", "jazz").param("when", "weekend")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.items[0].startAt").value(saturday.toString()));
+    }
+
     private MockHttpServletRequestBuilder events() {
         return get("/api/events");
     }
@@ -428,52 +529,6 @@ class PublicEventsHttpTest {
         }
         location.append('}');
         return location.toString();
-    }
-
-    private static Instant soon(TimeWindow.Range tonight, Instant now, Duration lead) {
-        Instant start = now.plus(lead);
-        if (start.isBefore(tonight.startsBefore())) {
-            return start;
-        }
-        Instant fallback = tonight.startsBefore().minusSeconds(1);
-        if (fallback.isAfter(now)) {
-            return fallback;
-        }
-        return now.plusMillis(200);
-    }
-
-    private static Instant inWeekend(Instant now, TimeWindow.Range tonight, TimeWindow.Range weekend) {
-        Instant afterTonight = tonight.startsBefore().plusHours(3);
-        if (afterTonight.isAfter(now)
-                && !afterTonight.isBefore(weekend.startsFrom())
-                && afterTonight.isBefore(weekend.startsBefore())) {
-            return afterTonight;
-        }
-        Instant start = now.plus(Duration.ofHours(1));
-        if (start.isBefore(weekend.startsFrom())) {
-            start = weekend.startsFrom().plusHours(3);
-        }
-        if (!start.isBefore(weekend.startsBefore())) {
-            start = weekend.startsBefore().minusMinutes(30);
-        }
-        if (!start.isAfter(now)) {
-            return now.plusSeconds(30);
-        }
-        return start;
-    }
-
-    private static Instant upcomingWeekday(Instant now) {
-        ZonedDateTime local = now.atZone(TimeWindow.ZONE);
-        for (int day = 2; day <= 20; day++) {
-            ZonedDateTime candidate = local.plusDays(day).withHour(15).withMinute(0).withSecond(0).withNano(0);
-            Instant start = candidate.toInstant();
-            TimeWindow.Range weekend = TimeWindow.weekend(start);
-            boolean inWeekend = !start.isBefore(weekend.startsFrom()) && start.isBefore(weekend.startsBefore());
-            if (!inWeekend && start.isAfter(now)) {
-                return start;
-            }
-        }
-        return now.plus(Duration.ofDays(9));
     }
 
     private record Seeded(UUID id, Instant start) {

@@ -1,4 +1,4 @@
-package nl.loc.backend.event.service;
+package nl.loc.backend.event.controller;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,10 +22,7 @@ public class BrowseCriteriaParser {
     public static final int MAX_QUERY_LENGTH = 100;
 
     public BrowseCriteria parse(EventsQuery query) {
-        String q = blankToNull(query.getQ());
-        if (q != null && q.length() > MAX_QUERY_LENGTH) {
-            throw new InvalidBrowseQueryException("q must be at most " + MAX_QUERY_LENGTH + " characters");
-        }
+        String q = searchText(query.getQ());
         String city = citySlug(query.getCity());
         List<EventCategory> categories = categories(query.getCategory());
         List<EventTag> tags = tags(query.getTag());
@@ -35,6 +32,14 @@ public class BrowseCriteriaParser {
         int page = page(query.getPage());
         int size = size(query.getSize());
         return new BrowseCriteria(q, city, categories, tags, when, sort, place, page, size);
+    }
+
+    public String searchText(String raw) {
+        String q = blankToNull(raw);
+        if (q != null && q.length() > MAX_QUERY_LENGTH) {
+            throw new InvalidBrowseQueryException("q must be at most " + MAX_QUERY_LENGTH + " characters");
+        }
+        return q;
     }
 
     public String homeCity(String city) {

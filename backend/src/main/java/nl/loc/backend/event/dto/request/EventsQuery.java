@@ -18,7 +18,6 @@ public class EventsQuery {
             description = "Free text. Matched with websearch_to_tsquery on title, description, venue, city, "
                     + "categories, and tags. At most 100 characters. When present, the default sort is relevance.",
             example = "jazz")
-    @Schema(description = "Free-text search. At most 100 characters.", example = "jazz")
     private String q;
 
     @Parameter(
@@ -27,7 +26,6 @@ public class EventsQuery {
             required = false,
             description = "City slug. Limits rows to that city. Example: amsterdam.",
             example = "amsterdam")
-    @Schema(description = "City slug, for example amsterdam.", example = "amsterdam")
     private String city;
 
     @Parameter(
@@ -37,18 +35,7 @@ public class EventsQuery {
             description = "Category slug. Repeat the parameter to combine categories with OR. Unknown slugs return 400.",
             example = "music-nightlife",
             array = @ArraySchema(schema = @Schema(
-                    example = "music-nightlife",
-                    allowableValues = {
-                            "music-nightlife",
-                            "arts-culture",
-                            "sports",
-                            "business-careers",
-                            "technology-science",
-                            "learning-skills",
-                            "nature-sustainability",
-                            "other"
-                    })))
-    @Schema(description = "Category slugs combined with OR.", example = "music-nightlife")
+                    example = "music-nightlife")))
     private List<String> category = new ArrayList<>();
 
     @Parameter(
@@ -58,20 +45,7 @@ public class EventsQuery {
             description = "Tag slug. Repeat the parameter to require every tag (AND). Unknown slugs return 400.",
             example = "jazz",
             array = @ArraySchema(schema = @Schema(
-                    example = "jazz",
-                    allowableValues = {
-                            "concert", "festival", "club-night", "dj-set", "live-music",
-                            "theatre", "comedy", "exhibition", "screening", "workshop",
-                            "conference", "meetup", "networking", "fair", "tour",
-                            "family-friendly", "kids", "students", "professionals", "beginners",
-                            "18-plus", "indoor", "outdoor", "free", "ticketed",
-                            "evening", "daytime", "techno", "house", "jazz",
-                            "classical", "pop", "rock", "hip-hop", "football",
-                            "running", "cycling", "fitness", "food-and-drink", "wellness",
-                            "startups", "climate", "coding", "arts", "sports",
-                            "business", "technology", "learning", "nature", "other"
-                    })))
-    @Schema(description = "Tag slugs combined with AND.", example = "jazz")
+                    example = "jazz")))
     private List<String> tag = new ArrayList<>();
 
     @Parameter(
@@ -80,11 +54,8 @@ public class EventsQuery {
             required = false,
             description = "Time window in Europe/Amsterdam. tonight is the calendar day, weekend is Saturday 00:00 "
                     + "through Monday 00:00, upcoming is the next 30 days. Unknown values return 400.",
-            example = "tonight")
-    @Schema(
-            description = "Time window: tonight, weekend, or upcoming.",
             example = "tonight",
-            allowableValues = {"tonight", "weekend", "upcoming"})
+            schema = @Schema(allowableValues = {"tonight", "weekend", "upcoming"}))
     private String when;
 
     @Parameter(
@@ -93,11 +64,8 @@ public class EventsQuery {
             required = false,
             description = "online selects location.type ONLINE. physical selects location.type PHYSICAL. "
                     + "Unknown values return 400.",
-            example = "physical")
-    @Schema(
-            description = "online or physical.",
             example = "physical",
-            allowableValues = {"online", "physical"})
+            schema = @Schema(allowableValues = {"physical", "online"}))
     private String place;
 
     @Parameter(
@@ -106,11 +74,8 @@ public class EventsQuery {
             required = false,
             description = "start_time orders by start time then id. relevance orders by search rank, then start time, "
                     + "then id. Defaults to relevance when q is present, otherwise start_time.",
-            example = "start_time")
-    @Schema(
-            description = "start_time or relevance.",
             example = "start_time",
-            allowableValues = {"start_time", "relevance"})
+            schema = @Schema(allowableValues = {"start_time", "relevance"}))
     private String sort;
 
     @Parameter(
@@ -118,8 +83,8 @@ public class EventsQuery {
             in = ParameterIn.QUERY,
             required = false,
             description = "Zero-based page index. Defaults to 0. Maximum 50. See-all uses 0.",
-            example = "0")
-    @Schema(description = "Zero-based page index. Defaults to 0.", example = "0", minimum = "0", maximum = "50")
+            example = "0",
+            schema = @Schema(minimum = "0", maximum = "50"))
     private Integer page;
 
     @Parameter(
@@ -127,8 +92,8 @@ public class EventsQuery {
             in = ParameterIn.QUERY,
             required = false,
             description = "Page size. Defaults to 20. Maximum 20.",
-            example = "20")
-    @Schema(description = "Page size. Defaults to 20. Maximum 20.", example = "20", minimum = "1", maximum = "20")
+            example = "20",
+            schema = @Schema(minimum = "1", maximum = "20"))
     private Integer size;
 
     public String getQ() {

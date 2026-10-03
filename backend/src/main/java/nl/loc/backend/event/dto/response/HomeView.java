@@ -11,10 +11,10 @@ public record HomeView(
         @Schema(description = "Resolved near-you city (slug and name). Defaults to amsterdam. "
                 + "It does not filter tags, categories, tonight, this weekend, or online.")
         City nearYouCity,
-        @Schema(description = "Up to 8 tags on discoverable events, not filtered by city, sorted A-Z by label. "
+        @Schema(description = "Up to 8 tags on discoverable physical events, not filtered by city, sorted A-Z by label. "
                 + "Slug and label only.")
         List<TagChip> tags,
-        @Schema(description = "Categories on discoverable events, not filtered by city, with event counts. "
+        @Schema(description = "Categories on discoverable physical events, not filtered by city, with event counts. "
                 + "Empty counts are omitted.")
         List<CategoryCount> categories,
         @Schema(description = "Physical events tonight, not filtered by city. Preview size 6. "

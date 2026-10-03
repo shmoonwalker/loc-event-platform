@@ -1,6 +1,6 @@
 package nl.loc.backend.config;
 
-import nl.loc.backend.event.service.InvalidBrowseQueryException;
+import nl.loc.backend.event.controller.InvalidBrowseQueryException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;

@@ -11,7 +11,7 @@ public class CitiesQuery {
             name = "q",
             in = ParameterIn.QUERY,
             required = false,
-            description = "Optional filter on city slug or name. Empty q lists cities with Amsterdam first.",
+            description = "Optional filter on city slug or name. Empty q lists cities with Amsterdam first. At most 100 characters.",
             example = "amster")
     @Schema(description = "Optional filter on city slug or name.", example = "amster")
     private String q;

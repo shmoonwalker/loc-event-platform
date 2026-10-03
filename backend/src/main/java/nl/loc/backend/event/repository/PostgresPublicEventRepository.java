@@ -1,7 +1,5 @@
-package nl.loc.backend.event.search;
+package nl.loc.backend.event.repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -10,7 +8,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.UUID;
 import nl.loc.backend.category.dto.response.CategoryCount;
 import nl.loc.backend.category.model.EventCategory;
 import nl.loc.backend.city.model.City;
@@ -18,17 +15,18 @@ import nl.loc.backend.event.dto.response.EventCard;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.model.BrowseCriteria;
 import nl.loc.backend.event.model.EventSort;
+import nl.loc.backend.event.model.Place;
 import nl.loc.backend.event.model.TimeWindow;
 import nl.loc.backend.tag.dto.response.TagChip;
 import nl.loc.backend.tag.model.EventTag;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-@Service
+@Repository
 @ConditionalOnProperty(name = "loc.search.engine", havingValue = "postgres", matchIfMissing = true)
-public class PostgresPublicEventSearch implements PublicEventSearch {
+public class PostgresPublicEventRepository implements PublicEventRepository {
 
     private static final String STARTS =
             "(s.payload->'schedule'->>'starts_at')::timestamptz";
@@ -48,20 +46,16 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
                    FROM jsonb_array_elements_text(coalesce(s.payload->'tags', '[]'::jsonb)) AS value)))""";
 
     private final JdbcClient jdbc;
+    private final EventCardRowMapper cardMapper;
 
-    public PostgresPublicEventSearch(JdbcClient jdbc) {
+    public PostgresPublicEventRepository(JdbcClient jdbc, EventCardRowMapper cardMapper) {
         this.jdbc = jdbc;
+        this.cardMapper = cardMapper;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public EventPage search(BrowseCriteria criteria, Instant now) {
-        TimeWindow.Range range = criteria.when() == null
-                ? TimeWindow.future(now)
-                : TimeWindow.forPreset(criteria.when(), now);
-        EventSort sort = criteria.sort() == EventSort.RELEVANCE && criteria.q() == null
-                ? EventSort.START_TIME
-                : criteria.sort();
+    public EventPage search(BrowseCriteria criteria, TimeWindow.Range range, EventSort sort) {
         long total = count(criteria, range);
         List<EventCard> items = total == 0 ? List.of() : cards(criteria, range, sort);
         int totalPages = total == 0 ? 0 : (int) Math.ceil(total / (double) criteria.size());
@@ -70,21 +64,22 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CategoryCount> categories(String citySlug, Instant now) {
+    public List<CategoryCount> categories(String citySlug, TimeWindow.Range range, Place place) {
         String sql = """
                 WITH next_occurrence AS (
                     SELECT DISTINCT ON (s.loc_event_id)
                            coalesce(s.payload->'categories', '[]'::jsonb) AS categories
                     FROM publication.discoverable_events s
                     WHERE %s
-                    ORDER BY s.loc_event_id, %s
+                    ORDER BY s.loc_event_id, %s, s.loc_occurrence_id
                 )
                 SELECT category_name, count(*) AS event_count
                 FROM next_occurrence
                 CROSS JOIN LATERAL jsonb_array_elements_text(categories) AS category_name
                 GROUP BY category_name
-                """.formatted(occurrenceFilter(citySlug != null, false, false), STARTS);
-        var rows = bind(jdbc.sql(sql), citySlug, TimeWindow.facets(now), List.of(), List.of(), null)
+                """.formatted(occurrenceFilter(citySlug != null, false, false) + " AND s.payload->'location'->>'type' = :place", STARTS);
+        var rows = bind(jdbc.sql(sql), citySlug, range, List.of(), List.of(), null)
+                .param("place", place.name())
                 .query((rs, row) -> new NameCount(rs.getString("category_name"), rs.getLong("event_count")))
                 .list();
         return java.util.Arrays.stream(EventCategory.values())
@@ -98,20 +93,21 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
 
     @Override
     @Transactional(readOnly = true)
-    public List<TagChip> tags(String citySlug, Instant now, int limit) {
+    public List<TagChip> tags(String citySlug, TimeWindow.Range range, Place place, int limit) {
         String sql = """
                 WITH next_occurrence AS (
                     SELECT DISTINCT ON (s.loc_event_id)
                            coalesce(s.payload->'tags', '[]'::jsonb) AS tags
                     FROM publication.discoverable_events s
                     WHERE %s
-                    ORDER BY s.loc_event_id, %s
+                    ORDER BY s.loc_event_id, %s, s.loc_occurrence_id
                 )
                 SELECT DISTINCT tag_slug
                 FROM next_occurrence
                 CROSS JOIN LATERAL jsonb_array_elements_text(tags) AS tag_slug
-                """.formatted(occurrenceFilter(citySlug != null, false, false), STARTS);
-        return bind(jdbc.sql(sql), citySlug, TimeWindow.facets(now), List.of(), List.of(), null)
+                """.formatted(occurrenceFilter(citySlug != null, false, false) + " AND s.payload->'location'->>'type' = :place", STARTS);
+        return bind(jdbc.sql(sql), citySlug, range, List.of(), List.of(), null)
+                .param("place", place.name())
                 .query((rs, row) -> rs.getString("tag_slug"))
                 .list()
                 .stream()
@@ -143,7 +139,7 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
 
     @Override
     @Transactional(readOnly = true)
-    public List<City> suggestCities(String q, int limit) {
+    public List<City> suggestCities(String q, int limit, TimeWindow.Range range) {
         String needle = cityQuery(q);
         String order = needle == null
                 ? "CASE WHEN city_slug = 'amsterdam' THEN 0 ELSE 1 END, event_count DESC, city_name"
@@ -163,8 +159,8 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
                 ORDER BY %s
                 LIMIT :limit
                 """.formatted(CITY_SLUG, occurrenceFilter(false, false, false), order);
-        return bind(jdbc.sql(sql), null, TimeWindow.facets(Instant.now()), List.of(), List.of(), null)
-                .param("q", needle)
+        return bind(jdbc.sql(sql), null, range, List.of(), List.of(), null)
+                .param("q", needle, Types.VARCHAR)
                 .param("limit", limit)
                 .query((rs, row) -> new City(rs.getString("city_slug"), rs.getString("city_name")))
                 .list();
@@ -176,7 +172,7 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
                     SELECT DISTINCT ON (s.loc_event_id) s.loc_event_id
                     FROM publication.discoverable_events s
                     WHERE %s
-                    ORDER BY s.loc_event_id, %s
+                    ORDER BY s.loc_event_id, %s, s.loc_occurrence_id
                 )
                 SELECT count(*) FROM next_occurrence
                 """.formatted(occurrenceFilter(criteria), STARTS);
@@ -209,7 +205,7 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
                            %s
                     FROM publication.discoverable_events s
                     WHERE %s
-                    ORDER BY s.loc_event_id, %s
+                    ORDER BY s.loc_event_id, %s, s.loc_occurrence_id
                 )
                 SELECT * FROM next_occurrence
                 ORDER BY %s
@@ -218,35 +214,8 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
         return bind(jdbc.sql(sql), criteria, range)
                 .param("limit", criteria.size())
                 .param("offset", criteria.page() * criteria.size())
-                .query(this::card)
+                .query(cardMapper)
                 .list();
-    }
-
-    private EventCard card(ResultSet rs, int row) throws SQLException {
-        List<String> categories = JsonStrings.array(rs.getString("categories_json")).stream()
-                .map(EventCategory::fromCatalogName)
-                .flatMap(Optional::stream)
-                .map(EventCategory::slug)
-                .distinct()
-                .toList();
-        List<String> tags = JsonStrings.array(rs.getString("tags_json")).stream()
-                .map(EventTag::fromSlug)
-                .flatMap(Optional::stream)
-                .map(EventTag::slug)
-                .distinct()
-                .toList();
-        String title = rs.getString("title");
-        return new EventCard(
-                rs.getObject("loc_event_id", UUID.class),
-                title == null ? "" : title,
-                instant(rs, "start_at"),
-                instant(rs, "end_at"),
-                rs.getString("city_slug"),
-                rs.getString("city_name"),
-                rs.getString("venue_name"),
-                blankToNull(rs.getString("image_url")),
-                categories,
-                tags);
     }
 
     private static String occurrenceFilter(BrowseCriteria criteria) {
@@ -333,20 +302,8 @@ public class PostgresPublicEventSearch implements PublicEventSearch {
                 .orElse(0);
     }
 
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
-
     private static OffsetDateTime offset(Instant instant) {
         return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
-    }
-
-    private static String blankToNull(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value;
     }
 
     private static String cityQuery(String q) {

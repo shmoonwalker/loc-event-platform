@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.time.Instant;
 import java.util.List;
 import nl.loc.backend.city.model.City;
 import nl.loc.backend.event.dto.request.CitiesQuery;
@@ -15,8 +14,7 @@ import nl.loc.backend.event.dto.request.EventsQuery;
 import nl.loc.backend.event.dto.request.HomeQuery;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.dto.response.HomeView;
-import nl.loc.backend.event.search.PublicEventSearch;
-import nl.loc.backend.event.service.BrowseCriteriaParser;
+import nl.loc.backend.event.service.EventBrowseService;
 import nl.loc.backend.event.service.HomeService;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ProblemDetail;
@@ -34,12 +32,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicBrowseController {
 
     private final HomeService homeService;
-    private final PublicEventSearch search;
+    private final EventBrowseService browse;
     private final BrowseCriteriaParser parser;
 
-    public PublicBrowseController(HomeService homeService, PublicEventSearch search, BrowseCriteriaParser parser) {
+    public PublicBrowseController(HomeService homeService, EventBrowseService browse, BrowseCriteriaParser parser) {
         this.homeService = homeService;
-        this.search = search;
+        this.browse = browse;
         this.parser = parser;
     }
 
@@ -63,7 +61,7 @@ public class PublicBrowseController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public HomeView home(@ParameterObject @ModelAttribute HomeQuery query) {
-        return homeService.home(query.getCity());
+        return homeService.home(parser.homeCity(query.getCity()));
     }
 
     @GetMapping("/events")
@@ -86,7 +84,7 @@ public class PublicBrowseController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public EventPage events(@ParameterObject @ModelAttribute EventsQuery query) {
-        return search.search(parser.parse(query), Instant.now());
+        return browse.search(parser.parse(query));
     }
 
     @GetMapping("/cities")
@@ -98,9 +96,13 @@ public class PublicBrowseController {
             @ApiResponse(
                     responseCode = "200",
                     description = "Matching cities, at most 10.",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = City.class))))
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = City.class)))),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "q exceeds 100 characters.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public List<City> cities(@ParameterObject @ModelAttribute CitiesQuery query) {
-        return search.suggestCities(query.getQ(), 10);
+        return browse.cities(parser.searchText(query.getQ()));
     }
 }
