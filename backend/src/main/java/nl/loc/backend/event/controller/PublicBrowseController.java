@@ -64,7 +64,7 @@ public class PublicBrowseController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public HomeView home(@ParameterObject @ModelAttribute HomeQuery query) {
-        return homeService.home(parser.homeCity(query.getCity()));
+        return homeService.home(parser.homeCity(query.city()));
     }
 
     @GetMapping("/events")
@@ -116,6 +116,6 @@ public class PublicBrowseController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public List<City> cities(@ParameterObject @ModelAttribute CitiesQuery query) {
-        return browse.cities(parser.searchText(query.getQ()));
+        return browse.cities(parser.searchText(query.q()));
     }
 }

@@ -25,19 +25,19 @@ public class BrowseCriteriaParser {
 
 
     public BrowseCriteria parse(EventsQuery query) {
-        String q = searchText(query.getQ());
-        String city = citySlug(query.getCity());
-        List<EventCategory> categories = categories(query.getCategory());
-        List<EventTag> tags = tags(query.getTag());
-        When when = when(query.getWhen());
-        Place place = place(query.getPlace());
-        EventSort sort = sort(query.getSort(), q);
-        int page = page(query.getPage());
-        int size = size(query.getSize());
-        LocalDate dateFrom = date(query.getDateFrom(), "dateFrom");
-        LocalDate dateTo = date(query.getDateTo(), "dateTo");
-        LocalTime timeFrom = time(query.getTimeFrom(), "timeFrom");
-        LocalTime timeTo = time(query.getTimeTo(), "timeTo");
+        String q = searchText(query.q());
+        String city = citySlug(query.city());
+        List<EventCategory> categories = categories(query.category());
+        List<EventTag> tags = tags(query.tag());
+        When when = when(query.when());
+        Place place = place(query.place());
+        EventSort sort = sort(query.sort(), q);
+        int page = page(query.page());
+        int size = size(query.size());
+        LocalDate dateFrom = date(query.dateFrom(), "dateFrom");
+        LocalDate dateTo = date(query.dateTo(), "dateTo");
+        LocalTime timeFrom = time(query.timeFrom(), "timeFrom");
+        LocalTime timeTo = time(query.timeTo(), "timeTo");
         if ((dateFrom == null) != (dateTo == null)) {
             throw new InvalidBrowseQueryException("dateFrom and dateTo must be supplied together");
         }
