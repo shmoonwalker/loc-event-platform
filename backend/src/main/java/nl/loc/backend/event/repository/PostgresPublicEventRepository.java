@@ -4,20 +4,16 @@ import java.sql.Types;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import nl.loc.backend.category.dto.response.CategoryCount;
 import nl.loc.backend.category.model.EventCategory;
 import nl.loc.backend.city.model.City;
 import nl.loc.backend.event.dto.response.EventCard;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.model.BrowseCriteria;
 import nl.loc.backend.event.model.EventSort;
-import nl.loc.backend.event.model.Place;
 import nl.loc.backend.event.model.TimeWindow;
-import nl.loc.backend.tag.dto.response.TagChip;
 import nl.loc.backend.tag.model.EventTag;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -64,63 +60,6 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CategoryCount> categories(String citySlug, TimeWindow.Range range, Place place) {
-        String sql = """
-                WITH next_occurrence AS (
-                    SELECT DISTINCT ON (s.loc_event_id)
-                           coalesce(s.payload->'categories', '[]'::jsonb) AS categories
-                    FROM publication.discoverable_events s
-                    WHERE %s
-                    ORDER BY s.loc_event_id, %s, s.loc_occurrence_id
-                )
-                SELECT category_name, count(*) AS event_count
-                FROM next_occurrence
-                CROSS JOIN LATERAL jsonb_array_elements_text(categories) AS category_name
-                GROUP BY category_name
-                """.formatted(occurrenceFilter(citySlug != null, false, false) + " AND s.payload->'location'->>'type' = :place", STARTS);
-        var rows = bind(jdbc.sql(sql), citySlug, range, List.of(), List.of(), null)
-                .param("place", place.name())
-                .query((rs, row) -> new NameCount(rs.getString("category_name"), rs.getLong("event_count")))
-                .list();
-        return java.util.Arrays.stream(EventCategory.values())
-                .map(category -> new CategoryCount(
-                        category.slug(),
-                        category.label(),
-                        countFor(rows, category.catalogName())))
-                .filter(category -> category.eventCount() > 0)
-                .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<TagChip> tags(String citySlug, TimeWindow.Range range, Place place, int limit) {
-        String sql = """
-                WITH next_occurrence AS (
-                    SELECT DISTINCT ON (s.loc_event_id)
-                           coalesce(s.payload->'tags', '[]'::jsonb) AS tags
-                    FROM publication.discoverable_events s
-                    WHERE %s
-                    ORDER BY s.loc_event_id, %s, s.loc_occurrence_id
-                )
-                SELECT DISTINCT tag_slug
-                FROM next_occurrence
-                CROSS JOIN LATERAL jsonb_array_elements_text(tags) AS tag_slug
-                """.formatted(occurrenceFilter(citySlug != null, false, false) + " AND s.payload->'location'->>'type' = :place", STARTS);
-        return bind(jdbc.sql(sql), citySlug, range, List.of(), List.of(), null)
-                .param("place", place.name())
-                .query((rs, row) -> rs.getString("tag_slug"))
-                .list()
-                .stream()
-                .map(EventTag::fromSlug)
-                .flatMap(Optional::stream)
-                .map(tag -> new TagChip(tag.slug(), tag.label()))
-                .sorted(Comparator.comparing(TagChip::label, String.CASE_INSENSITIVE_ORDER))
-                .limit(limit)
-                .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Optional<City> findCity(String slug) {
         String sql = """
                 SELECT trim(s.payload->'location'->>'city') AS city_name
@@ -128,7 +67,7 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
                 WHERE %s = :slug
                   AND coalesce(trim(s.payload->'location'->>'city'), '') <> ''
                 GROUP BY 1
-                ORDER BY count(*) DESC
+                ORDER BY count(*) DESC, city_name
                 LIMIT 1
                 """.formatted(CITY_SLUG);
         return jdbc.sql(sql)
@@ -194,14 +133,13 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
                     SELECT DISTINCT ON (s.loc_event_id)
                            s.loc_event_id,
                            s.payload->>'title' AS title,
+                           s.payload->'location'->>'type' AS place,
                            %s AS start_at,
                            %s AS end_at,
                            nullif(trim(s.payload->'location'->>'city'), '') AS city_name,
                            nullif(%s, '') AS city_slug,
                            nullif(trim(s.payload->'location'->>'venue_name'), '') AS venue_name,
-                           s.payload->'images'->0->>'url' AS image_url,
-                           coalesce(s.payload->'categories', '[]'::jsonb)::text AS categories_json,
-                           coalesce(s.payload->'tags', '[]'::jsonb)::text AS tags_json
+                           s.payload->'images'->0->>'url' AS image_url
                            %s
                     FROM publication.discoverable_events s
                     WHERE %s
@@ -213,7 +151,7 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
                 """.formatted(STARTS, ENDS, CITY_SLUG, rankColumn, occurrenceFilter(criteria), STARTS, orderBy(sort));
         return bind(jdbc.sql(sql), criteria, range)
                 .param("limit", criteria.size())
-                .param("offset", criteria.page() * criteria.size())
+                .param("offset", (long) criteria.page() * criteria.size())
                 .query(cardMapper)
                 .list();
     }
@@ -226,6 +164,12 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
         }
         if (criteria.place() != null) {
             filter = filter + " AND s.payload->'location'->>'type' = :place";
+        }
+        if (criteria.timeFrom() != null) {
+            String localTime = "(" + STARTS + " AT TIME ZONE :zone)::time";
+            String join = criteria.timeFrom().isBefore(criteria.timeTo()) ? " AND " : " OR ";
+            filter += " AND (" + localTime + " >= CAST(:timeFrom AS time)" + join
+                    + localTime + " < CAST(:timeTo AS time))";
         }
         return filter;
     }
@@ -265,6 +209,11 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
         if (criteria.place() != null) {
             bound = bound.param("place", criteria.place().name());
         }
+        if (criteria.timeFrom() != null) {
+            bound = bound.param("zone", TimeWindow.ZONE.getId())
+                    .param("timeFrom", criteria.timeFrom(), Types.TIME)
+                    .param("timeTo", criteria.timeTo(), Types.TIME);
+        }
         return bound;
     }
 
@@ -294,14 +243,6 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
         return bound;
     }
 
-    private static long countFor(List<NameCount> rows, String name) {
-        return rows.stream()
-                .filter(row -> name.equalsIgnoreCase(row.name()))
-                .mapToLong(NameCount::count)
-                .findFirst()
-                .orElse(0);
-    }
-
     private static OffsetDateTime offset(Instant instant) {
         return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
     }
@@ -317,6 +258,4 @@ public class PostgresPublicEventRepository implements PublicEventRepository {
         return cleaned.isBlank() ? null : cleaned;
     }
 
-    private record NameCount(String name, long count) {
-    }
 }

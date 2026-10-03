@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 /** Published {@code location.type}: ONLINE or PHYSICAL. */
 @Schema(
         description = "Published location.type. Query values are online and physical.",
-        allowableValues = {"online", "physical"})
+        allowableValues = {"ONLINE", "PHYSICAL"})
 public enum Place {
     @Schema(description = "location.type ONLINE. The online rail is not filtered by city. Query value: online.")
     ONLINE,
