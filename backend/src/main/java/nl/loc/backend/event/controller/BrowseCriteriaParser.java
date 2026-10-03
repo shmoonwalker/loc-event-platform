@@ -41,8 +41,11 @@ public class BrowseCriteriaParser {
         if ((dateFrom == null) != (dateTo == null)) {
             throw new InvalidBrowseQueryException("dateFrom and dateTo must be supplied together");
         }
-        if (dateFrom != null && (dateFrom.isAfter(dateTo) || when != null)) {
-            throw new InvalidBrowseQueryException("dateFrom must not exceed dateTo; custom dates cannot combine with when");
+        if (dateFrom != null && dateFrom.isAfter(dateTo)) {
+            throw new InvalidBrowseQueryException("dateFrom must not be after dateTo");
+        }
+        if (dateFrom != null && when != null) {
+            throw new InvalidBrowseQueryException("dateFrom/dateTo cannot be combined with when");
         }
         if ((timeFrom == null) != (timeTo == null) || (timeFrom != null && timeFrom.equals(timeTo))) {
             throw new InvalidBrowseQueryException("timeFrom and timeTo must be supplied together and must differ");
