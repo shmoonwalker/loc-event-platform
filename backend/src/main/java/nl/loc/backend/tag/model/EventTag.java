@@ -93,7 +93,10 @@ public enum EventTag {
             case DJ_SET -> "DJ set";
             case EIGHTEEN_PLUS -> "18 plus";
             case HIP_HOP -> "Hip hop";
-            default -> humanize(slug);
+            default -> {
+                String words = slug.replace('-', ' ');
+                yield Character.toUpperCase(words.charAt(0)) + words.substring(1);
+            }
         };
     }
 
@@ -102,17 +105,5 @@ public enum EventTag {
             return Optional.empty();
         }
         return Optional.ofNullable(BY_SLUG.get(slug.strip().toLowerCase(Locale.ROOT)));
-    }
-
-    private static String humanize(String slug) {
-        String[] parts = slug.split("-");
-        StringBuilder label = new StringBuilder();
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) {
-                label.append(' ');
-            }
-            label.append(parts[i]);
-        }
-        return label.substring(0, 1).toUpperCase(Locale.ROOT) + label.substring(1);
     }
 }

@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
 import nl.loc.backend.city.model.City;
-import nl.loc.backend.city.model.CityNames;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.dto.response.EventRail;
 import nl.loc.backend.event.dto.response.HomeView;
@@ -32,7 +31,7 @@ public class HomeService {
 
     public HomeView home(String slug) {
         Instant now = clock.instant();
-        City city = repository.findCity(slug).orElseGet(() -> new City(slug, CityNames.fromSlug(slug)));
+        City city = repository.findCity(slug).orElseGet(() -> City.fromSlug(slug));
         EventRail tonight = rail(RailMode.TONIGHT, null, When.TONIGHT, Place.PHYSICAL, now);
         if (tonight.total() == 0) {
             // Only homepage discovery broadens an empty request. Explicit browse filters stay strict.
