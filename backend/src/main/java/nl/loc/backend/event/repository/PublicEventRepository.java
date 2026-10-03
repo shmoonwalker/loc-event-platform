@@ -195,7 +195,7 @@ public class PublicEventRepository {
     }
 
     private JdbcClient.StatementSpec bind(JdbcClient.StatementSpec statement, BrowseCriteria criteria, TimeWindow.Range range) {
-        List<String> categories = criteria.categories().stream().map(EventCategory::catalogName).toList();
+        List<String> categories = criteria.categories().stream().map(EventCategory::label).toList();
         List<String> tags = criteria.tags().stream().map(EventTag::slug).toList();
         JdbcClient.StatementSpec bound = bind(statement, criteria.city(), range, categories, tags, criteria.q());
         if (criteria.place() != null) {
