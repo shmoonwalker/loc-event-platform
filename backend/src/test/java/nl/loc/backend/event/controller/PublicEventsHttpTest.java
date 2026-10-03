@@ -28,6 +28,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestConstructor;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import java.net.URI;
+import nl.loc.backend.category.model.EventCategory;
+import nl.loc.backend.tag.model.EventTag;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -51,7 +55,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Sql(scripts = "/db/publication-discoverable-events.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class PublicEventsHttpTest {
 
-    private static final Instant NOW = Instant.parse("2030-06-07T10:00:00Z");
+    private static final Instant NOW = Instant.parse("2030-06-07T16:00:00Z");
 
     @TestConfiguration(proxyBeanMethods = false)
     static class FixedTime {
@@ -64,7 +68,7 @@ class PublicEventsHttpTest {
 
     private static final Set<String> PAGE_KEYS = Set.of("page", "size", "totalElements", "totalPages", "items");
     private static final Set<String> CARD_KEYS = Set.of(
-            "id", "title", "startAt", "endAt", "citySlug", "cityName", "venueName", "imageUrl", "categories", "tags");
+            "id", "title", "startAt", "endAt", "citySlug", "cityName", "venueName", "imageUrl", "place");
     private static final Set<String> FORBIDDEN_KEYS = Set.of(
             "source", "sourceUrl", "locOccurrenceId", "locEventId", "organizers", "organizer",
             "externalId", "external_id", "revision", "lifecycle", "discoverable", "state",
@@ -264,10 +268,9 @@ class PublicEventsHttpTest {
                 .andExpect(jsonPath("$.items[0].cityName").value("Amsterdam"))
                 .andExpect(jsonPath("$.items[0].venueName").value("Paradiso"))
                 .andExpect(jsonPath("$.items[0].imageUrl").value("https://images.example/jazz.jpg"))
-                .andExpect(jsonPath("$.items[0].categories", hasSize(1)))
-                .andExpect(jsonPath("$.items[0].categories[0]").value("music-nightlife"))
-                .andExpect(jsonPath("$.items[0].tags", hasSize(1)))
-                .andExpect(jsonPath("$.items[0].tags[0]").value("jazz"));
+                .andExpect(jsonPath("$.items[0].place").value("PHYSICAL"))
+                .andExpect(jsonPath("$.items[0].categories").doesNotExist())
+                .andExpect(jsonPath("$.items[0].tags").doesNotExist());
 
         JsonNode root = JsonMapper.shared().readTree(body(result));
         assertThat(names(root)).containsExactlyInAnyOrderElementsOf(PAGE_KEYS);
@@ -302,7 +305,7 @@ class PublicEventsHttpTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"page,-1", "page,51", "page,abc", "size,0", "size,21", "when,yesterday",
+    @CsvSource({"page,-1", "page,abc", "size,0", "size,21", "when,yesterday",
             "place,moon", "sort,random", "category,unknown", "tag,unknown", "city,bad city"})
     void invalidParametersReturnBadRequest(String parameter, String value) throws Exception {
         mockMvc.perform(events().param(parameter, value)).andExpect(status().isBadRequest());
@@ -315,7 +318,7 @@ class PublicEventsHttpTest {
     }
 
     @Test
-    void homeUsesPhysicalFacetsAndScopesOnlyNearYouToCity() throws Exception {
+    void homeScopesOnlyNearYouToCityAndKeepsCardsSmall() throws Exception {
         mockMvc.perform(get("/api/home").param("city", "rotterdam"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nearYouCity.slug").value("rotterdam"))
@@ -323,8 +326,9 @@ class PublicEventsHttpTest {
                 .andExpect(jsonPath("$.nearYou.items[0].id").value(sports.id().toString()))
                 .andExpect(jsonPath("$.tonight.items[*].id", hasItem(music.id().toString())))
                 .andExpect(jsonPath("$.online.items[0].id").value(online.id().toString()))
-                .andExpect(jsonPath("$.categories[*].slug", not(hasItem("technology-science"))))
-                .andExpect(jsonPath("$.tags[*].slug", not(hasItem("meetup"))));
+                .andExpect(jsonPath("$.tonight.mode").value("TONIGHT"))
+                .andExpect(jsonPath("$.categories").doesNotExist())
+                .andExpect(jsonPath("$.tags").doesNotExist());
         mockMvc.perform(get("/api/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nearYouCity.slug").value("amsterdam"));
@@ -390,6 +394,232 @@ class PublicEventsHttpTest {
         mockMvc.perform(events().param("tag", "jazz").param("when", "weekend")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.items[0].startAt").value(saturday.toString()));
+    }
+
+    @Test
+    void filterOptionsAreCompleteEvenWhenNoEventsExist() throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot").update();
+        mockMvc.perform(get("/api/events/filter-options")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories", hasSize(EventCategory.values().length)))
+                .andExpect(jsonPath("$.tags", hasSize(EventTag.values().length)))
+                .andExpect(jsonPath("$.tags[*].value", hasItem("meetup")))
+                .andExpect(jsonPath("$.sorts[*].value", hasItem("relevance")))
+                .andExpect(jsonPath("$.datePresets[*].value", hasItem("tonight")))
+                .andExpect(jsonPath("$.places[*].value", hasItem("online")))
+                .andExpect(jsonPath("$.timezone").value("Europe/Amsterdam"))
+                .andExpect(jsonPath("$.maxPageSize").value(20))
+                .andExpect(jsonPath("$.categories[0].eventCount").doesNotExist());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 3, 6, 7})
+    void emptyTonightFallsBackToAvailablePhysicalEventsOnly(int count) throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot").update();
+        for (int i = 0; i < count; i++) {
+            addEvent("Future physical " + i, "2030-07-20T12:00:00Z", "PHYSICAL", "Groningen");
+        }
+        addEvent("Earlier online", "2030-06-08T12:00:00Z", "ONLINE", null);
+        JsonNode home = response(mockMvc.perform(get("/api/home")));
+        JsonNode rail = home.get("tonight");
+        assertThat(rail.get("mode").asText()).isEqualTo("STARTING_SOON");
+        assertThat(rail.get("total").asInt()).isEqualTo(count);
+        assertThat(rail.get("items").size()).isEqualTo(Math.min(count, 6));
+        assertThat(rail.get("hasMore").asBoolean()).isEqualTo(count > 6);
+        assertThat(home.get("nearYou").get("total").asInt()).isZero();
+        assertThat(home.get("thisWeekend").get("total").asInt()).isZero();
+        assertRailLinkMatchesPreview(rail);
+        mockMvc.perform(events().param("when", "tonight").param("place", "physical"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void nonemptyTonightIsNotPaddedWithOtherDates() throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot WHERE loc_event_id = :id").param("id", SPORTS_ID).update();
+        mockMvc.perform(get("/api/home")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.tonight.mode").value("TONIGHT"))
+                .andExpect(jsonPath("$.tonight.total").value(1))
+                .andExpect(jsonPath("$.tonight.items", hasSize(1)))
+                .andExpect(jsonPath("$.tonight.items[0].id").value(MUSIC_ID.toString()));
+    }
+
+    @Test
+    void sparseDataStillSurfacesPhysicalEventsAndBroaderOnlineBrowsing() throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot").update();
+        String[] cities = {"Groningen", "Zwolle", "Rotterdam", "Utrecht", "Eindhoven", "Den Bosch",
+                "'s-Hertogenbosch", "Amersfoort", "Zwolle"};
+        for (int i = 0; i < cities.length; i++) {
+            addEvent("Physical " + i, Instant.parse("2030-06-10T11:00:00Z").plus(Duration.ofHours(i)).toString(),
+                    "PHYSICAL", cities[i]);
+        }
+        for (int i = 0; i < 11; i++) {
+            addEvent("Online " + i, i < 6 ? "2030-06-10T12:00:00Z" : "2030-08-10T12:00:00Z", "ONLINE", null);
+        }
+        JsonNode home = response(mockMvc.perform(get("/api/home")));
+        assertThat(home.get("nearYouCity").get("slug").asText()).isEqualTo("amsterdam");
+        assertThat(home.get("nearYou").get("total").asInt()).isZero();
+        assertThat(home.get("thisWeekend").get("total").asInt()).isZero();
+        assertThat(home.get("tonight").get("mode").asText()).isEqualTo("STARTING_SOON");
+        assertThat(home.get("tonight").get("total").asInt()).isEqualTo(9);
+        assertThat(home.get("tonight").get("items").size()).isEqualTo(6);
+        assertThat(home.get("tonight").get("items").get(0).get("cityName").asText()).isEqualTo("Groningen");
+        assertThat(home.get("online").get("total").asInt()).isEqualTo(6);
+        assertThat(home.has("categories")).isFalse();
+        assertThat(home.has("tags")).isFalse();
+        mockMvc.perform(get(URI.create(home.get("online").get("broaderBrowseUrl").asText())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(11));
+        mockMvc.perform(get(URI.create(home.get("nearYou").get("broaderBrowseUrl").asText())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(9));
+        mockMvc.perform(get(URI.create(home.get("browseUrl").asText())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(20));
+        for (String section : List.of("tonight", "thisWeekend", "nearYou", "online")) {
+            assertRailLinkMatchesPreview(home.get(section));
+        }
+    }
+
+    @Test
+    void exactLinksMatchNormalSectionsAndUnknownCityRemainsSelected() throws Exception {
+        JsonNode home = response(mockMvc.perform(get("/api/home").param("city", "unknown-city")));
+        assertThat(home.get("nearYouCity").get("slug").asText()).isEqualTo("unknown-city");
+        assertThat(home.get("nearYou").get("total").asInt()).isZero();
+        for (String section : List.of("tonight", "thisWeekend", "nearYou", "online")) {
+            assertRailLinkMatchesPreview(home.get(section));
+        }
+    }
+
+    @Test
+    void entirelyEmptyCatalogHasHonestEmptySectionsAndUsableLinks() throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot").update();
+        JsonNode home = response(mockMvc.perform(get("/api/home")));
+        for (String section : List.of("tonight", "thisWeekend", "nearYou", "online")) {
+            JsonNode rail = home.get(section);
+            assertThat(rail.get("items").size()).isZero();
+            assertThat(rail.get("total").asInt()).isZero();
+            assertThat(rail.get("hasMore").asBoolean()).isFalse();
+            assertRailLinkMatchesPreview(rail);
+        }
+        mockMvc.perform(get("/api/cities")).andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void customDatesIncludeBothLocalDatesButNotFollowingMidnight() throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot").update();
+        Seeded first = addEvent("First boundary", "2030-06-07T22:00:00Z", "PHYSICAL", "Amsterdam");
+        Seeded last = addEvent("Last boundary", "2030-06-09T21:59:59Z", "PHYSICAL", "Amsterdam");
+        addEvent("Outside", "2030-06-09T22:00:00Z", "PHYSICAL", "Amsterdam");
+        mockMvc.perform(events().param("dateFrom", "2030-06-08").param("dateTo", "2030-06-09"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.items[0].id").value(first.id().toString()))
+                .andExpect(jsonPath("$.items[1].id").value(last.id().toString()));
+    }
+
+    @Test
+    void daytimeRangeAppliesToEveryDateAndHasExclusiveEnd() throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot").update();
+        addEvent("Saturday evening", "2030-06-08T16:00:00Z", "PHYSICAL", "Amsterdam");
+        addEvent("Sunday evening", "2030-06-09T20:59:59Z", "PHYSICAL", "Amsterdam");
+        addEvent("Saturday noon", "2030-06-08T10:00:00Z", "PHYSICAL", "Amsterdam");
+        addEvent("End boundary", "2030-06-09T21:00:00Z", "PHYSICAL", "Amsterdam");
+        mockMvc.perform(events().param("dateFrom", "2030-06-08").param("dateTo", "2030-06-09")
+                        .param("timeFrom", "18:00").param("timeTo", "23:00"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void overnightTimeWindowUsesStartDateAndWorksWithoutDates() throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot").update();
+        addEvent("Early selected date", "2030-06-07T23:00:00Z", "PHYSICAL", "Amsterdam");
+        addEvent("Late selected date", "2030-06-08T20:00:00Z", "PHYSICAL", "Amsterdam");
+        addEvent("Following date", "2030-06-08T23:00:00Z", "PHYSICAL", "Amsterdam");
+        addEvent("Exclusive end", "2030-06-08T00:00:00Z", "PHYSICAL", "Amsterdam");
+        mockMvc.perform(events().param("dateFrom", "2030-06-08").param("dateTo", "2030-06-08")
+                        .param("timeFrom", "22:00").param("timeTo", "02:00"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+        mockMvc.perform(events().param("timeFrom", "22:00").param("timeTo", "02:00"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test
+    void repeatedLocalHourDuringAutumnDstMatchesBothInstants() throws Exception {
+        jdbc.sql("DELETE FROM publication.event_snapshot").update();
+        addEvent("Before clock rollback", "2030-10-27T00:30:00Z", "PHYSICAL", "Amsterdam");
+        addEvent("After clock rollback", "2030-10-27T01:30:00Z", "PHYSICAL", "Amsterdam");
+        mockMvc.perform(events().param("dateFrom", "2030-10-27").param("dateTo", "2030-10-27")
+                        .param("timeFrom", "02:00").param("timeTo", "03:00"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void customFiltersCombineWithSearchAndKeepFiltersOnTheNextPage() throws Exception {
+        mockMvc.perform(events().param("dateFrom", "2030-06-07").param("dateTo", "2030-06-10")
+                        .param("timeFrom", "18:00").param("timeTo", "22:00")
+                        .param("category", "music-nightlife", "other").param("tag", "coding")
+                        .param("city", "amsterdam").param("place", "physical").param("q", "Shared")
+                        .param("size", "1").param("page", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.items[0].id").value(TIE_HIGH_ID.toString()));
+    }
+
+    @Test
+    void endedEventsStayExcludedEvenWhenCustomDatesMatch() throws Exception {
+        Seeded ended = addEvent("Ended", "2030-06-06T10:00:00Z", "PHYSICAL", "Amsterdam");
+        mockMvc.perform(events().param("dateFrom", "2030-06-06").param("dateTo", "2030-06-08"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[*].id", not(hasItem(ended.id().toString()))));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"dateFrom,2030-02-30", "dateFrom,0000-01-01", "dateFrom,2030-6-8", "dateTo,2030-06-08",
+            "timeFrom,24:00", "timeFrom,9:00", "timeFrom,18:00:00", "timeTo,18:00", "page,2147483648"})
+    void invalidOrIncompleteCustomRangesReturn400(String parameter, String value) throws Exception {
+        mockMvc.perform(events().param(parameter, value)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void conflictingRangesAndOnlineCityReturn400() throws Exception {
+        mockMvc.perform(events().param("dateFrom", "2030-06-09").param("dateTo", "2030-06-08"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(events().param("dateFrom", "2030-06-08").param("dateTo", "2030-06-09").param("when", "weekend"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(events().param("timeFrom", "18:00").param("timeTo", "18:00"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(events().param("city", "amsterdam").param("place", "online"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {51, 2147483647})
+    void largePageIndexesReturnEmptyPagesWithoutOffsetOverflow(int page) throws Exception {
+        mockMvc.perform(events().param("page", String.valueOf(page)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(7))
+                .andExpect(jsonPath("$.items", hasSize(0)));
+    }
+
+    @Test
+    void onlineCardsCarryExplicitPlaceAndNullablePresentationFields() throws Exception {
+        mockMvc.perform(events().param("place", "online")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].place").value("ONLINE"))
+                .andExpect(jsonPath("$.items[0].cityName").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].venueName").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].imageUrl").value(nullValue()));
+    }
+
+    private Seeded addEvent(String title, String start, String place, String city) {
+        return insert(UUID.randomUUID(), title, Instant.parse(start), "Other", "coding", place, city, null,
+                null, true, Instant.parse("9999-01-01T00:00:00Z"));
+    }
+
+    private JsonNode response(ResultActions result) throws Exception {
+        result.andExpect(status().isOk());
+        return JsonMapper.shared().readTree(body(result));
+    }
+
+    private void assertRailLinkMatchesPreview(JsonNode rail) throws Exception {
+        JsonNode page = response(mockMvc.perform(get(URI.create(rail.get("browseUrl").asText()))));
+        assertThat(page.get("page").asInt()).isZero();
+        assertThat(page.get("totalElements").asLong()).isEqualTo(rail.get("total").asLong());
+        for (int i = 0; i < rail.get("items").size(); i++) {
+            assertThat(page.get("items").get(i)).isEqualTo(rail.get("items").get(i));
+        }
     }
 
     private MockHttpServletRequestBuilder events() {
