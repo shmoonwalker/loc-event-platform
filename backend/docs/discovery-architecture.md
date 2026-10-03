@@ -43,8 +43,7 @@ event/
     HomeService                  sections, homepage-only fallback, browse URLs
     FilterOptionsService         complete static vocabulary from supported catalogs
   repository/
-    PublicEventRepository        read-operation contract
-    PostgresPublicEventRepository SQL, parameter binding, grouping and pagination
+    PublicEventRepository        SQL, parameter binding, grouping and pagination
     EventCardRowMapper           ResultSet to public preview DTO
   model/
     BrowseCriteria               typed search criteria
@@ -82,13 +81,12 @@ with identical fields would not add value for this read-only projection.
 
 ## Spring dependencies
 
-`PostgresPublicEventRepository` implements `PublicEventRepository` and is annotated
-`@Repository`. Constructor injection supplies `JdbcClient` and `EventCardRowMapper`.
-Spring Boot configures JDBC from the datasource configuration and PostgreSQL driver.
-The SQL implementation is enabled when `loc.search.engine=postgres`, or the property
-is absent. Another value requires another implementation; no alternate engine exists.
+`PublicEventRepository` is a concrete `@Repository` class. Constructor injection
+supplies `JdbcClient` and `EventCardRowMapper`. Spring Boot configures JDBC from the
+datasource configuration and PostgreSQL driver. There is one search implementation,
+so there is no interface or engine property; add one only when a second engine exists.
 
-`EventBrowseService` depends on the interface and Clock. `HomeService` depends on
+`EventBrowseService` depends on the repository and Clock. `HomeService` depends on
 the repository for city resolution, on EventBrowseService for searches, and on
 Clock. It uses one instant for a complete homepage calculation. FilterOptionsService
 uses category/tag catalogs and does not query publication.
