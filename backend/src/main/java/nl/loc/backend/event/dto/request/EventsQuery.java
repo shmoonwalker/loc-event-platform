@@ -52,7 +52,7 @@ public class EventsQuery {
             name = "when",
             in = ParameterIn.QUERY,
             required = false,
-            description = "Time window in Europe/Amsterdam. tonight is the calendar day, weekend is Saturday 00:00 "
+            description = "Time window in Europe/Amsterdam. tonight is 18:00 until midnight, weekend is Saturday 00:00 "
                     + "through Monday 00:00, upcoming is the next 30 days. Unknown values return 400.",
             example = "tonight",
             schema = @Schema(allowableValues = {"tonight", "weekend", "upcoming"}))
@@ -82,9 +82,9 @@ public class EventsQuery {
             name = "page",
             in = ParameterIn.QUERY,
             required = false,
-            description = "Zero-based page index. Defaults to 0. Maximum 50. See-all uses 0.",
+            description = "Zero-based page index. Defaults to 0. See-all uses 0.",
             example = "0",
-            schema = @Schema(minimum = "0", maximum = "50"))
+            schema = @Schema(minimum = "0", maximum = "2147483647"))
     private Integer page;
 
     @Parameter(
@@ -95,6 +95,18 @@ public class EventsQuery {
             example = "20",
             schema = @Schema(minimum = "1", maximum = "20"))
     private Integer size;
+
+    @Parameter(description = "Inclusive first start date in Europe/Amsterdam. Requires dateTo; cannot combine with when.", example = "2030-06-08")
+    private String dateFrom;
+
+    @Parameter(description = "Inclusive last start date in Europe/Amsterdam. Requires dateFrom.", example = "2030-06-10")
+    private String dateTo;
+
+    @Parameter(description = "Inclusive local start time HH:mm. Requires timeTo. Applies on each selected date.", example = "18:00")
+    private String timeFrom;
+
+    @Parameter(description = "Exclusive local start time HH:mm. Earlier than timeFrom means overnight; equal times are invalid.", example = "23:00")
+    private String timeTo;
 
     public String getQ() {
         return q;
@@ -166,5 +178,37 @@ public class EventsQuery {
 
     public void setSize(Integer size) {
         this.size = size;
+    }
+
+    public String getDateFrom() {
+        return dateFrom;
+    }
+
+    public void setDateFrom(String dateFrom) {
+        this.dateFrom = dateFrom;
+    }
+
+    public String getDateTo() {
+        return dateTo;
+    }
+
+    public void setDateTo(String dateTo) {
+        this.dateTo = dateTo;
+    }
+
+    public String getTimeFrom() {
+        return timeFrom;
+    }
+
+    public void setTimeFrom(String timeFrom) {
+        this.timeFrom = timeFrom;
+    }
+
+    public String getTimeTo() {
+        return timeTo;
+    }
+
+    public void setTimeTo(String timeTo) {
+        this.timeTo = timeTo;
     }
 }
