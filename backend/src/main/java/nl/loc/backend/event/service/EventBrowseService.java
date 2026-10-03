@@ -28,12 +28,15 @@ public class EventBrowseService {
     EventPage search(BrowseCriteria criteria, Instant now) {
         TimeWindow.Range range = criteria.when() == null
                 ? TimeWindow.future(now) : TimeWindow.forPreset(criteria.when(), now);
+        if (criteria.dateFrom() != null) {
+            range = TimeWindow.custom(criteria.dateFrom(), criteria.dateTo(), now);
+        }
         EventSort sort = criteria.sort() == EventSort.RELEVANCE && criteria.q() == null
                 ? EventSort.START_TIME : criteria.sort();
         return repository.search(criteria, range, sort);
     }
 
     public List<City> cities(String q) {
-        return repository.suggestCities(q, 10, TimeWindow.facets(clock.instant()));
+        return repository.suggestCities(q, 10, TimeWindow.future(clock.instant()));
     }
 }

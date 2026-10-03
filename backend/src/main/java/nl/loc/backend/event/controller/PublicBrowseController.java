@@ -14,6 +14,8 @@ import nl.loc.backend.event.dto.request.EventsQuery;
 import nl.loc.backend.event.dto.request.HomeQuery;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.dto.response.HomeView;
+import nl.loc.backend.event.dto.response.FilterOptions;
+import nl.loc.backend.event.service.FilterOptionsService;
 import nl.loc.backend.event.service.EventBrowseService;
 import nl.loc.backend.event.service.HomeService;
 import org.springdoc.core.annotations.ParameterObject;
@@ -34,22 +36,23 @@ public class PublicBrowseController {
     private final HomeService homeService;
     private final EventBrowseService browse;
     private final BrowseCriteriaParser parser;
+    private final FilterOptionsService filterOptions;
 
-    public PublicBrowseController(HomeService homeService, EventBrowseService browse, BrowseCriteriaParser parser) {
+    public PublicBrowseController(HomeService homeService, EventBrowseService browse,
+                                  BrowseCriteriaParser parser, FilterOptionsService filterOptions) {
         this.homeService = homeService;
         this.browse = browse;
         this.parser = parser;
+        this.filterOptions = filterOptions;
     }
 
     @GetMapping("/home")
     @Operation(
             summary = "Homepage",
-            description = "Returns tags, category counts, and four rails. Each rail previews 6 events with total, "
-                    + "items, and hasMore. Query city applies only to nearYou and defaults to amsterdam. "
-                    + "Tags, categories, tonight, and this weekend are physical discovery and are not filtered "
-                    + "by that city. Online is location.type ONLINE and is not filtered by city. No GPS. "
-                    + "Tags are a field, not a rail. Near-you see-all is "
-                    + "GET /api/events?city={slug}&when=upcoming&place=physical with page 0 and size at most 20.")
+            description = "Four previews of up to six events. city scopes only nearYou and defaults to Amsterdam. "
+                    + "Tonight is 18:00-midnight Amsterdam; if empty, mode becomes STARTING_SOON with upcoming physical events. "
+                    + "Weekend and nearYou stay empty when no matches exist. Each section supplies exact and broader browse URLs. "
+                    + "No GPS. Complete filter options are available separately at /api/events/filter-options.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -61,7 +64,7 @@ public class PublicBrowseController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public HomeView home(@ParameterObject @ModelAttribute HomeQuery query) {
-        return homeService.home(parser.homeCity(query.getCity()));
+        return homeService.home(parser.homeCity(query.city()));
     }
 
     @GetMapping("/events")
@@ -72,7 +75,10 @@ public class PublicBrowseController {
                     + "Other homepage rails omit city. page starts at 0. Repeated category is OR. Repeated tag is AND. "
                     + "q is matched with websearch_to_tsquery on title, description, venue, city, categories, and tags. "
                     + "Sort defaults to relevance when q is present, otherwise start time, then id. "
-                    + "Unknown place, category, tag, when, or sort returns 400.")
+                    + "Custom dateFrom/dateTo are inclusive Amsterdam dates and cannot combine with when. "
+                    + "timeFrom/timeTo are local HH:mm start times applied each date; overnight ranges are supported. "
+                    + "Both ends of each custom range are required. Ended events remain excluded. "
+                    + "city with place=online is invalid. Explicit searches never fall back. Unknown filters return 400.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -85,6 +91,13 @@ public class PublicBrowseController {
     })
     public EventPage events(@ParameterObject @ModelAttribute EventsQuery query) {
         return browse.search(parser.parse(query));
+    }
+
+    @GetMapping("/events/filter-options")
+    @Operation(summary = "Complete event filter options",
+            description = "Supported categories, tags, sorts, date presets, places, timezone, and limits. No result counts.")
+    public FilterOptions filterOptions() {
+        return filterOptions.options();
     }
 
     @GetMapping("/cities")
@@ -103,6 +116,6 @@ public class PublicBrowseController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public List<City> cities(@ParameterObject @ModelAttribute CitiesQuery query) {
-        return browse.cities(parser.searchText(query.getQ()));
+        return browse.cities(parser.searchText(query.q()));
     }
 }

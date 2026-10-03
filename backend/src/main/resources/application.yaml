@@ -11,10 +11,6 @@ spring:
 server:
   port: 8080
 
-loc:
-  search:
-    engine: postgres
-
 springdoc:
   api-docs:
     path: /api/docs/openapi.yaml

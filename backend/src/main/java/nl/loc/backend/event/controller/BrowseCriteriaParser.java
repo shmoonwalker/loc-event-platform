@@ -1,6 +1,13 @@
 package nl.loc.backend.event.controller;
 
+import static nl.loc.backend.event.model.BrowseLimits.DEFAULT_PAGE_SIZE;
+import static nl.loc.backend.event.model.BrowseLimits.MAX_PAGE_SIZE;
+import static nl.loc.backend.event.model.BrowseLimits.MAX_QUERY_LENGTH;
+
 import java.util.ArrayList;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 import nl.loc.backend.category.model.EventCategory;
@@ -16,22 +23,37 @@ import org.springframework.stereotype.Component;
 @Component
 public class BrowseCriteriaParser {
 
-    public static final int DEFAULT_PAGE_SIZE = 20;
-    public static final int MAX_PAGE_SIZE = 20;
-    public static final int MAX_PAGE = 50;
-    public static final int MAX_QUERY_LENGTH = 100;
 
     public BrowseCriteria parse(EventsQuery query) {
-        String q = searchText(query.getQ());
-        String city = citySlug(query.getCity());
-        List<EventCategory> categories = categories(query.getCategory());
-        List<EventTag> tags = tags(query.getTag());
-        When when = when(query.getWhen());
-        Place place = place(query.getPlace());
-        EventSort sort = sort(query.getSort(), q);
-        int page = page(query.getPage());
-        int size = size(query.getSize());
-        return new BrowseCriteria(q, city, categories, tags, when, sort, place, page, size);
+        String q = searchText(query.q());
+        String city = citySlug(query.city());
+        List<EventCategory> categories = categories(query.category());
+        List<EventTag> tags = tags(query.tag());
+        When when = when(query.when());
+        Place place = place(query.place());
+        EventSort sort = sort(query.sort(), q);
+        int page = page(query.page());
+        int size = size(query.size());
+        LocalDate dateFrom = date(query.dateFrom(), "dateFrom");
+        LocalDate dateTo = date(query.dateTo(), "dateTo");
+        LocalTime timeFrom = time(query.timeFrom(), "timeFrom");
+        LocalTime timeTo = time(query.timeTo(), "timeTo");
+        if ((dateFrom == null) != (dateTo == null)) {
+            throw new InvalidBrowseQueryException("dateFrom and dateTo must be supplied together");
+        }
+        if (dateFrom != null && dateFrom.isAfter(dateTo)) {
+            throw new InvalidBrowseQueryException("dateFrom must not be after dateTo");
+        }
+        if (dateFrom != null && when != null) {
+            throw new InvalidBrowseQueryException("dateFrom/dateTo cannot be combined with when");
+        }
+        if ((timeFrom == null) != (timeTo == null) || (timeFrom != null && timeFrom.equals(timeTo))) {
+            throw new InvalidBrowseQueryException("timeFrom and timeTo must be supplied together and must differ");
+        }
+        if (place == Place.ONLINE && city != null) {
+            throw new InvalidBrowseQueryException("city cannot be combined with place=online");
+        }
+        return new BrowseCriteria(q, city, categories, tags, when, sort, place, dateFrom, dateTo, timeFrom, timeTo, page, size);
     }
 
     public String searchText(String raw) {
@@ -76,7 +98,7 @@ public class BrowseCriteriaParser {
             categories.add(EventCategory.fromSlug(value)
                     .orElseThrow(() -> new InvalidBrowseQueryException("Unknown category: " + value.strip())));
         }
-        return List.copyOf(categories);
+        return categories.stream().distinct().toList();
     }
 
     private static List<EventTag> tags(List<String> raw) {
@@ -91,7 +113,7 @@ public class BrowseCriteriaParser {
             tags.add(EventTag.fromSlug(value)
                     .orElseThrow(() -> new InvalidBrowseQueryException("Unknown tag: " + value.strip())));
         }
-        return List.copyOf(tags);
+        return tags.stream().distinct().toList();
     }
 
     private static When when(String raw) {
@@ -130,8 +152,8 @@ public class BrowseCriteriaParser {
 
     private static int page(Integer page) {
         int value = page == null ? 0 : page;
-        if (value < 0 || value > MAX_PAGE) {
-            throw new InvalidBrowseQueryException("page must be between 0 and " + MAX_PAGE);
+        if (value < 0) {
+            throw new InvalidBrowseQueryException("page must be zero or greater");
         }
         return value;
     }
@@ -142,6 +164,36 @@ public class BrowseCriteriaParser {
             throw new InvalidBrowseQueryException("size must be between 1 and " + MAX_PAGE_SIZE);
         }
         return value;
+    }
+
+    private static LocalDate date(String raw, String field) {
+        String value = blankToNull(raw);
+        if (value == null) {
+            return null;
+        }
+        try {
+            if (!value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}") || value.startsWith("0000")) {
+                throw new DateTimeParseException("Invalid date", value, 0);
+            }
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException ex) {
+            throw new InvalidBrowseQueryException(field + " must be a valid date in YYYY-MM-DD format, year 0001-9999");
+        }
+    }
+
+    private static LocalTime time(String raw, String field) {
+        String value = blankToNull(raw);
+        if (value == null) {
+            return null;
+        }
+        try {
+            if (!value.matches("[0-9]{2}:[0-9]{2}")) {
+                throw new DateTimeParseException("Invalid time", value, 0);
+            }
+            return LocalTime.parse(value);
+        } catch (DateTimeParseException ex) {
+            throw new InvalidBrowseQueryException(field + " must be a valid local time in HH:mm format");
+        }
     }
 
     private static String blankToNull(String value) {

@@ -8,12 +8,18 @@ It serves public event discovery and owns application-specific behaviour such as
 
 The backend does not collect or normalize external event data.
 
-**Implementation status:** the old controllers, services, repositories, and
-database migrations have been removed. The current application is a Spring
-Boot shell with OpenAPI metadata, request validation error handling, and a
-default-deny security configuration. Product endpoints, authentication,
-database access, and the backend-owned schema will be implemented during the
-redesign. The sections below describe intended product behaviour.
+**Implementation status:** public discovery is implemented: homepage previews with
+an honest Tonight fallback, event search/filtering/pagination, complete filter
+options, and city suggestions. PostgreSQL reads use the qualified publication
+contract. Event detail, authentication, saved events, comments, moderation, and
+the backend-owned schema remain future work. The sections below include those
+planned product responsibilities; they are not all implemented endpoints.
+
+- [Discovery API and frontend integration](docs/discovery-api.md): exact filters,
+  response shapes, empty states, fallback rules, date/time semantics, and navigation.
+- [Discovery architecture and repository guide](docs/discovery-architecture.md):
+  package responsibilities, JSONB publication, SQL, dependencies, and testing.
+
 
 ---
 
@@ -102,12 +108,18 @@ Public discovery can use catalog attributes such as:
 - date and time
 
 Public discovery reads `publication.discoverable_events`, which contains only
-currently qualified occurrences. The backend also applies any backend-owned
-moderation visibility rules.
+currently qualified occurrences. Backend-owned moderation visibility rules are
+planned alongside the future moderation feature.
 
-Past, cancelled or administratively hidden events are excluded from normal discovery and search results.
+Publication eligibility and temporal filters exclude ended or withdrawn occurrences.
+Backend-owned administrative hiding is planned, not yet implemented.
 
-Discovery list results are grouped by `loc_event_id`: the home and default browse UI show one card per logical event, not one card per occurrence. A card represents an event that has at least one currently discoverable occurrence after backend moderation rules. The list response includes shared event fields (title, location, categories, tags, primary image) plus summary scheduling such as the next upcoming start and the count of upcoming discoverable occurrences, and optionally the last upcoming start or a short date range. Pagination and total counts refer to distinct events, not occurrence snapshots. Sorting (for example soonest) uses the earliest upcoming discoverable occurrence per event.
+Discovery list results are grouped by `loc_event_id`: one card per logical event.
+Each card selects the earliest matching occurrence and exposes title, start/end,
+place, city, venue, and optional image. Categories/tags are filterable but are not
+card fields; the complete vocabulary comes from `/api/events/filter-options`.
+Pagination and totals count distinct events, not occurrence snapshots. Occurrence
+counts and richer detail are not part of the current card response.
 
 Occurrence-level filters (such as a date range or "this weekend") are applied to occurrences first. Results are then collapsed to events that retain at least one matching occurrence. The card's summary scheduling must reflect only the matched occurrences, not every occurrence of the event.
 
@@ -155,7 +167,7 @@ Organizer accounts, organizer authentication and organizer-managed pages are not
 
 ## Related Events
 
-The backend provides related-event discovery using available catalog information such as:
+The planned backend will provide related-event discovery using available catalog information such as:
 
 - categories
 - tags
@@ -169,7 +181,7 @@ The exact similarity and ranking implementation may evolve independently of the 
 
 ## Authentication and Users
 
-Loc supports user registration and JWT-based authentication.
+User registration and JWT-based authentication are planned; they are not implemented in the current discovery API.
 
 Authentication is not required for public event discovery.
 
@@ -280,10 +292,9 @@ PostgreSQL
 
 The data application has write access to catalog data.
 
-The backend will read qualified publication data and have read/write access to
-its own application data when that schema is created. The current shell has no
-database connection. Product event reads will not rely on intermediate catalog
-rows.
+The backend reads qualified publication data through JdbcClient. It will have
+read/write access to its own application data when that schema is created. Product
+event reads do not rely on intermediate catalog rows.
 
 This keeps service responsibilities separate without requiring separate databases.
 
@@ -343,9 +354,9 @@ Backend APIs should:
 - return explicit event state where it affects product behaviour
 - preserve clear ownership between catalog data and backend-owned state
 
-As backend endpoints are implemented, their generated OpenAPI specification
-will describe the actual request and response structures. The current shell
-has no product endpoints or authentication scheme to document yet.
+The generated OpenAPI specification documents the implemented discovery endpoints.
+See the linked API guide for examples and product semantics. Authentication
+endpoints and their security scheme remain future work.
 
 This document defines high-level backend behaviour and ownership rather than individual endpoint implementation.
 

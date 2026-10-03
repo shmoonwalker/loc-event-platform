@@ -18,7 +18,7 @@ public final class TimeWindow {
     public static Range tonight(Instant now) {
         LocalDate today = now.atZone(ZONE).toLocalDate();
         return new Range(
-                today.atStartOfDay(ZONE).toInstant(),
+                today.atTime(18, 0).atZone(ZONE).toInstant(),
                 today.plusDays(1).atStartOfDay(ZONE).toInstant(),
                 now);
     }
@@ -48,9 +48,8 @@ public final class TimeWindow {
         return new Range(now, null, now);
     }
 
-    /** Category counts: still running, and starting within the next 18 months. */
-    public static Range facets(Instant now) {
-        return new Range(null, now.atZone(ZONE).plusMonths(18).toInstant(), now);
+    public static Range custom(LocalDate from, LocalDate to, Instant now) {
+        return new Range(from.atStartOfDay(ZONE).toInstant(), to.plusDays(1).atStartOfDay(ZONE).toInstant(), now);
     }
 
     public static Range forPreset(When when, Instant now) {

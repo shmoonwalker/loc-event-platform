@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Shared Loc categories. {@code catalogName} is the value stored on a published snapshot. */
+/** Shared Loc categories. {@code label} is the value stored on a published snapshot. */
 @Schema(
         description = "Shared Loc category. Query and card values are slugs. The snapshot stores the label.",
         allowableValues = {
@@ -41,29 +41,22 @@ public enum EventCategory {
 
     private static final Map<String, EventCategory> BY_SLUG = Arrays.stream(values())
             .collect(Collectors.toUnmodifiableMap(EventCategory::slug, Function.identity()));
-    private static final Map<String, EventCategory> BY_CATALOG_NAME = Arrays.stream(values())
-            .collect(Collectors.toUnmodifiableMap(
-                    category -> category.catalogName.toLowerCase(Locale.ROOT),
-                    Function.identity()));
 
     private final String slug;
-    private final String catalogName;
+    private final String label;
 
-    EventCategory(String slug, String catalogName) {
+    EventCategory(String slug, String label) {
         this.slug = slug;
-        this.catalogName = catalogName;
+        this.label = label;
     }
 
     public String slug() {
         return slug;
     }
 
+    /** Display label; also the exact value stored in a published snapshot's categories. */
     public String label() {
-        return catalogName;
-    }
-
-    public String catalogName() {
-        return catalogName;
+        return label;
     }
 
     public static Optional<EventCategory> fromSlug(String slug) {
@@ -71,12 +64,5 @@ public enum EventCategory {
             return Optional.empty();
         }
         return Optional.ofNullable(BY_SLUG.get(slug.strip().toLowerCase(Locale.ROOT)));
-    }
-
-    public static Optional<EventCategory> fromCatalogName(String catalogName) {
-        if (catalogName == null || catalogName.isBlank()) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(BY_CATALOG_NAME.get(catalogName.strip().toLowerCase(Locale.ROOT)));
     }
 }
