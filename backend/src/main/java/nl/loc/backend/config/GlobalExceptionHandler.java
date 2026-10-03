@@ -1,5 +1,6 @@
 package nl.loc.backend.config;
 
+import nl.loc.backend.event.controller.InvalidBrowseQueryException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -37,6 +38,14 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
         problem.setTitle("Invalid request parameter");
         problem.setDetail("The value provided for '" + ex.getName() + "' has an invalid format");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidBrowseQueryException.class)
+    public ProblemDetail handleInvalidBrowseQuery(InvalidBrowseQueryException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Invalid browse query");
+        problem.setDetail(ex.getMessage());
         return problem;
     }
 
