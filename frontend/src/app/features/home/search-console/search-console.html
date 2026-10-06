@@ -16,7 +16,7 @@
         #queryInput
       />
     </label>
-    <button type="submit" class="btn-primary">Search</button>
+    <button type="submit" class="btn-primary max-sm:w-full">Search</button>
   </form>
 
   <!-- Filter triggers + online switch -->
@@ -41,7 +41,7 @@
     <button
       type="button"
       role="switch"
-      class="group ml-auto flex min-h-14 items-center gap-3 rounded-[14px] border border-line bg-panel px-4 text-[15px] font-semibold aria-checked:border-blush aria-checked:bg-blush-soft max-sm:ml-0"
+      class="group ml-auto flex min-h-14 items-center gap-3 rounded-[14px] border border-line bg-panel px-4 text-[15px] font-semibold aria-checked:border-blush aria-checked:bg-blush-soft max-sm:ml-0 max-sm:flex-[1_1_calc(50%-8px)] max-sm:justify-between"
       [attr.aria-checked]="f().place === 'online'"
       (click)="setOnline(f().place !== 'online')"
     >

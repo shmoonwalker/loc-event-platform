@@ -48,6 +48,55 @@ export interface EventPage {
   items: EventCard[];
 }
 
+export interface OrganizerInfo {
+  id: string;
+  name: string;
+  description: string | null;
+  site: string | null;
+}
+
+export interface Occurrence {
+  startAt: string; // ISO instant, UTC
+  endAt: string; // equals startAt when the event has no end
+}
+
+/** Forecast for the event's first date. weatherCode is a WMO code. */
+export interface Weather {
+  forecastFetchedAt: string;
+  forecastHour: string;
+  temperatureCelsius: number | null;
+  precipitationProbabilityPercent: number | null;
+  windSpeedKmh: number | null;
+  weatherCode: number | null;
+}
+
+/** The event page. Online events have null venue, address, city, coordinates and weather. */
+export interface EventDetail {
+  id: string;
+  title: string;
+  description: string | null; // plain text
+  place: Place;
+  sourceUrl: string | null;
+  venueName: string | null;
+  address: string | null;
+  postalCode: string | null;
+  citySlug: string | null;
+  cityName: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  categories: FilterOption[];
+  tags: FilterOption[];
+  imageUrls: string[]; // the first is the main image
+  organizers: OrganizerInfo[];
+  occurrences: Occurrence[]; // soonest first, never empty
+  weather: Weather | null;
+}
+
+export interface OrganizerDetail {
+  organizer: OrganizerInfo;
+  events: EventPage;
+}
+
 /** value is sent to the API, label is shown to people. */
 export interface FilterOption {
   value: string;

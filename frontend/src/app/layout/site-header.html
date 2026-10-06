@@ -9,7 +9,7 @@
 
     <label class="pill-btn font-normal text-muted">
       <app-icon name="pin" />
-      Your city
+      <span class="max-sm:sr-only">Your city</span>
       <select
         class="h-[34px] cursor-pointer bg-transparent pr-1.5 font-semibold text-ink"
         (change)="homeCity.set(citySelect.value)"
@@ -28,7 +28,7 @@
       [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
     >
       <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
-      <span>{{ theme.theme() === 'dark' ? 'Light' : 'Dark' }}</span>
+      <span class="max-sm:hidden">{{ theme.theme() === 'dark' ? 'Light' : 'Dark' }}</span>
     </button>
   </div>
 </header>

@@ -18,7 +18,7 @@
     }
   </div>
 
-  <ul role="list" class="-mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pt-1 pb-4">
+  <ul role="list" class="-mx-1 flex snap-x snap-mandatory scroll-px-1 gap-5 overflow-x-auto px-1 pt-1 pb-4">
     @for (event of rail().items; track event.id) {
       <li class="w-[78vw] max-w-68 shrink-0 snap-start sm:w-68">
         <app-event-card [event]="event" />

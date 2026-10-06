@@ -20,6 +20,17 @@ export const routes: Routes = [
         loadComponent: () => import('./features/home/home-page').then((m) => m.HomePage),
       },
       {
+        // The page sets the real title (the event's) once it has loaded.
+        path: 'events/:id',
+        title: 'Event – Loc',
+        loadComponent: () => import('./features/event/event-page').then((m) => m.EventPage),
+      },
+      {
+        path: 'organizers/:id',
+        title: 'Organizer – Loc',
+        loadComponent: () => import('./features/organizer/organizer-page').then((m) => m.OrganizerPage),
+      },
+      {
         path: '**',
         title: 'Page not found – Loc',
         loadComponent: () => import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),

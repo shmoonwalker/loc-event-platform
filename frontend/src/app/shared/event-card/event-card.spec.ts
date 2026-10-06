@@ -69,4 +69,15 @@ describe('EventCardComponent', () => {
     const el = render({ ...base, category: 'nope' });
     expect(el.querySelector('img')?.getAttribute('src')).toBe('/images/categories/default.jpg');
   });
+
+  it('falls back to the category image when the event image fails to load', async () => {
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(EventCardComponent);
+    fixture.componentRef.setInput('event', { ...base, imageUrl: 'https://images.example/dead.jpg' });
+    fixture.detectChanges();
+    const img = (fixture.nativeElement as HTMLElement).querySelector('img')!;
+    img.dispatchEvent(new Event('error'));
+    await fixture.whenStable();
+    expect(img.getAttribute('src')).toBe('/images/categories/music-nightlife.jpg');
+  });
 });

@@ -1,0 +1,171 @@
+@if (notFound()) {
+  <app-not-found-state
+    heading="Event not found"
+    message="This event doesn't exist or has already ended."
+  />
+} @else if (detail.error()) {
+  <div class="wrap py-16">
+    <app-error-state
+      message="We couldn't load this event. Check your connection and try again."
+      (action)="detail.reload()"
+    />
+  </div>
+} @else if (event(); as e) {
+  <article
+    class="wrap grid gap-x-12 gap-y-10 pt-10 pb-6 lg:grid-cols-[minmax(0,1fr)_340px]"
+    aria-labelledby="event-title"
+  >
+    <div class="min-w-0">
+      <div class="aspect-video overflow-hidden rounded-[18px] border border-line bg-panel">
+        <img
+          [src]="image().src"
+          [alt]="image().alt"
+          class="size-full object-cover"
+          (error)="imageFailed.set(true)"
+        />
+      </div>
+
+      <h1 class="display mt-8 text-[clamp(32px,5vw,56px)] wrap-break-word" id="event-title">
+        {{ e.title }}
+      </h1>
+      <p class="mt-4 text-lg font-semibold">{{ when() }}</p>
+      <p class="mt-1.5 flex items-start gap-2 text-muted">
+        <app-icon [name]="online() ? 'screen' : 'pin'" class="mt-0.75" />
+        {{ placeLine() }}
+      </p>
+
+      @if (e.description) {
+        <!-- plain text from the source: keep its line breaks -->
+        <p
+          class="mt-8 max-w-[70ch] text-[17px] leading-relaxed wrap-break-word whitespace-pre-line"
+        >
+          {{ e.description }}
+        </p>
+      }
+
+      @if (e.categories.length || e.tags.length) {
+        <h2 class="sr-only">Categories and tags</h2>
+        <ul role="list" class="mt-8 flex flex-wrap gap-2">
+          @for (c of e.categories; track c.value) {
+            <li>
+              <a
+                class="chip chip-sm bg-blush-soft hover:border-blush"
+                routerLink="/"
+                [queryParams]="filterParams({ categories: [c.value] })"
+                fragment="all"
+              >
+                {{ c.label }}
+              </a>
+            </li>
+          }
+          @for (t of e.tags; track t.value) {
+            <li>
+              <a
+                class="chip chip-sm hover:border-blush"
+                routerLink="/"
+                [queryParams]="filterParams({ tags: [t.value] })"
+                fragment="all"
+              >
+                #{{ t.label }}
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+
+    <aside class="flex min-w-0 flex-col gap-8 wrap-break-word">
+      @if (addressLines().length) {
+        <section aria-labelledby="where-title">
+          <h2 class="text-xl font-semibold" id="where-title">Where</h2>
+          <address class="mt-2 not-italic">
+            @for (line of addressLines(); track $index) {
+              <span class="block">{{ line }}</span>
+            }
+          </address>
+          @if (mapUrl(); as url) {
+            <a
+              class="link mt-2 inline-block"
+              [href]="url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in maps<span class="sr-only"> (opens in a new tab)</span>
+            </a>
+          }
+        </section>
+      }
+
+      @if (weather(); as w) {
+        <section aria-labelledby="weather-title">
+          <h2 class="text-xl font-semibold" id="weather-title">Weather</h2>
+          <div class="mt-2 flex items-center gap-3 rounded-[14px] border border-line bg-panel p-4">
+            <app-icon [name]="w.icon" [size]="32" />
+            <div>
+              <p class="font-semibold">{{ w.summary }}</p>
+              @if (w.details) {
+                <p class="text-sm text-muted">{{ w.details }}</p>
+              }
+              <p class="text-sm text-muted">Forecast for {{ w.hour }}</p>
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (e.organizers.length) {
+        <section aria-labelledby="organizers-title">
+          <h2 class="text-xl font-semibold" id="organizers-title">Organized by</h2>
+          <ul role="list" class="mt-2 flex flex-col gap-3">
+            @for (o of e.organizers; track o.id) {
+              <li>
+                <a class="link" [routerLink]="['/organizers', o.id]">{{ o.name }}</a>
+                @if (o.description) {
+                  <p class="mt-1 line-clamp-3 text-sm text-muted">{{ o.description }}</p>
+                }
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (moreDates().length) {
+        <section aria-labelledby="dates-title">
+          <h2 class="text-xl font-semibold" id="dates-title">More dates</h2>
+          <ul role="list" class="mt-2 flex flex-col gap-1.5">
+            @for (d of moreDates(); track $index) {
+              <li>{{ d }}</li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (sourceUrl(); as url) {
+        <a class="link" [href]="url" target="_blank" rel="noopener noreferrer">
+          View the original listing<span class="sr-only"> (opens in a new tab)</span>
+        </a>
+      }
+    </aside>
+  </article>
+} @else {
+  <div
+    class="wrap grid gap-x-12 gap-y-10 pt-10 pb-6 lg:grid-cols-[minmax(0,1fr)_340px]"
+    aria-busy="true"
+  >
+    <div class="motion-safe:animate-pulse" aria-hidden="true">
+      <div class="aspect-video rounded-[18px] bg-line/60"></div>
+      <div class="mt-8 h-12 w-4/5 rounded bg-line/60"></div>
+      <div class="mt-4 h-5 w-2/5 rounded bg-line/60"></div>
+      <div class="mt-8 flex flex-col gap-2.5">
+        <div class="h-4 rounded bg-line/60"></div>
+        <div class="h-4 rounded bg-line/60"></div>
+        <div class="h-4 w-3/5 rounded bg-line/60"></div>
+      </div>
+    </div>
+    <div class="flex flex-col gap-3 motion-safe:animate-pulse" aria-hidden="true">
+      <div class="h-6 w-1/3 rounded bg-line/60"></div>
+      <div class="h-4 w-4/5 rounded bg-line/60"></div>
+      <div class="h-4 w-3/5 rounded bg-line/60"></div>
+    </div>
+    <span class="sr-only" role="status">Loading event…</span>
+  </div>
+}

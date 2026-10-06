@@ -9,6 +9,8 @@ const dowFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short'
 const dayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: 'numeric' });
 const monFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, month: 'short' });
 
+const dateFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
 const toDate = (at: Date | string) => (typeof at === 'string' ? new Date(at) : at);
 
 /** The calendar date in Amsterdam as YYYY-MM-DD (the format the API's dateFrom/dateTo use). */
@@ -30,4 +32,18 @@ export const formatTime = (iso: string): string => timeFmt.format(new Date(iso))
 export function dayParts(iso: string): { dow: string; day: string; mon: string } {
   const d = new Date(iso);
   return { dow: dowFmt.format(d), day: dayFmt.format(d), mon: monFmt.format(d) };
+}
+
+/** "Sat, 10 Oct 2026" in Amsterdam time. */
+export const formatDate = (iso: string): string => dateFmt.format(new Date(iso));
+
+/**
+ * "Sat, 10 Oct 2026, 20:30 – 23:00". The end is left out when there is none (end = start)
+ * and gets its own date when it falls on a later Amsterdam day.
+ */
+export function formatWhen(startAt: string, endAt: string): string {
+  const start = `${formatDate(startAt)}, ${formatTime(startAt)}`;
+  if (startAt === endAt) return start;
+  const end = amsterdamDate(startAt) === amsterdamDate(endAt) ? formatTime(endAt) : `${formatDate(endAt)}, ${formatTime(endAt)}`;
+  return `${start} – ${end}`;
 }
