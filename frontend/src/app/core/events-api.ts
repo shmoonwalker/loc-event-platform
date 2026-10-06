@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { City, EventPage, FilterOptions, HomeView } from './models';
+import { City, EventDetail, EventPage, FilterOptions, HomeView, OrganizerDetail } from './models';
 
 /** Query string values; an array becomes a repeated parameter (?tag=a&tag=b). */
 export type QueryParams = Record<string, string | string[]>;
@@ -21,6 +21,15 @@ export class EventsApi {
 
   events(params: QueryParams, size: number): Observable<EventPage> {
     return this.http.get<EventPage>('/api/events', { params: { ...params, size } });
+  }
+
+  event(id: string): Observable<EventDetail> {
+    return this.http.get<EventDetail>(`/api/events/${encodeURIComponent(id)}`);
+  }
+
+  /** The organizer plus one page of their upcoming events (the backend's default size, 20). */
+  organizer(id: string, page: number): Observable<OrganizerDetail> {
+    return this.http.get<OrganizerDetail>(`/api/organizers/${encodeURIComponent(id)}`, { params: { page } });
   }
 
   cities(q = ''): Observable<City[]> {

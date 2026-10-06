@@ -1,4 +1,4 @@
-import { addDays, amsterdamDate, dayParts, formatTime } from './time';
+import { addDays, amsterdamDate, dayParts, formatTime, formatWhen } from './time';
 
 describe('time (Europe/Amsterdam)', () => {
   it('formats a UTC instant as Amsterdam wall-clock time (summer, UTC+2)', () => {
@@ -26,5 +26,11 @@ describe('time (Europe/Amsterdam)', () => {
     expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
     expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+
+  it('formats an occurrence, with the end date only when it is another day', () => {
+    expect(formatWhen('2026-10-10T18:30:00Z', '2026-10-10T21:00:00Z')).toBe('Sat, 10 Oct 2026, 20:30 – 23:00');
+    expect(formatWhen('2026-10-10T18:30:00Z', '2026-10-10T18:30:00Z')).toBe('Sat, 10 Oct 2026, 20:30');
+    expect(formatWhen('2026-10-10T20:00:00Z', '2026-10-11T00:30:00Z')).toBe('Sat, 10 Oct 2026, 22:00 – Sun, 11 Oct 2026, 02:30');
   });
 });

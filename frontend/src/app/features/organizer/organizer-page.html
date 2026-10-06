@@ -1,0 +1,100 @@
+@if (notFound()) {
+  <app-not-found-state
+    heading="Organizer not found"
+    message="This organizer doesn't exist or has no upcoming events."
+  />
+} @else if (detail.error() && !organizer()) {
+  <div class="wrap py-16">
+    <app-error-state
+      message="We couldn't load this organizer. Check your connection and try again."
+      (action)="detail.reload()"
+    />
+  </div>
+} @else {
+  <section class="wrap pt-14 pb-2">
+    @if (organizer(); as o) {
+      <h1 class="display text-[clamp(36px,5vw,60px)]">{{ o.name }}</h1>
+      @if (o.description) {
+        <p class="mt-4 max-w-[70ch] text-[17px] leading-relaxed whitespace-pre-line text-muted">
+          {{ o.description }}
+        </p>
+      }
+      @if (site(); as url) {
+        <a class="link mt-4 inline-block" [href]="url" target="_blank" rel="noopener noreferrer">
+          Visit website<span class="sr-only"> (opens in a new tab)</span>
+        </a>
+      }
+    } @else {
+      <div class="flex flex-col gap-4 motion-safe:animate-pulse" aria-hidden="true">
+        <div class="h-12 w-1/2 rounded bg-line/60"></div>
+        <div class="h-4 w-3/5 rounded bg-line/60"></div>
+      </div>
+    }
+  </section>
+
+  <section
+    class="wrap mt-8 scroll-mt-24 border-t border-line pt-8 pb-6"
+    id="events"
+    aria-labelledby="events-title"
+  >
+    <h2 class="display text-3xl" id="events-title">Upcoming events</h2>
+    <p class="mt-2 text-muted" aria-live="polite">
+      @if (events(); as page) {
+        {{ page.totalElements }} {{ page.totalElements === 1 ? 'event' : 'events' }}.
+      } @else if (detail.isLoading()) {
+        Loading events…
+      }
+    </p>
+
+    <div class="mt-7">
+      @if (detail.error()) {
+        <app-error-state
+          message="We couldn't load events. Check your connection and try again."
+          (action)="detail.reload()"
+        />
+      } @else if (events(); as page) {
+        @if (page.items.length) {
+          <ul
+            role="list"
+            class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6"
+          >
+            @for (event of page.items; track event.id) {
+              <li><app-event-card [event]="event" /></li>
+            }
+          </ul>
+        } @else {
+          <div class="rounded-[18px] border border-dashed border-line px-6 py-12 text-center">
+            <h3 class="mb-1.5 text-xl font-semibold">No upcoming events here</h3>
+            <p class="text-muted">There is nothing on this page.</p>
+            @if (pageIndex() > 0) {
+              <button type="button" class="btn-dark mt-5" (click)="setPage(0)">
+                Back to the first page
+              </button>
+            }
+          </div>
+        }
+      } @else {
+        <div
+          class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6"
+          aria-busy="true"
+        >
+          @for (_ of skeletons; track $index) {
+            <app-event-card-skeleton />
+          }
+        </div>
+      }
+    </div>
+
+    @if (events(); as page) {
+      @if (page.totalPages > 1) {
+        <div class="mt-10">
+          <app-pagination
+            [page]="page.page"
+            [totalPages]="page.totalPages"
+            (pageChange)="setPage($event)"
+          />
+        </div>
+      }
+    }
+  </section>
+}
