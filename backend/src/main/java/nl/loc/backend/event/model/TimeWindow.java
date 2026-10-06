@@ -40,10 +40,6 @@ public final class TimeWindow {
                 now);
     }
 
-    public static Range next30Days(Instant now) {
-        return new Range(now, now.atZone(ZONE).plusDays(30).toInstant(), now);
-    }
-
     public static Range future(Instant now) {
         return new Range(now, null, now);
     }
@@ -56,7 +52,7 @@ public final class TimeWindow {
         return switch (when) {
             case TONIGHT -> tonight(now);
             case WEEKEND -> weekend(now);
-            case UPCOMING -> next30Days(now);
+            case UPCOMING -> future(now);
         };
     }
 

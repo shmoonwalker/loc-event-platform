@@ -12,6 +12,6 @@ public enum When {
     @Schema(description = "Saturday 00:00 through Monday 00:00 in Europe/Amsterdam. Query value: weekend.")
     WEEKEND,
 
-    @Schema(description = "The next 30 days. Query value: upcoming.")
+    @Schema(description = "Every event that has not ended yet. Query value: upcoming.")
     UPCOMING
 }

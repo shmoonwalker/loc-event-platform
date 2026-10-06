@@ -51,7 +51,7 @@ public record EventsQuery(
                 in = ParameterIn.QUERY,
                 required = false,
                 description = "Time window in Europe/Amsterdam. tonight is 18:00 until midnight, weekend is Saturday 00:00 "
-                        + "through Monday 00:00, upcoming is the next 30 days. Unknown values return 400.",
+                        + "through Monday 00:00, upcoming is every event not yet ended. Unknown values return 400.",
                 example = "tonight",
                 schema = @Schema(allowableValues = {"tonight", "weekend", "upcoming"}))
         String when,
