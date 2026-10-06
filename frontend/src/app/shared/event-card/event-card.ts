@@ -1,6 +1,6 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, linkedSignal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { eventImageUrl } from '../../core/event-image';
+import { categoryImage, eventImageUrl } from '../../core/event-image';
 import { dayParts, formatTime } from '../../core/time';
 import { EventCard } from '../../core/models';
 
@@ -15,7 +15,11 @@ export class EventCardComponent {
 
   protected readonly online = computed(() => this.event().place === 'ONLINE');
   protected readonly day = computed(() => dayParts(this.event().startAt));
-  protected readonly imageUrl = computed(() => eventImageUrl(this.event()));
+  /** A listing image that fails to load (dead link, hotlink block) falls back to the category photo. */
+  protected readonly imageFailed = linkedSignal({ source: this.event, computation: () => false });
+  protected readonly imageUrl = computed(() =>
+    this.imageFailed() ? categoryImage(this.event().category) : eventImageUrl(this.event()),
+  );
 
   /** "20:30 – 23:00", or just "20:30" when the event has no end time. */
   protected readonly time = computed(() => {

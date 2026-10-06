@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
@@ -79,6 +80,18 @@ describe('EventPage', () => {
       '/images/categories/music-nightlife.jpg',
     );
     expect(fallback.querySelector('img')?.getAttribute('alt')).toBe('');
+  });
+
+  it('swaps a listing image that fails to load for the category photo', async () => {
+    const el = await open((req) =>
+      req.flush({ ...event, imageUrls: ['https://images.example/dead.jpg'] }),
+    );
+    el.querySelector('img')!.dispatchEvent(new Event('error'));
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(el.querySelector('img')?.getAttribute('src')).toBe(
+      '/images/categories/music-nightlife.jpg',
+    );
+    expect(el.querySelector('img')?.getAttribute('alt')).toBe('');
   });
 
   it('links categories and tags to the filtered home list', async () => {

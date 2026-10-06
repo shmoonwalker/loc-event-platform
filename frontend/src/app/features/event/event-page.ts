@@ -1,8 +1,8 @@
-import { Component, computed, effect, inject, input } from '@angular/core';
+import { Component, computed, effect, inject, input, linkedSignal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
-import { eventImageUrl } from '../../core/event-image';
+import { categoryImage } from '../../core/event-image';
 import { EventsApi, QueryParams } from '../../core/events-api';
 import { externalUrl } from '../../core/external-url';
 import { EMPTY_FILTERS, Filters, filtersToParams } from '../../core/filters';
@@ -35,11 +35,13 @@ export class EventPage {
   protected readonly notFound = computed(() => errorStatus(this.detail) === 404);
   protected readonly online = computed(() => this.event()?.place === 'ONLINE');
   /** The main image, else the same category photo the event card falls back to (decorative, so no alt text). */
+  /** Set when the listing's image fails to load (dead link, hotlink block); resets for the next event. */
+  protected readonly imageFailed = linkedSignal({ source: this.event, computation: () => false });
   protected readonly image = computed(() => {
     const e = this.event();
-    const own = e?.imageUrls[0]?.trim();
+    const own = this.imageFailed() ? undefined : e?.imageUrls[0]?.trim();
     return {
-      src: eventImageUrl({ imageUrl: own || null, category: e?.categories[0]?.value }),
+      src: own || categoryImage(e?.categories[0]?.value),
       alt: own ? (e?.title ?? '') : '',
     };
   });

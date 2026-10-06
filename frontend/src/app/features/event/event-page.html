@@ -17,19 +17,28 @@
   >
     <div class="min-w-0">
       <div class="aspect-video overflow-hidden rounded-[18px] border border-line bg-panel">
-        <img [src]="image().src" [alt]="image().alt" class="size-full object-cover" />
+        <img
+          [src]="image().src"
+          [alt]="image().alt"
+          class="size-full object-cover"
+          (error)="imageFailed.set(true)"
+        />
       </div>
 
-      <h1 class="display mt-8 text-[clamp(32px,5vw,56px)]" id="event-title">{{ e.title }}</h1>
+      <h1 class="display mt-8 text-[clamp(32px,5vw,56px)] wrap-break-word" id="event-title">
+        {{ e.title }}
+      </h1>
       <p class="mt-4 text-lg font-semibold">{{ when() }}</p>
-      <p class="mt-1.5 flex items-center gap-2 text-muted">
-        <app-icon [name]="online() ? 'screen' : 'pin'" />
+      <p class="mt-1.5 flex items-start gap-2 text-muted">
+        <app-icon [name]="online() ? 'screen' : 'pin'" class="mt-0.75" />
         {{ placeLine() }}
       </p>
 
       @if (e.description) {
         <!-- plain text from the source: keep its line breaks -->
-        <p class="mt-8 max-w-[70ch] text-[17px] leading-relaxed whitespace-pre-line">
+        <p
+          class="mt-8 max-w-[70ch] text-[17px] leading-relaxed wrap-break-word whitespace-pre-line"
+        >
           {{ e.description }}
         </p>
       }
@@ -65,7 +74,7 @@
       }
     </div>
 
-    <aside class="flex flex-col gap-8 lg:pt-2">
+    <aside class="flex min-w-0 flex-col gap-8 wrap-break-word">
       @if (addressLines().length) {
         <section aria-labelledby="where-title">
           <h2 class="text-xl font-semibold" id="where-title">Where</h2>
