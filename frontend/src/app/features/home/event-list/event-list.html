@@ -1,0 +1,70 @@
+<section class="wrap mt-10 scroll-mt-24 border-t border-line pt-10 pb-6" id="all" aria-labelledby="list-title">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h2 class="display text-4xl" id="list-title">{{ filtered() ? 'Events matching your filters' : 'All upcoming events' }}</h2>
+      <p class="mt-2 text-muted">
+        <!-- polite live region: screen readers hear the new count after each filter change -->
+        <span aria-live="polite">
+          @if (result.hasValue()) {
+            {{ total() }} {{ total() === 1 ? 'event' : 'events' }}.
+          } @else if (result.isLoading()) {
+            Loading events…
+          }
+        </span>
+        <a class="link" routerLink="." queryParamsHandling="preserve" fragment="top">Change filters</a>
+      </p>
+    </div>
+
+    <label class="flex items-center gap-2.5 text-[15px] text-muted">
+      Sort by
+      <select
+        class="min-h-11 rounded-xl border border-line bg-panel px-3 font-semibold text-ink"
+        [value]="sort()"
+        (change)="setSort(sortSelect.value)"
+        #sortSelect
+      >
+        @for (s of sorts; track s.value) {
+          <option [value]="s.value" [selected]="s.value === sort()" [disabled]="s.value === 'relevance' && !store.filters().q">
+            {{ s.label }}
+          </option>
+        }
+      </select>
+    </label>
+  </div>
+
+  <div class="mt-7">
+    @if (result.error()) {
+      @if (badRequest()) {
+        <app-error-state message="Those filters can't be combined. Clear them and try again." actionLabel="Clear filters" (action)="clearFilters()" />
+      } @else {
+        <app-error-state message="We couldn't load events. Check your connection and try again." (action)="result.reload()" />
+      }
+    } @else if (result.isLoading()) {
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6" aria-busy="true">
+        @for (_ of skeletons; track $index) {
+          <app-event-card-skeleton />
+        }
+      </div>
+    } @else if (result.hasValue() && result.value().items.length === 0) {
+      <div class="rounded-[18px] border border-dashed border-line px-6 py-12 text-center">
+        <h3 class="mb-1.5 text-xl font-semibold">No events match these filters</h3>
+        <p class="text-muted">Remove a filter or pick a wider date range.</p>
+        @if (filtered()) {
+          <button type="button" class="btn-dark mt-5" (click)="clearFilters()">Clear filters</button>
+        }
+      </div>
+    } @else if (result.hasValue()) {
+      <ul role="list" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6">
+        @for (event of result.value().items; track event.id) {
+          <li><app-event-card [event]="event" /></li>
+        }
+      </ul>
+    }
+  </div>
+
+  @if (result.hasValue() && result.value().totalPages > 1) {
+    <div class="mt-10">
+      <app-pagination [page]="result.value().page" [totalPages]="result.value().totalPages" (pageChange)="setPage($event)" />
+    </div>
+  }
+</section>
