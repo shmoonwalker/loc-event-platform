@@ -68,7 +68,7 @@ public class EventDetailRepository {
                 loc.path("latitude").isNumber() ? loc.path("latitude").asDouble() : null,
                 loc.path("longitude").isNumber() ? loc.path("longitude").asDouble() : null,
                 categories(p.path("categories")), tags(p.path("tags")),
-                strings(p.path("images"), "url"), organizers(p.path("organizers")), occurrences));
+                strings(p.path("images"), "url"), organizers(p.path("organizers")), occurrences, weather(p.path("weather"))));
     }
 
     @Transactional(readOnly = true)
@@ -104,6 +104,22 @@ public class EventDetailRepository {
                 .param("now", OffsetDateTime.ofInstant(now, java.time.ZoneOffset.UTC))
                 .query(cardMapper).list();
         return Optional.of(new OrganizerDetail(info, events));
+    }
+
+    private static EventDetail.Weather weather(JsonNode w) {
+        if (!w.isObject()) {
+            return null;
+        }
+        return new EventDetail.Weather(instant(w, "forecast_fetched_at"), instant(w, "requested_for_hour"),
+                w.path("temperature_celsius").isNumber() ? w.path("temperature_celsius").asDouble() : null,
+                w.path("precipitation_probability_percent").isNumber() ? w.path("precipitation_probability_percent").asInt() : null,
+                w.path("wind_speed_kmh").isNumber() ? w.path("wind_speed_kmh").asDouble() : null,
+                w.path("weather_code").isNumber() ? w.path("weather_code").asInt() : null);
+    }
+
+    private static Instant instant(JsonNode n, String field) {
+        String v = text(n, field);
+        return v == null ? null : Instant.parse(v);
     }
 
     private static String slug(String city) {

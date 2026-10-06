@@ -288,7 +288,10 @@ class PublicEventsHttpTest {
                 .andExpect(jsonPath("$.categories[0].value").value("music-nightlife"))
                 .andExpect(jsonPath("$.tags[0].value").value("jazz"))
                 .andExpect(jsonPath("$.organizers[0].name").value("Hidden Organizer"))
-                .andExpect(jsonPath("$.occurrences", hasSize(1)));
+                .andExpect(jsonPath("$.occurrences", hasSize(1)))
+                .andExpect(jsonPath("$.weather.temperatureCelsius").value(18.5))
+                .andExpect(jsonPath("$.weather.precipitationProbabilityPercent").value(30))
+                .andExpect(jsonPath("$.weather.weatherCode").value(3));
         assertThat(body(result)).doesNotContain("ext-org-secret", "tm-998877");
     }
 
@@ -799,6 +802,9 @@ class PublicEventsHttpTest {
                   "schedule": {"starts_at": "%s", "ends_at": "%s"},
                   "location": %s,
                   "images": %s,
+                  "weather": {"forecast_fetched_at": "2030-06-07T12:00:00Z", "requested_for_hour": "2030-06-08T18:00:00Z",
+                    "temperature_celsius": 18.5, "precipitation_probability_percent": 30,
+                    "wind_speed_kmh": 12.0, "weather_code": 3},
                   "organizers": [{
                     "locOrganizerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                     "name": "Hidden Organizer",

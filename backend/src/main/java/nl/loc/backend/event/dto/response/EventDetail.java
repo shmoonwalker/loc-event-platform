@@ -24,8 +24,14 @@ public record EventDetail(
         @Schema(description = "Tag value (slug) and label. Send value to /api/events?tag=.") List<FilterOption> tags,
         List<String> imageUrls,
         List<OrganizerInfo> organizers,
-        @Schema(description = "Upcoming dates, soonest first. Never empty.") List<Occurrence> occurrences
+        @Schema(description = "Upcoming dates, soonest first. Never empty.") List<Occurrence> occurrences,
+        @Schema(description = "Forecast for the next date. Null for online events or when no current forecast exists.") Weather weather
 ) {
     public record Occurrence(Instant startAt, Instant endAt) {
+    }
+
+    @Schema(description = "weatherCode is the WMO code from the forecast provider.")
+    public record Weather(Instant forecastFetchedAt, Instant forecastHour, Double temperatureCelsius,
+                          Integer precipitationProbabilityPercent, Double windSpeedKmh, Integer weatherCode) {
     }
 }
