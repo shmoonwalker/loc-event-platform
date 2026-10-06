@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import nl.loc.backend.category.model.EventCategory;
-import nl.loc.backend.event.dto.response.EventCard;
 import nl.loc.backend.event.dto.response.EventDetail;
 import nl.loc.backend.event.dto.response.FilterOption;
 import nl.loc.backend.event.dto.response.OrganizerDetail;
@@ -72,7 +71,7 @@ public class EventDetailRepository {
     }
 
     @Transactional(readOnly = true)
-    public Optional<OrganizerDetail> findOrganizer(UUID id, Instant now) {
+    public Optional<OrganizerDetail> findOrganizer(UUID id, Instant now, int page, int size) {
         String match = "[{\"locOrganizerId\":\"" + id + "\"}]";
         List<String> payloads = jdbc.sql("""
                 SELECT s.payload::text FROM publication.discoverable_events s
@@ -84,8 +83,7 @@ public class EventDetailRepository {
         }
         OrganizerInfo info = organizers(json.readTree(payloads.getFirst()).path("organizers")).stream()
                 .filter(o -> o.id().equals(id)).findFirst().orElseThrow();
-        List<EventCard> cards = events.organizerCards(id, now, 20);
-        return Optional.of(new OrganizerDetail(info, cards));
+        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size)));
     }
 
     private static EventDetail.Weather weather(JsonNode w) {

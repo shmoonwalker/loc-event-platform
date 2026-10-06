@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -119,10 +120,13 @@ public class PublicBrowseController {
 
     @GetMapping("/organizers/{id}")
     @Operation(summary = "Organizer detail",
-            description = "Organizer profile and their upcoming events (at most 20). 404 when unknown or "
+            description = "Organizer profile and one page of their upcoming events (page from 0, size 1-20, default 20, same as /api/events). 404 when unknown or "
                     + "they have no discoverable event.")
-    public OrganizerDetail organizer(@PathVariable UUID id) {
-        return details.organizer(id);
+    public OrganizerDetail organizer(@PathVariable UUID id,
+                                     @RequestParam(required = false) Integer page,
+                                     @RequestParam(required = false) Integer size) {
+        return details.organizer(id, BrowseCriteriaParser.page(page),
+                BrowseCriteriaParser.size(size));
     }
 
     @GetMapping("/categories")

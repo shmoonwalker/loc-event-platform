@@ -307,8 +307,14 @@ class PublicEventsHttpTest {
         mockMvc.perform(get("/api/organizers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.organizer.name").value("Hidden Organizer"))
-                .andExpect(jsonPath("$.events", hasSize(discoverable.size())))
-                .andExpect(jsonPath("$.events[0].id").exists());
+                .andExpect(jsonPath("$.events.totalElements").value(discoverable.size()))
+                .andExpect(jsonPath("$.events.items", hasSize(discoverable.size())));
+        mockMvc.perform(get("/api/organizers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa").param("size", "2").param("page", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.events.page").value(1))
+                .andExpect(jsonPath("$.events.items", hasSize(2)));
+        mockMvc.perform(get("/api/organizers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa").param("size", "21"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

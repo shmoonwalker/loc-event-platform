@@ -11,7 +11,7 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 | `GET /api/cities?q=amster` | Up to ten city suggestions for the city picker. |
 
 | `GET /api/events/{id}` | Event page: description, address, coordinates, categories, tags, images, organizers, every upcoming date, forecast (`weather`, null when none). `404` when unknown or over. |
-| `GET /api/organizers/{id}` | Organizer profile (`name`, `description`, `site`) plus up to 20 upcoming event cards. Organizer ids come from `EventDetail.organizers[].id`. `404` when none. |
+| `GET /api/organizers/{id}` | Organizer profile (`name`, `description`, `site`) plus a page of upcoming event cards in `events` (same `page`/`size` and shape as `/api/events`). Organizer ids come from `EventDetail.organizers[].id`. `404` when none. |
 | `GET /api/categories`, `GET /api/tags` | `{ value, label }` lists, same as in filter-options. |
 
 Online vs in person is the `place` filter (`physical` / `online`) on `/api/events`; every card and detail carries `place`.

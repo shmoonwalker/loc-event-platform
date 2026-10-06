@@ -7,6 +7,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import nl.loc.backend.category.model.EventCategory;
 import nl.loc.backend.city.model.City;
 import nl.loc.backend.event.dto.response.EventCard;
@@ -101,9 +102,19 @@ public class PublicEventRepository {
                 .list();
     }
 
-    /** Upcoming events of one organizer, one card per event, using the same occurrence selection as the list. */
+    /** One page of an organizer's upcoming events, one card per event, same occurrence selection as the list. */
     @Transactional(readOnly = true)
-    public List<EventCard> organizerCards(java.util.UUID organizerId, Instant now, int limit) {
+    public EventPage organizerEvents(UUID organizerId, Instant now, int page, int size) {
+        String match = "[{\"locOrganizerId\":\"" + organizerId + "\"}]";
+        OffsetDateTime at = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
+        Long total = jdbc.sql("""
+                SELECT count(DISTINCT s.loc_event_id) FROM publication.discoverable_events s
+                WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
+                  AND %1$s IS NOT NULL AND %2$s > :now
+                """.formatted(STARTS, ENDS)).param("match", match).param("now", at).query(Long.class).single();
+        if (total == null || total == 0) {
+            return new EventPage(page, size, 0, 0, List.of());
+        }
         String sql = """
                 SELECT * FROM (
                     SELECT DISTINCT ON (s.loc_event_id)
@@ -122,14 +133,16 @@ public class PublicEventRepository {
                     ORDER BY s.loc_event_id, %1$s, s.loc_occurrence_id
                 ) e
                 ORDER BY start_at, loc_event_id
-                LIMIT :limit
+                LIMIT :limit OFFSET :offset
                 """.formatted(STARTS, ENDS, CITY_SLUG);
-        return jdbc.sql(sql)
-                .param("match", "[{\"locOrganizerId\":\"" + organizerId + "\"}]")
-                .param("now", OffsetDateTime.ofInstant(now, ZoneOffset.UTC))
-                .param("limit", limit)
+        List<EventCard> items = jdbc.sql(sql)
+                .param("match", match)
+                .param("now", at)
+                .param("limit", size)
+                .param("offset", (long) page * size)
                 .query(cardMapper)
                 .list();
+        return new EventPage(page, size, total, (int) Math.ceil(total / (double) size), items);
     }
 
     private long count(BrowseCriteria criteria, TimeWindow.Range range) {
