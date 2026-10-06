@@ -101,6 +101,37 @@ public class PublicEventRepository {
                 .list();
     }
 
+    /** Upcoming events of one organizer, one card per event, using the same occurrence selection as the list. */
+    @Transactional(readOnly = true)
+    public List<EventCard> organizerCards(java.util.UUID organizerId, Instant now, int limit) {
+        String sql = """
+                SELECT * FROM (
+                    SELECT DISTINCT ON (s.loc_event_id)
+                           s.loc_event_id,
+                           s.payload->>'title' AS title,
+                           s.payload->'location'->>'type' AS place,
+                           %1$s AS start_at,
+                           %2$s AS end_at,
+                           nullif(trim(s.payload->'location'->>'city'), '') AS city_name,
+                           nullif(%3$s, '') AS city_slug,
+                           nullif(trim(s.payload->'location'->>'venue_name'), '') AS venue_name,
+                           s.payload->'images'->0->>'url' AS image_url
+                    FROM publication.discoverable_events s
+                    WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
+                      AND %1$s IS NOT NULL AND %2$s > :now
+                    ORDER BY s.loc_event_id, %1$s, s.loc_occurrence_id
+                ) e
+                ORDER BY start_at, loc_event_id
+                LIMIT :limit
+                """.formatted(STARTS, ENDS, CITY_SLUG);
+        return jdbc.sql(sql)
+                .param("match", "[{\"locOrganizerId\":\"" + organizerId + "\"}]")
+                .param("now", OffsetDateTime.ofInstant(now, ZoneOffset.UTC))
+                .param("limit", limit)
+                .query(cardMapper)
+                .list();
+    }
+
     private long count(BrowseCriteria criteria, TimeWindow.Range range) {
         String sql = """
                 SELECT count(DISTINCT s.loc_event_id)

@@ -29,12 +29,12 @@ public class EventDetailRepository {
 
     private final JdbcClient jdbc;
     private final JsonMapper json;
-    private final EventCardRowMapper cardMapper;
+    private final PublicEventRepository events;
 
-    public EventDetailRepository(JdbcClient jdbc, JsonMapper json, EventCardRowMapper cardMapper) {
+    public EventDetailRepository(JdbcClient jdbc, JsonMapper json, PublicEventRepository events) {
         this.jdbc = jdbc;
         this.json = json;
-        this.cardMapper = cardMapper;
+        this.events = events;
     }
 
     /** Payload of the next upcoming occurrence is shown; every upcoming date is listed. */
@@ -84,26 +84,8 @@ public class EventDetailRepository {
         }
         OrganizerInfo info = organizers(json.readTree(payloads.getFirst()).path("organizers")).stream()
                 .filter(o -> o.id().equals(id)).findFirst().orElseThrow();
-        List<EventCard> events = jdbc.sql("""
-                SELECT * FROM (
-                    SELECT DISTINCT ON (s.loc_event_id)
-                           s.loc_event_id, s.payload->>'title' AS title,
-                           s.payload->'location'->>'type' AS place,
-                           %1$s AS start_at, %2$s AS end_at,
-                           nullif(trim(s.payload->'location'->>'city'), '') AS city_name,
-                           nullif(trim(both '-' from lower(regexp_replace(trim(coalesce(s.payload->'location'->>'city', '')),
-                                   '[^[:alnum:]]+', '-', 'g'))), '') AS city_slug,
-                           nullif(trim(s.payload->'location'->>'venue_name'), '') AS venue_name,
-                           s.payload->'images'->0->>'url' AS image_url
-                    FROM publication.discoverable_events s
-                    WHERE s.payload->'organizers' @> CAST(:match AS jsonb) AND %1$s IS NOT NULL AND %2$s > :now
-                    ORDER BY s.loc_event_id, %1$s, s.loc_occurrence_id
-                ) e ORDER BY start_at, loc_event_id LIMIT 20
-                """.formatted(STARTS, ENDS))
-                .param("match", match)
-                .param("now", OffsetDateTime.ofInstant(now, java.time.ZoneOffset.UTC))
-                .query(cardMapper).list();
-        return Optional.of(new OrganizerDetail(info, events));
+        List<EventCard> cards = events.organizerCards(id, now, 20);
+        return Optional.of(new OrganizerDetail(info, cards));
     }
 
     private static EventDetail.Weather weather(JsonNode w) {
