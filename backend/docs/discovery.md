@@ -10,7 +10,11 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 | `GET /api/events/filter-options` | Values and labels for the filter controls. |
 | `GET /api/cities?q=amster` | Up to ten city suggestions for the city picker. |
 
-Event detail (`GET /api/events/{id}`) is not built yet.
+| `GET /api/events/{id}` | Event page: description, address, coordinates, categories, tags, images, organizers, every upcoming date, forecast (`weather`, null when none). `404` when unknown or over. |
+| `GET /api/organizers/{id}` | Organizer profile (`name`, `description`, `site`) plus a page of upcoming event cards in `events` (same `page`/`size` and shape as `/api/events`). Organizer ids come from `EventDetail.organizers[].id`. `404` when none. |
+| `GET /api/categories`, `GET /api/tags` | `{ value, label }` lists, same as in filter-options. |
+
+Online vs in person is the `place` filter (`physical` / `online`) on `/api/events`; every card and detail carries `place`.
 
 ## Homepage: how the frontend uses it
 

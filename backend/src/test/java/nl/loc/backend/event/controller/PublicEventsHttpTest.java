@@ -278,6 +278,54 @@ class PublicEventsHttpTest {
     }
 
     @Test
+    void eventDetailShowsOrganizerCategoriesAndTagsButNotInternals() throws Exception {
+        ResultActions result = mockMvc.perform(get("/api/events/" + music.id()));
+        result.andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Late night jazz"))
+                .andExpect(jsonPath("$.place").value("PHYSICAL"))
+                .andExpect(jsonPath("$.venueName").value("Paradiso"))
+                .andExpect(jsonPath("$.citySlug").value("amsterdam"))
+                .andExpect(jsonPath("$.categories[0].value").value("music-nightlife"))
+                .andExpect(jsonPath("$.tags[0].value").value("jazz"))
+                .andExpect(jsonPath("$.organizers[0].name").value("Hidden Organizer"))
+                .andExpect(jsonPath("$.occurrences", hasSize(1)))
+                .andExpect(jsonPath("$.weather.temperatureCelsius").value(18.5))
+                .andExpect(jsonPath("$.weather.precipitationProbabilityPercent").value(30))
+                .andExpect(jsonPath("$.weather.weatherCode").value(3));
+        assertThat(body(result)).doesNotContain("ext-org-secret", "tm-998877");
+    }
+
+    @Test
+    void unknownOrEndedEventAndOrganizerReturn404() throws Exception {
+        mockMvc.perform(get("/api/events/" + EXPIRED_ID)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/events/" + WITHDRAWN_ID)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/organizers/" + UUID.randomUUID())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void organizerDetailListsTheirUpcomingEventsAsCards() throws Exception {
+        mockMvc.perform(get("/api/organizers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organizer.name").value("Hidden Organizer"))
+                .andExpect(jsonPath("$.events.totalElements").value(discoverable.size()))
+                .andExpect(jsonPath("$.events.items", hasSize(discoverable.size())));
+        mockMvc.perform(get("/api/organizers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa").param("size", "2").param("page", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.events.page").value(1))
+                .andExpect(jsonPath("$.events.items", hasSize(2)));
+        mockMvc.perform(get("/api/organizers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa").param("size", "21"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void categoriesAndTagsEndpointsMatchFilterOptions() throws Exception {
+        mockMvc.perform(get("/api/categories")).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(EventCategory.values().length)));
+        mockMvc.perform(get("/api/tags")).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(EventTag.values().length)));
+    }
+
+    @Test
     void equalStartTimesStayOrderedByEventId() throws Exception {
         ResultActions first = mockMvc.perform(events().param("tag", "coding").param("sort", "start_time"));
         first.andExpect(status().isOk())
@@ -760,6 +808,9 @@ class PublicEventsHttpTest {
                   "schedule": {"starts_at": "%s", "ends_at": "%s"},
                   "location": %s,
                   "images": %s,
+                  "weather": {"forecast_fetched_at": "2030-06-07T12:00:00Z", "requested_for_hour": "2030-06-08T18:00:00Z",
+                    "temperature_celsius": 18.5, "precipitation_probability_percent": 30,
+                    "wind_speed_kmh": 12.0, "weather_code": 3},
                   "organizers": [{
                     "locOrganizerId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                     "name": "Hidden Organizer",

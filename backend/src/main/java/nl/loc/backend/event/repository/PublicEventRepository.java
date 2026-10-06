@@ -7,6 +7,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import nl.loc.backend.category.model.EventCategory;
 import nl.loc.backend.city.model.City;
 import nl.loc.backend.event.dto.response.EventCard;
@@ -99,6 +100,49 @@ public class PublicEventRepository {
                 .param("limit", limit)
                 .query((rs, row) -> new City(rs.getString("city_slug"), rs.getString("city_name")))
                 .list();
+    }
+
+    /** One page of an organizer's upcoming events, one card per event, same occurrence selection as the list. */
+    @Transactional(readOnly = true)
+    public EventPage organizerEvents(UUID organizerId, Instant now, int page, int size) {
+        String match = "[{\"locOrganizerId\":\"" + organizerId + "\"}]";
+        OffsetDateTime at = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
+        Long total = jdbc.sql("""
+                SELECT count(DISTINCT s.loc_event_id) FROM publication.discoverable_events s
+                WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
+                  AND %1$s IS NOT NULL AND %2$s > :now
+                """.formatted(STARTS, ENDS)).param("match", match).param("now", at).query(Long.class).single();
+        if (total == null || total == 0) {
+            return new EventPage(page, size, 0, 0, List.of());
+        }
+        String sql = """
+                SELECT * FROM (
+                    SELECT DISTINCT ON (s.loc_event_id)
+                           s.loc_event_id,
+                           s.payload->>'title' AS title,
+                           s.payload->'location'->>'type' AS place,
+                           %1$s AS start_at,
+                           %2$s AS end_at,
+                           nullif(trim(s.payload->'location'->>'city'), '') AS city_name,
+                           nullif(%3$s, '') AS city_slug,
+                           nullif(trim(s.payload->'location'->>'venue_name'), '') AS venue_name,
+                           s.payload->'images'->0->>'url' AS image_url
+                    FROM publication.discoverable_events s
+                    WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
+                      AND %1$s IS NOT NULL AND %2$s > :now
+                    ORDER BY s.loc_event_id, %1$s, s.loc_occurrence_id
+                ) e
+                ORDER BY start_at, loc_event_id
+                LIMIT :limit OFFSET :offset
+                """.formatted(STARTS, ENDS, CITY_SLUG);
+        List<EventCard> items = jdbc.sql(sql)
+                .param("match", match)
+                .param("now", at)
+                .param("limit", size)
+                .param("offset", (long) page * size)
+                .query(cardMapper)
+                .list();
+        return new EventPage(page, size, total, (int) Math.ceil(total / (double) size), items);
     }
 
     private long count(BrowseCriteria criteria, TimeWindow.Range range) {

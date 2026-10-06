@@ -150,7 +150,7 @@ public class BrowseCriteriaParser {
         };
     }
 
-    private static int page(Integer page) {
+    static int page(Integer page) {
         int value = page == null ? 0 : page;
         if (value < 0) {
             throw new InvalidBrowseQueryException("page must be zero or greater");
@@ -158,7 +158,7 @@ public class BrowseCriteriaParser {
         return value;
     }
 
-    private static int size(Integer size) {
+    static int size(Integer size) {
         int value = size == null ? DEFAULT_PAGE_SIZE : size;
         if (value < 1 || value > MAX_PAGE_SIZE) {
             throw new InvalidBrowseQueryException("size must be between 1 and " + MAX_PAGE_SIZE);
