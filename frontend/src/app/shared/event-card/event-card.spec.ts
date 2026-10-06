@@ -13,6 +13,7 @@ const base: EventCard = {
   cityName: 'Amsterdam',
   venueName: 'Bimhuis',
   imageUrl: null,
+  category: 'music-nightlife',
 };
 
 function render(event: EventCard): HTMLElement {
@@ -42,5 +43,30 @@ describe('EventCardComponent', () => {
     const el = render({ ...base, endAt: base.startAt });
     expect(el.textContent).toContain('20:30');
     expect(el.textContent).not.toContain('–');
+  });
+
+  it('uses the event image when one is set', () => {
+    const el = render({ ...base, imageUrl: 'https://images.example/jazz.jpg', category: 'sports' });
+    expect(el.querySelector('img')?.getAttribute('src')).toBe('https://images.example/jazz.jpg');
+  });
+
+  it('uses the category image when the event has no image URL', () => {
+    const el = render(base);
+    expect(el.querySelector('img')?.getAttribute('src')).toBe('/images/categories/music-nightlife.jpg');
+  });
+
+  it('treats a blank image URL as missing and uses the category image', () => {
+    const el = render({ ...base, imageUrl: '  ', category: 'sports' });
+    expect(el.querySelector('img')?.getAttribute('src')).toBe('/images/categories/sports.jpg');
+  });
+
+  it('uses the generic image when the category is missing', () => {
+    const el = render({ ...base, category: null });
+    expect(el.querySelector('img')?.getAttribute('src')).toBe('/images/categories/default.jpg');
+  });
+
+  it('uses the generic image when the category is unknown', () => {
+    const el = render({ ...base, category: 'nope' });
+    expect(el.querySelector('img')?.getAttribute('src')).toBe('/images/categories/default.jpg');
   });
 });

@@ -2,15 +2,8 @@
   [routerLink]="['/events', event().id]"
   class="group flex h-full flex-col overflow-hidden rounded-[18px] border border-line bg-panel shadow-card"
 >
-  <div
-    class="relative grid h-40 place-items-center"
-    [class]="online() ? 'bg-sky text-sky-ink' : event().imageUrl ? 'bg-panel' : tint() + ' text-muted'"
-  >
-    @if (event().imageUrl) {
-      <img [src]="event().imageUrl" alt="" loading="lazy" class="size-full object-cover" />
-    } @else {
-      <app-icon [name]="online() ? 'screen' : 'photo'" [size]="online() ? 34 : 30" />
-    }
+  <div class="relative grid h-40 place-items-center bg-panel">
+    <img [src]="imageUrl()" alt="" loading="lazy" class="size-full object-cover" />
 
     <span class="absolute top-3 left-3 min-w-11 rounded-xl bg-panel px-2 py-1.5 text-center leading-[1.1] text-ink">
       <span class="block text-[13px] font-semibold text-blush-ink">{{ day().dow }}</span>
