@@ -20,7 +20,7 @@ public class FilterOptionsService {
                         .sorted(Comparator.comparing(FilterOption::label, String.CASE_INSENSITIVE_ORDER)).toList(),
                 List.of(new FilterOption("start_time", "Soonest first"), new FilterOption("relevance", "Relevance")),
                 List.of(new FilterOption("tonight", "Tonight"), new FilterOption("weekend", "This weekend"),
-                        new FilterOption("upcoming", "Next 30 days")),
+                        new FilterOption("upcoming", "Upcoming")),
                 List.of(new FilterOption("physical", "In person"), new FilterOption("online", "Online")),
                 TimeWindow.ZONE.getId(), BrowseLimits.DEFAULT_PAGE_SIZE, BrowseLimits.MAX_PAGE_SIZE, BrowseLimits.MAX_QUERY_LENGTH);
     }

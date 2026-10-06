@@ -29,7 +29,6 @@ import org.springframework.test.context.TestConstructor;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import java.net.URI;
 import nl.loc.backend.category.model.EventCategory;
 import nl.loc.backend.tag.model.EventTag;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -171,7 +170,7 @@ class PublicEventsHttpTest {
     }
 
     @Test
-    void dateFilterLimitsTonightWeekendAndUpcoming() throws Exception {
+    void dateFilterLimitsTonightAndWeekendAndUpcomingHasNoCutoff() throws Exception {
         ResultActions tonight = mockMvc.perform(events().param("when", "tonight"));
         tonight.andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[*].id", hasItem(music.id().toString())))
@@ -190,7 +189,7 @@ class PublicEventsHttpTest {
         upcoming.andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[*].id", hasItem(music.id().toString())))
                 .andExpect(jsonPath("$.items[*].id", hasItem(online.id().toString())))
-                .andExpect(jsonPath("$.items[*].id", not(hasItem(LATER_ID.toString()))));
+                .andExpect(jsonPath("$.items[*].id", hasItem(LATER_ID.toString())));
     }
 
     @Test
@@ -319,16 +318,16 @@ class PublicEventsHttpTest {
 
     @Test
     void homeScopesOnlyNearYouToCityAndKeepsCardsSmall() throws Exception {
-        mockMvc.perform(get("/api/home").param("city", "rotterdam"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nearYouCity.slug").value("rotterdam"))
-                .andExpect(jsonPath("$.nearYou.items", hasSize(1)))
-                .andExpect(jsonPath("$.nearYou.items[0].id").value(sports.id().toString()))
-                .andExpect(jsonPath("$.tonight.items[*].id", hasItem(music.id().toString())))
-                .andExpect(jsonPath("$.online.items[0].id").value(online.id().toString()))
-                .andExpect(jsonPath("$.tonight.mode").value("TONIGHT"))
-                .andExpect(jsonPath("$.categories").doesNotExist())
-                .andExpect(jsonPath("$.tags").doesNotExist());
+        JsonNode home = response(mockMvc.perform(get("/api/home").param("city", "rotterdam")));
+        assertThat(home.get("nearYouCity").get("slug").asText()).isEqualTo("rotterdam");
+        assertThat(modes(home)).containsExactly("TONIGHT", "WEEKEND", "NEAR_YOU", "ONLINE");
+        JsonNode nearYou = rail(home, "NEAR_YOU");
+        assertThat(nearYou.get("items").size()).isEqualTo(1);
+        assertThat(nearYou.get("items").get(0).get("id").asText()).isEqualTo(sports.id().toString());
+        assertThat(ids(rail(home, "TONIGHT"))).contains(music.id().toString());
+        assertThat(rail(home, "ONLINE").get("items").get(0).get("id").asText()).isEqualTo(online.id().toString());
+        assertThat(home.has("categories")).isFalse();
+        assertThat(home.has("tags")).isFalse();
         mockMvc.perform(get("/api/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nearYouCity.slug").value("amsterdam"));
@@ -336,13 +335,34 @@ class PublicEventsHttpTest {
     }
 
     @Test
+    void homeHasOnlyRailsAndEachRailCarriesItsSeeAllFilters() throws Exception {
+        JsonNode home = response(mockMvc.perform(get("/api/home").param("city", "rotterdam")));
+        assertThat(home.has("events")).isFalse();
+        assertThat(home.has("browseUrl")).isFalse();
+        assertThat(rail(home, "TONIGHT").get("filters").toString()).isEqualTo("{\"when\":\"tonight\",\"place\":\"physical\"}");
+        assertThat(rail(home, "NEAR_YOU").get("filters").toString())
+                .isEqualTo("{\"city\":\"rotterdam\",\"when\":\"upcoming\",\"place\":\"physical\"}");
+        for (JsonNode rail : home.get("rails")) {
+            assertRailFiltersMatchPreview(rail);
+        }
+    }
+
+    @Test
+    void defaultEventListIsEveryUpcomingEventSoonestFirst() throws Exception {
+        JsonNode page = response(mockMvc.perform(events()));
+        assertThat(page.get("page").asInt()).isZero();
+        assertThat(page.get("totalElements").asInt()).isEqualTo(discoverable.size());
+        assertThat(page.get("items").get(0).get("id").asText()).isEqualTo(music.id().toString());
+    }
+
+    @Test
     void homeReflectsPublicationChangesOnTheNextRequest() throws Exception {
         mockMvc.perform(get("/api/home")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.tonight.items[*].id", hasItem(music.id().toString())));
+                .andExpect(jsonPath("$.rails[?(@.mode == 'TONIGHT')].items[*].id", hasItem(music.id().toString())));
         jdbc.sql("UPDATE publication.event_snapshot SET discoverable = false WHERE loc_event_id = :id")
                 .param("id", music.id()).update();
         mockMvc.perform(get("/api/home")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.tonight.items[*].id", not(hasItem(music.id().toString()))));
+                .andExpect(jsonPath("$.rails[?(@.mode == 'TONIGHT')].items[*].id", not(hasItem(music.id().toString()))));
     }
 
     @Test
@@ -412,22 +432,19 @@ class PublicEventsHttpTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {0, 1, 2, 3, 6, 7})
-    void emptyTonightFallsBackToAvailablePhysicalEventsOnly(int count) throws Exception {
+    @ValueSource(ints = {0, 1, 7})
+    void emptyRailsAreOmittedButTheDefaultListStillShowsEvents(int count) throws Exception {
         jdbc.sql("DELETE FROM publication.event_snapshot").update();
         for (int i = 0; i < count; i++) {
             addEvent("Future physical " + i, "2030-07-20T12:00:00Z", "PHYSICAL", "Groningen");
         }
-        addEvent("Earlier online", "2030-06-08T12:00:00Z", "ONLINE", null);
+        Seeded earlierOnline = addEvent("Earlier online", "2030-06-08T12:00:00Z", "ONLINE", null);
         JsonNode home = response(mockMvc.perform(get("/api/home")));
-        JsonNode rail = home.get("tonight");
-        assertThat(rail.get("mode").asText()).isEqualTo("STARTING_SOON");
-        assertThat(rail.get("total").asInt()).isEqualTo(count);
-        assertThat(rail.get("items").size()).isEqualTo(Math.min(count, 6));
-        assertThat(rail.get("hasMore").asBoolean()).isEqualTo(count > 6);
-        assertThat(home.get("nearYou").get("total").asInt()).isZero();
-        assertThat(home.get("thisWeekend").get("total").asInt()).isZero();
-        assertRailLinkMatchesPreview(rail);
+        assertThat(modes(home)).containsExactly("ONLINE");
+        JsonNode events = response(mockMvc.perform(events()));
+        assertThat(events.get("totalElements").asInt()).isEqualTo(count + 1);
+        assertThat(events.get("items").size()).isEqualTo(count + 1);
+        assertThat(events.get("items").get(0).get("id").asText()).isEqualTo(earlierOnline.id().toString());
         mockMvc.perform(events().param("when", "tonight").param("place", "physical"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
     }
@@ -435,15 +452,14 @@ class PublicEventsHttpTest {
     @Test
     void nonemptyTonightIsNotPaddedWithOtherDates() throws Exception {
         jdbc.sql("DELETE FROM publication.event_snapshot WHERE loc_event_id = :id").param("id", SPORTS_ID).update();
-        mockMvc.perform(get("/api/home")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.tonight.mode").value("TONIGHT"))
-                .andExpect(jsonPath("$.tonight.total").value(1))
-                .andExpect(jsonPath("$.tonight.items", hasSize(1)))
-                .andExpect(jsonPath("$.tonight.items[0].id").value(MUSIC_ID.toString()));
+        JsonNode tonight = rail(response(mockMvc.perform(get("/api/home"))), "TONIGHT");
+        assertThat(tonight.get("total").asInt()).isEqualTo(1);
+        assertThat(tonight.get("items").size()).isEqualTo(1);
+        assertThat(tonight.get("items").get(0).get("id").asText()).isEqualTo(MUSIC_ID.toString());
     }
 
     @Test
-    void sparseDataStillSurfacesPhysicalEventsAndBroaderOnlineBrowsing() throws Exception {
+    void sparseDataShowsOnlyNonEmptyRailsAndEveryEventInTheList() throws Exception {
         jdbc.sql("DELETE FROM publication.event_snapshot").update();
         String[] cities = {"Groningen", "Zwolle", "Rotterdam", "Utrecht", "Eindhoven", "Den Bosch",
                 "'s-Hertogenbosch", "Amersfoort", "Zwolle"};
@@ -456,23 +472,18 @@ class PublicEventsHttpTest {
         }
         JsonNode home = response(mockMvc.perform(get("/api/home")));
         assertThat(home.get("nearYouCity").get("slug").asText()).isEqualTo("amsterdam");
-        assertThat(home.get("nearYou").get("total").asInt()).isZero();
-        assertThat(home.get("thisWeekend").get("total").asInt()).isZero();
-        assertThat(home.get("tonight").get("mode").asText()).isEqualTo("STARTING_SOON");
-        assertThat(home.get("tonight").get("total").asInt()).isEqualTo(9);
-        assertThat(home.get("tonight").get("items").size()).isEqualTo(6);
-        assertThat(home.get("tonight").get("items").get(0).get("cityName").asText()).isEqualTo("Groningen");
-        assertThat(home.get("online").get("total").asInt()).isEqualTo(6);
+        assertThat(modes(home)).containsExactly("ONLINE");
+        assertThat(rail(home, "ONLINE").get("total").asInt()).isEqualTo(11);
         assertThat(home.has("categories")).isFalse();
         assertThat(home.has("tags")).isFalse();
-        mockMvc.perform(get(URI.create(home.get("online").get("broaderBrowseUrl").asText())))
+        JsonNode events = response(mockMvc.perform(events()));
+        assertThat(events.get("totalElements").asInt()).isEqualTo(20);
+        assertThat(events.get("items").size()).isEqualTo(20);
+        assertThat(events.get("items").get(0).get("cityName").asText()).isEqualTo("Groningen");
+        mockMvc.perform(events().param("place", "online"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(11));
-        mockMvc.perform(get(URI.create(home.get("nearYou").get("broaderBrowseUrl").asText())))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(9));
-        mockMvc.perform(get(URI.create(home.get("browseUrl").asText())))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(20));
-        for (String section : List.of("tonight", "thisWeekend", "nearYou", "online")) {
-            assertRailLinkMatchesPreview(home.get(section));
+        for (JsonNode rail : home.get("rails")) {
+            assertRailFiltersMatchPreview(rail);
         }
     }
 
@@ -480,23 +491,19 @@ class PublicEventsHttpTest {
     void exactLinksMatchNormalSectionsAndUnknownCityRemainsSelected() throws Exception {
         JsonNode home = response(mockMvc.perform(get("/api/home").param("city", "unknown-city")));
         assertThat(home.get("nearYouCity").get("slug").asText()).isEqualTo("unknown-city");
-        assertThat(home.get("nearYou").get("total").asInt()).isZero();
-        for (String section : List.of("tonight", "thisWeekend", "nearYou", "online")) {
-            assertRailLinkMatchesPreview(home.get(section));
+        assertThat(modes(home)).containsExactly("TONIGHT", "WEEKEND", "ONLINE");
+        for (JsonNode rail : home.get("rails")) {
+            assertRailFiltersMatchPreview(rail);
         }
     }
 
     @Test
-    void entirelyEmptyCatalogHasHonestEmptySectionsAndUsableLinks() throws Exception {
+    void entirelyEmptyCatalogHasNoRailsAndAnEmptyEventList() throws Exception {
         jdbc.sql("DELETE FROM publication.event_snapshot").update();
         JsonNode home = response(mockMvc.perform(get("/api/home")));
-        for (String section : List.of("tonight", "thisWeekend", "nearYou", "online")) {
-            JsonNode rail = home.get(section);
-            assertThat(rail.get("items").size()).isZero();
-            assertThat(rail.get("total").asInt()).isZero();
-            assertThat(rail.get("hasMore").asBoolean()).isFalse();
-            assertRailLinkMatchesPreview(rail);
-        }
+        assertThat(home.get("rails").size()).isZero();
+        mockMvc.perform(events()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0)).andExpect(jsonPath("$.items", hasSize(0)));
         mockMvc.perform(get("/api/cities")).andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
     }
 
@@ -613,8 +620,33 @@ class PublicEventsHttpTest {
         return JsonMapper.shared().readTree(body(result));
     }
 
-    private void assertRailLinkMatchesPreview(JsonNode rail) throws Exception {
-        JsonNode page = response(mockMvc.perform(get(URI.create(rail.get("browseUrl").asText()))));
+    private static JsonNode rail(JsonNode home, String mode) {
+        for (JsonNode rail : home.get("rails")) {
+            if (rail.get("mode").asText().equals(mode)) {
+                return rail;
+            }
+        }
+        return null;
+    }
+
+    private static List<String> modes(JsonNode home) {
+        List<String> modes = new ArrayList<>();
+        home.get("rails").forEach(rail -> modes.add(rail.get("mode").asText()));
+        return modes;
+    }
+
+    private static List<String> ids(JsonNode rail) {
+        List<String> ids = new ArrayList<>();
+        rail.get("items").forEach(item -> ids.add(item.get("id").asText()));
+        return ids;
+    }
+
+    private void assertRailFiltersMatchPreview(JsonNode rail) throws Exception {
+        MockHttpServletRequestBuilder seeAll = events();
+        for (java.util.Map.Entry<String, JsonNode> filter : rail.get("filters").properties()) {
+            seeAll.param(filter.getKey(), filter.getValue().asText());
+        }
+        JsonNode page = response(mockMvc.perform(seeAll));
         assertThat(page.get("page").asInt()).isZero();
         assertThat(page.get("totalElements").asLong()).isEqualTo(rail.get("total").asLong());
         for (int i = 0; i < rail.get("items").size(); i++) {

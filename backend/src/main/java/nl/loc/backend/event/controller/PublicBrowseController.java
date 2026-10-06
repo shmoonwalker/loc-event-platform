@@ -49,14 +49,14 @@ public class PublicBrowseController {
     @GetMapping("/home")
     @Operation(
             summary = "Homepage",
-            description = "Four previews of up to six events. city scopes only nearYou and defaults to Amsterdam. "
-                    + "Tonight is 18:00-midnight Amsterdam; if empty, mode becomes STARTING_SOON with upcoming physical events. "
-                    + "Weekend and nearYou stay empty when no matches exist. Each section supplies exact and broader browse URLs. "
-                    + "No GPS. Complete filter options are available separately at /api/events/filter-options.")
+            description = "Highlight rails (tonight, weekend, near you, online) of up to six events each. "
+                    + "A rail with no matches is omitted, so rails can be empty. Each rail carries the "
+                    + "/api/events filters for See all. The event list itself is GET /api/events. "
+                    + "city scopes only the near-you rail and defaults to Amsterdam. No GPS.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Homepage. city scopes the near-you rail only.",
+                    description = "Non-empty homepage rails.",
                     content = @Content(schema = @Schema(implementation = HomeView.class))),
             @ApiResponse(
                     responseCode = "400",
@@ -70,9 +70,9 @@ public class PublicBrowseController {
     @GetMapping("/events")
     @Operation(
             summary = "Events collection",
-            description = "Search, filter, and page published events. See-all uses this collection with page 0 and "
-                    + "size at most 20. Near-you see-all passes city, when=upcoming, and place=physical. "
-                    + "Other homepage rails omit city. page starts at 0. Repeated category is OR. Repeated tag is AND. "
+            description = "Search, filter, sort, and page upcoming published events. With no parameters this is the "
+                    + "homepage list, soonest first. Rail See all passes the rail's filters. page starts at 0. "
+                    + "Repeated category is OR. Repeated tag is AND. "
                     + "q is matched with websearch_to_tsquery on title, description, venue, city, categories, and tags. "
                     + "Sort defaults to relevance when q is present, otherwise start time, then id. "
                     + "Custom dateFrom/dateTo are inclusive Amsterdam dates and cannot combine with when. "

@@ -2,19 +2,21 @@ package nl.loc.backend.event.service;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Stream;
 import nl.loc.backend.city.model.City;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.dto.response.EventRail;
 import nl.loc.backend.event.dto.response.HomeView;
 import nl.loc.backend.event.model.BrowseCriteria;
-import nl.loc.backend.event.model.BrowseLimits;
 import nl.loc.backend.event.model.Place;
 import nl.loc.backend.event.model.RailMode;
 import nl.loc.backend.event.model.When;
 import nl.loc.backend.event.repository.PublicEventRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class HomeService {
@@ -32,36 +34,32 @@ public class HomeService {
     public HomeView home(String slug) {
         Instant now = clock.instant();
         City city = repository.findCity(slug).orElseGet(() -> City.fromSlug(slug));
-        EventRail tonight = rail(RailMode.TONIGHT, null, When.TONIGHT, Place.PHYSICAL, now);
-        if (tonight.total() == 0) {
-            // Only homepage discovery broadens an empty request. Explicit browse filters stay strict.
-            tonight = rail(RailMode.STARTING_SOON, null, null, Place.PHYSICAL, now);
-        }
-        return new HomeView(city, tonight,
-                rail(RailMode.WEEKEND, null, When.WEEKEND, Place.PHYSICAL, now),
-                rail(RailMode.NEAR_YOU, slug, When.UPCOMING, Place.PHYSICAL, now),
-                rail(RailMode.ONLINE, null, When.UPCOMING, Place.ONLINE, now),
-                browseUrl(null, null, null));
+        // Rails are optional highlights: a rail with no matches is left out, never padded or replaced.
+        // The full event list is not part of home; the frontend reads it from GET /api/events.
+        List<EventRail> rails = Stream.of(
+                        rail(RailMode.TONIGHT, null, When.TONIGHT, Place.PHYSICAL, now),
+                        rail(RailMode.WEEKEND, null, When.WEEKEND, Place.PHYSICAL, now),
+                        rail(RailMode.NEAR_YOU, slug, When.UPCOMING, Place.PHYSICAL, now),
+                        rail(RailMode.ONLINE, null, When.UPCOMING, Place.ONLINE, now))
+                .filter(rail -> rail.total() > 0)
+                .toList();
+        return new HomeView(city, rails);
     }
 
     private EventRail rail(RailMode mode, String city, When when, Place place, Instant now) {
         EventPage page = browse.search(BrowseCriteria.rail(city, when, place, RAIL_SIZE), now);
         return new EventRail(mode, page.totalElements(), page.items(), page.totalElements() > page.items().size(),
-                browseUrl(city, when, place), browseUrl(null, null, place));
+                filters(city, when, place));
     }
 
-    private static String browseUrl(String city, When when, Place place) {
-        UriComponentsBuilder url = UriComponentsBuilder.fromPath("/api/events");
+    /** The /api/events query parameters that reproduce this rail; used for "See all". */
+    private static Map<String, String> filters(String city, When when, Place place) {
+        Map<String, String> filters = new LinkedHashMap<>();
         if (city != null) {
-            url.queryParam("city", city);
+            filters.put("city", city);
         }
-        if (when != null) {
-            url.queryParam("when", when.name().toLowerCase(Locale.ROOT));
-        }
-        if (place != null) {
-            url.queryParam("place", place.name().toLowerCase(Locale.ROOT));
-        }
-        return url.queryParam("sort", "start_time").queryParam("page", 0)
-                .queryParam("size", BrowseLimits.DEFAULT_PAGE_SIZE).build().encode().toUriString();
+        filters.put("when", when.name().toLowerCase(Locale.ROOT));
+        filters.put("place", place.name().toLowerCase(Locale.ROOT));
+        return filters;
     }
 }

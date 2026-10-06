@@ -8,17 +8,15 @@ It serves public event discovery and owns application-specific behaviour such as
 
 The backend does not collect or normalize external event data.
 
-**Implementation status:** public discovery is implemented: homepage previews with
-an honest Tonight fallback, event search/filtering/pagination, complete filter
+**Implementation status:** public discovery is implemented: homepage rails (only
+rails with events are returned), event search/filtering/sorting/pagination, filter
 options, and city suggestions. PostgreSQL reads use the qualified publication
 contract. Event detail, authentication, saved events, comments, moderation, and
 the backend-owned schema remain future work. The sections below include those
 planned product responsibilities; they are not all implemented endpoints.
 
-- [Discovery API and frontend integration](docs/discovery-api.md): exact filters,
-  response shapes, empty states, fallback rules, date/time semantics, and navigation.
-- [Discovery architecture and repository guide](docs/discovery-architecture.md):
-  package responsibilities, JSONB publication, SQL, dependencies, and testing.
+- [Discovery API](docs/discovery.md): endpoints, homepage behavior, filters,
+  response shapes, and implementation notes.
 
 
 ---
