@@ -1,0 +1,17 @@
+<a
+  href=""
+  class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-20 focus:rounded-lg focus:bg-panel focus:px-4 focus:py-2"
+  (click)="$event.preventDefault(); main.focus()"
+>
+  Skip to content
+</a>
+<app-site-header />
+<main id="top" tabindex="-1" class="outline-none" #main>
+  <router-outlet />
+</main>
+<footer class="mt-16 border-t border-line">
+  <div class="wrap flex flex-wrap items-center justify-between gap-x-8 gap-y-4 pt-8 pb-10 text-sm text-muted">
+    <span><span class="mr-2.5 font-display text-xl font-extrabold text-ink">loc</span>Local events in the Netherlands</span>
+    <span>All times are Amsterdam time.</span>
+  </div>
+</footer>

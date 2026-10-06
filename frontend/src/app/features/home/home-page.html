@@ -1,0 +1,47 @@
+<section class="wrap pt-16 pb-8">
+  <h1 class="display max-w-[860px] text-[clamp(40px,6vw,72px)] leading-[1.02] tracking-[-0.035em]">What’s happening in the Netherlands</h1>
+  <p class="mt-4.5 max-w-xl text-[19px] text-muted">
+    Concerts, workshops, markets, meetups and online sessions in one place. Search, then narrow it down.
+  </p>
+
+  <div class="mt-8"><app-search-console /></div>
+
+  @if (jumpLinks().length) {
+    <nav class="mt-4.5 flex flex-wrap items-center gap-2" aria-label="Jump to">
+      <span class="text-muted">Jump to</span>
+      @for (link of jumpLinks(); track link.id) {
+        <a
+          class="inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-panel px-4 font-medium hover:border-blush"
+          routerLink="."
+          queryParamsHandling="preserve"
+          [fragment]="link.id"
+        >
+          @if (link.live) {
+            <span class="size-2 rounded-full bg-tonight" aria-hidden="true"></span>
+          }
+          {{ link.label }}
+        </a>
+      }
+    </nav>
+  }
+</section>
+
+@if (home.error()) {
+  <div class="wrap pt-8">
+    <app-error-state message="We couldn't load the highlights." (action)="home.reload()" />
+  </div>
+} @else if (home.isLoading()) {
+  <div class="wrap pt-8" aria-busy="true">
+    <div class="flex gap-5 overflow-hidden">
+      @for (_ of skeletons; track $index) {
+        <app-event-card-skeleton class="w-68 shrink-0" />
+      }
+    </div>
+  </div>
+} @else {
+  @for (rail of rails(); track rail.mode) {
+    <app-rail [rail]="rail" [cityName]="cityName()" />
+  }
+}
+
+<app-event-list />

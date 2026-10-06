@@ -1,0 +1,185 @@
+<div class="rounded-3xl border border-line bg-panel shadow-card">
+  <!-- Search -->
+  <form class="flex flex-wrap gap-2.5 p-3" role="search" (submit)="search($event)">
+    <label
+      class="flex min-h-14 flex-[1_1_340px] items-center gap-2.5 rounded-2xl border border-line bg-bg px-4 transition-shadow focus-within:shadow-[0_0_0_4px_var(--glow)]"
+    >
+      <app-icon name="search" [size]="20" class="text-muted" />
+      <span class="sr-only">Search events</span>
+      <input
+        type="search"
+        class="min-w-0 flex-1 bg-transparent text-[17px] outline-none"
+        [maxLength]="options()?.maxQueryLength ?? 100"
+        placeholder="Try “jazz”, “Paradiso” or “workshop”"
+        [value]="query()"
+        (input)="query.set(queryInput.value)"
+        #queryInput
+      />
+    </label>
+    <button type="submit" class="btn-primary">Search</button>
+  </form>
+
+  <!-- Filter triggers + online switch -->
+  <div class="flex flex-wrap items-stretch gap-2 px-3 pb-3">
+    @for (t of triggers(); track t.key) {
+      <button
+        type="button"
+        class="group flex min-h-14 items-center gap-3 rounded-[14px] border border-line bg-panel py-1.5 pr-3 pl-4 text-left hover:bg-bg aria-expanded:border-blush data-[active=true]:border-blush data-[active=true]:bg-blush-soft max-sm:flex-[1_1_calc(50%-8px)] max-sm:justify-between"
+        [attr.aria-expanded]="open() === t.key"
+        [attr.aria-controls]="open() === t.key ? 'panel-' + t.key : null"
+        [attr.data-active]="t.active"
+        (click)="togglePanel(t.key)"
+      >
+        <span>
+          <small class="block text-[13px] leading-tight text-muted">{{ t.label }}</small>
+          <b class="block text-[15px] leading-tight font-semibold">{{ t.value }}</b>
+        </span>
+        <app-icon name="chevron" [size]="16" class="text-muted transition-transform group-aria-expanded:rotate-180" />
+      </button>
+    }
+
+    <button
+      type="button"
+      role="switch"
+      class="group ml-auto flex min-h-14 items-center gap-3 rounded-[14px] border border-line bg-panel px-4 text-[15px] font-semibold aria-checked:border-blush aria-checked:bg-blush-soft max-sm:ml-0"
+      [attr.aria-checked]="f().place === 'online'"
+      (click)="setOnline(f().place !== 'online')"
+    >
+      Online only
+      <span
+        class="relative h-6.5 w-11 rounded-full bg-muted transition-colors group-aria-checked:bg-blush after:absolute after:top-[3px] after:left-[3px] after:size-5 after:rounded-full after:bg-white after:shadow-sm after:transition-[left] group-aria-checked:after:left-[21px]"
+        aria-hidden="true"
+      ></span>
+    </button>
+  </div>
+
+  <!-- Drawers: only the open one exists in the DOM -->
+  @switch (open()) {
+    @case ('date') {
+      <div class="drawer" id="panel-date">
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Date">
+          @for (p of datePresets; track p.value) {
+            <button type="button" class="chip" [attr.aria-pressed]="f().date === p.value" (click)="store.patch({ date: p.value, dateFrom: '', dateTo: '' })">
+              {{ p.label }}
+            </button>
+          }
+        </div>
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="flex flex-col gap-1.5 text-sm text-muted">
+            From
+            <input type="date" class="field-input" [value]="dateDraft().from" (change)="setDate('from', fromDate.value)" #fromDate />
+          </label>
+          <label class="flex flex-col gap-1.5 text-sm text-muted">
+            To
+            <input type="date" class="field-input" [value]="dateDraft().to" (change)="setDate('to', toDate.value)" #toDate />
+          </label>
+          <p class="mb-2.5 text-sm" [class.text-muted]="!dateError()" [class.text-blush-ink]="dateError()" [attr.role]="dateError() ? 'alert' : null">
+            {{ dateError() ? '“From” must not be after “To”.' : 'Pick both dates to set your own range.' }}
+          </p>
+        </div>
+      </div>
+    }
+    @case ('time') {
+      <div class="drawer" id="panel-time">
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2" role="group" aria-label="Start time">
+          @for (p of timePresets; track p.value) {
+            <button type="button" class="tile" [attr.aria-pressed]="f().time === p.value" (click)="store.patch({ time: p.value, timeFrom: '', timeTo: '' })">
+              <b class="font-semibold">{{ p.label }}</b>
+              <small class="text-[13px] text-muted">{{ p.hours }}</small>
+            </button>
+          }
+        </div>
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="flex flex-col gap-1.5 text-sm text-muted">
+            Starts after
+            <input type="time" class="field-input" [value]="timeDraft().from" (change)="setTime('from', fromTime.value)" #fromTime />
+          </label>
+          <label class="flex flex-col gap-1.5 text-sm text-muted">
+            Starts before
+            <input type="time" class="field-input" [value]="timeDraft().to" (change)="setTime('to', toTime.value)" #toTime />
+          </label>
+          <p class="mb-2.5 text-sm" [class.text-muted]="!timeError()" [class.text-blush-ink]="timeError()" [attr.role]="timeError() ? 'alert' : null">
+            {{ timeError() ? 'The two times must differ.' : 'Late ranges like 22:00 to 02:00 run past midnight.' }}
+          </p>
+        </div>
+      </div>
+    }
+    @case ('city') {
+      <div class="drawer" id="panel-city">
+        <label class="flex min-h-11 max-w-sm items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5">
+          <span class="sr-only">Find a city</span>
+          <input type="text" class="min-w-0 flex-1 bg-transparent outline-none" placeholder="Find a city" maxlength="100" [value]="cityText()" (input)="cityText.set(cityInput.value)" #cityInput />
+        </label>
+        @if (f().place === 'online') {
+          <p class="text-sm text-muted">Online events have no city. Turn off Online only to filter by city.</p>
+        }
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Cities">
+          @for (c of cityList(); track c.slug) {
+            <button type="button" class="chip group" [attr.aria-pressed]="f().city === c.slug" [disabled]="f().place === 'online'" (click)="pickCity(c.slug)">
+              <app-icon name="check" [size]="16" class="hidden text-blush-ink group-aria-pressed:inline-flex" />{{ c.name }}
+            </button>
+          } @empty {
+            <p class="text-sm text-muted">{{ citiesLoading() ? 'Loading cities…' : 'No city with upcoming events matches that name.' }}</p>
+          }
+        </div>
+      </div>
+    }
+    @case ('category') {
+      <div class="drawer" id="panel-category">
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2" role="group" aria-label="Categories">
+          @for (c of options()?.categories; track c.value) {
+            <button type="button" class="tile group min-h-13 flex-row items-center justify-between font-medium" [attr.aria-pressed]="f().categories.includes(c.value)" (click)="toggleCategory(c.value)">
+              {{ c.label }}
+              <span class="grid size-5 flex-none place-items-center rounded-md border-2 border-line text-on-blush group-aria-pressed:border-blush group-aria-pressed:bg-blush">
+                <app-icon name="check" [size]="12" class="invisible group-aria-pressed:visible" />
+              </span>
+            </button>
+          } @empty {
+            <p class="text-sm text-muted">{{ optionsLoading() ? 'Loading categories…' : 'Categories are not available right now.' }}</p>
+          }
+        </div>
+      </div>
+    }
+    @case ('tags') {
+      <div class="drawer" id="panel-tags">
+        <p class="text-sm text-muted">Events must have every tag you pick.</p>
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Tags">
+          @for (t of tagsShown(); track t.value) {
+            <button type="button" class="chip chip-sm" [attr.aria-pressed]="f().tags.includes(t.value)" (click)="toggleTag(t.value)">
+              #{{ t.label.toLowerCase() }}
+            </button>
+          } @empty {
+            <p class="text-sm text-muted">{{ optionsLoading() ? 'Loading tags…' : 'Tags are not available right now.' }}</p>
+          }
+        </div>
+        @if (options(); as opts) {
+          <button type="button" class="min-h-11 self-start px-1 font-semibold text-blush-ink underline underline-offset-3" (click)="showAllTags.set(!showAllTags())">
+            {{ showAllTags() ? 'Show popular tags' : 'Show all ' + opts.tags.length + ' tags' }}
+          </button>
+        }
+      </div>
+    }
+  }
+
+  <!-- Applied filters -->
+  <div class="flex flex-wrap items-center gap-2.5 border-t border-line px-4 py-3.5">
+    <div class="flex flex-[1_1_300px] flex-wrap items-center gap-1.5">
+      @for (t of tokens(); track t.key) {
+        <button
+          type="button"
+          class="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-blush-soft pr-2 pl-3 text-sm font-medium"
+          [attr.aria-label]="'Remove ' + t.label"
+          (click)="store.patch(t.remove)"
+        >
+          {{ t.label }}<app-icon name="x" [size]="14" class="text-blush-ink" />
+        </button>
+      } @empty {
+        <p class="text-[15px] text-muted">No filters yet. Showing every upcoming event, soonest first.</p>
+      }
+      @if (tokens().length) {
+        <button type="button" class="min-h-9 px-2 text-sm font-semibold text-muted underline underline-offset-3" (click)="clearAll()">Clear all</button>
+      }
+    </div>
+    <a class="btn-dark" routerLink="." queryParamsHandling="preserve" fragment="all">Show events</a>
+  </div>
+</div>

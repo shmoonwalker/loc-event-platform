@@ -1,0 +1,28 @@
+<section class="wrap pt-8 pb-2" [id]="'rail-' + rail().mode" [attr.aria-labelledby]="headingId()">
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h2 class="display flex items-center gap-2.5 text-3xl" [id]="headingId()">
+        @if (rail().mode === 'TONIGHT') {
+          <span class="size-3 rounded-full bg-tonight shadow-[0_0_0_5px_var(--glow)]" aria-hidden="true"></span>
+        }
+        {{ text().title }}
+      </h2>
+      <p class="mt-1.5 text-[15px] text-muted">{{ text().subtitle }}</p>
+    </div>
+
+    <!-- hasMore is false when the six cards already are everything, so "See all" would show nothing new -->
+    @if (rail().hasMore) {
+      <a class="link inline-flex min-h-11 items-center px-1" routerLink="/" [queryParams]="rail().filters" fragment="all">
+        See all {{ rail().total }}<span class="sr-only"> events in {{ text().title }}</span>
+      </a>
+    }
+  </div>
+
+  <ul role="list" class="-mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pt-1 pb-4">
+    @for (event of rail().items; track event.id) {
+      <li class="w-[78vw] max-w-68 shrink-0 snap-start sm:w-68">
+        <app-event-card [event]="event" />
+      </li>
+    }
+  </ul>
+</section>

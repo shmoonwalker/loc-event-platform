@@ -1,36 +1,146 @@
-/* You can add global styles to this file, and also import other style files */
+@import "tailwindcss";
+
+/* Tailwind v4 is configured in CSS (no tailwind.config.js).
+   Utilities like bg-panel / text-muted read CSS variables, so flipping
+   data-theme on <html> re-themes the whole app without any dark: classes. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-blush: var(--blush);
+  --color-blush-ink: var(--blush-ink);
+  --color-blush-soft: var(--blush-soft);
+  --color-on-blush: var(--on-blush);
+  --color-sky: var(--sky);
+  --color-sky-ink: var(--sky-ink);
+  --color-glow: var(--glow);
+  --color-tonight: var(--tonight);
+  --color-tint-a: var(--tint-a);
+  --color-tint-b: var(--tint-b);
+  --color-tint-c: var(--tint-c);
+  --font-display: "Bricolage Grotesque", sans-serif;
+  --font-sans: "Instrument Sans", system-ui, sans-serif;
+  --shadow-card: var(--shadow);
+  --animate-drawer: drawer 0.18s ease-out;
+}
+
+@theme {
+  @keyframes drawer {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* ---------- Design tokens (copied from the design reference) ---------- */
 :root {
-    --bg: #e7eef3;
-    --panel: #f6f7ff;
-    --ink: #1c2433;
-    --muted: #556579;
-    --line: #ddd4f2;
-    --blush: #e21878;
-    --blush-soft: #ffe4f3;
-    --on-blush: #ffffff;
-    --sky: #d7fbff;
-    --glow: rgba(226, 24, 120, 0.38);
-    --shadow: 0 14px 32px rgba(28, 36, 51, 0.08);
-    --tonight: #e21878;
+  --bg: #e7eef3;
+  --panel: #f6f7ff;
+  --ink: #1c2433;
+  --muted: #556579;
+  --line: #ddd4f2;
+  --blush: #e21878;
+  --blush-ink: #b0115b;
+  --blush-soft: #ffe4f3;
+  --on-blush: #ffffff;
+  --sky: #d7fbff;
+  --sky-ink: #0a5e69;
+  --glow: rgba(226, 24, 120, 0.38);
+  --shadow: 0 14px 32px rgba(28, 36, 51, 0.08);
+  --tonight: #e21878;
+  --tint-a: #f3dcea;
+  --tint-b: #dde6f6;
+  --tint-c: #e6def8;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #121620;
+  --panel: #1b202d;
+  --ink: #eef1f8;
+  --muted: #9ba8ba;
+  --line: #2f2c45;
+  --blush: #ff4fa0;
+  --blush-ink: #ff8cc2;
+  --blush-soft: #3d1630;
+  --on-blush: #1c0a14;
+  --sky: #123740;
+  --sky-ink: #86e8f3;
+  --glow: rgba(255, 79, 160, 0.32);
+  --shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+  --tonight: #ff4fa0;
+  --tint-a: #352236;
+  --tint-b: #222d42;
+  --tint-c: #2b2742;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    scroll-padding-top: 6rem; /* sticky header height, so #anchors are not hidden under it */
   }
-  
-  * {
-    box-sizing: border-box;
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
   }
-  
-  html,
   body {
-    margin: 0;
-    padding: 0;
+    @apply bg-bg font-sans text-ink antialiased;
   }
-  
-  body {
-    min-height: 100vh;
-    font-family: Nunito, "Avenir Next", "Segoe UI", sans-serif;
-    background:
-      radial-gradient(520px 320px at 12% 8%, color-mix(in srgb, var(--sky) 80%, transparent), transparent 70%),
-      radial-gradient(480px 340px at 90% 90%, color-mix(in srgb, var(--blush) 18%, transparent), transparent 72%),
-      var(--bg);
-    color: var(--ink);
-    line-height: 1.45;
+  button { cursor: pointer; }
+  :focus-visible {
+    outline: 2px solid var(--blush);
+    outline-offset: 2px;
   }
+}
+
+/* ---------- Small reusable building blocks ---------- */
+@utility wrap {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1280px;
+  padding-inline: calc(var(--spacing) * 6);
+}
+
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+/* Classes repeated many times in templates live here instead of in every element. */
+@layer components {
+  .chip {
+    @apply inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-panel px-4 font-medium
+      enabled:hover:border-blush disabled:cursor-not-allowed disabled:opacity-45
+      aria-pressed:border-blush aria-pressed:bg-blush-soft;
+  }
+  .chip-sm {
+    @apply min-h-10 px-3.5 text-[15px];
+  }
+  .tile {
+    @apply flex min-h-15 flex-col justify-center rounded-[14px] border border-line bg-panel px-3.5 py-2 text-left
+      aria-pressed:border-blush aria-pressed:bg-blush-soft;
+  }
+  .drawer {
+    @apply mx-3 mb-3 flex animate-drawer flex-col gap-4.5 rounded-2xl bg-bg p-5 motion-reduce:animate-none;
+  }
+  .field-input {
+    @apply min-h-11 rounded-xl border border-line bg-panel px-3 text-ink;
+  }
+  .btn-primary {
+    @apply min-h-14 rounded-2xl bg-blush px-8 text-[17px] font-semibold text-on-blush
+      shadow-[0_8px_20px_var(--glow)] hover:brightness-95;
+  }
+  .btn-dark {
+    @apply inline-flex min-h-12 items-center rounded-[14px] bg-ink px-5.5 font-semibold text-panel hover:brightness-95;
+  }
+  .pill-btn {
+    @apply flex h-11 items-center gap-2 rounded-full border border-line bg-panel px-3.5 font-semibold;
+  }
+  .link {
+    @apply font-semibold text-blush-ink underline underline-offset-4;
+  }
+}
