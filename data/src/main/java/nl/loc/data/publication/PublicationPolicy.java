@@ -38,7 +38,7 @@ public class PublicationPolicy {
         this.includeSeasonPasses = includeSeasonPasses;
     }
 
-    public String version() { return "loc-v2:" + countries + ":" + maxAge + ":rvo=" + rvoMaxAge
+    public String version() { return "loc-v3:" + countries + ":" + maxAge + ":rvo=" + rvoMaxAge
             + ":ticketmaster=" + ticketmasterMaxAge + ":" + checkInterval + ":passes=" + includeSeasonPasses; }
 
     private Duration maxAge(JsonNode event) {
@@ -78,6 +78,7 @@ public class PublicationPolicy {
         String title = nl.loc.data.text.HtmlPlainText.convert(text(event, "title"));
         if (!includeSeasonPasses && title != null && title.toLowerCase(Locale.ROOT)
                 .matches(".*\\b(seizoenskaart|seizoenkaart|season pass|season ticket)\\b.*")) reasons.add("SEASON_PASS");
+        if (outOfScopeProduct(title) || outOfScopeProduct(text(location, "venue_name"))) reasons.add("OUT_OF_SCOPE_PRODUCT");
         if (title == null || !title.codePoints().anyMatch(Character::isLetterOrDigit)
                 || Set.of("test", "tba", "tbd", "untitled", "placeholder").contains(title.toLowerCase(Locale.ROOT))) {
             reasons.add("INVALID_TITLE");
@@ -184,6 +185,15 @@ public class PublicationPolicy {
                 : slot != null && instant(slot, "ends_at") != null && !slot.path("end_approximate").asBoolean()
                     ? "ONGOING" : "STARTED_END_UNKNOWN";
         return new Decision(List.copyOf(reasons), List.copyOf(warnings), next, cutoff, state);
+    }
+
+    // Parking passes and add-ons (VIP packages, upgrades) are not events; Ticketmaster often files them as normal events.
+    private static final java.util.regex.Pattern NON_EVENT = java.util.regex.Pattern.compile(
+            "\\b(parkeer\\w*|parking|vip (package|upgrades?)|\\w+ room upgrade|ticket not included)\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    private static boolean outOfScopeProduct(String value) {
+        return value != null && NON_EVENT.matcher(value).find();
     }
 
     private void physical(JsonNode location, Set<String> reasons, Set<String> warnings) {
