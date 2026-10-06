@@ -1,0 +1,29 @@
+<nav aria-label="Pagination" class="flex flex-wrap justify-center gap-2">
+  <button type="button" [class]="buttonClass" aria-label="Previous page" [disabled]="page() === 0" (click)="pageChange.emit(page() - 1)">
+    ‹
+  </button>
+  @for (item of items(); track $index) {
+    @if (item === null) {
+      <span class="grid min-h-11 min-w-8 place-items-center text-muted" aria-hidden="true">…</span>
+    } @else {
+      <button
+        type="button"
+        [class]="buttonClass"
+        [attr.aria-current]="item === page() ? 'page' : null"
+        [attr.aria-label]="'Page ' + (item + 1)"
+        (click)="pageChange.emit(item)"
+      >
+        {{ item + 1 }}
+      </button>
+    }
+  }
+  <button
+    type="button"
+    [class]="buttonClass"
+    aria-label="Next page"
+    [disabled]="page() >= totalPages() - 1"
+    (click)="pageChange.emit(page() + 1)"
+  >
+    ›
+  </button>
+</nav>
