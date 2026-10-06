@@ -10,11 +10,10 @@ public record HomeQuery(
                 name = "city",
                 in = ParameterIn.QUERY,
                 required = false,
-                description = "City slug for the nearYou rail only. Does not filter tags, categories, tonight, "
-                        + "this weekend, or online. Defaults to amsterdam. No device location. "
-                        + "Invalid slug format returns 400.",
+                description = "City slug that picks the city for the near-you rail only; the other rails "
+                        + "ignore it. Defaults to amsterdam. No device location. Invalid slug format returns 400.",
                 example = "amsterdam")
-        @Schema(description = "Near-you city slug. Defaults to amsterdam. Does not filter the rest of the homepage.",
+        @Schema(description = "City for the near-you rail only. Defaults to amsterdam.",
                 example = "amsterdam")
         String city
 ) {

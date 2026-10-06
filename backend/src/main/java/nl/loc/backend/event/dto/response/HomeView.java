@@ -1,17 +1,15 @@
 package nl.loc.backend.event.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import nl.loc.backend.city.model.City;
 
-@Schema(description = "Discovery homepage. city scopes only nearYou; defaults to Amsterdam. Filters have a separate endpoint.")
+@Schema(description = "Homepage highlight rails. The event list itself comes from GET /api/events.")
 public record HomeView(
+        @Schema(description = "City used for the NEAR_YOU rail; returned even when that rail is omitted.")
         City nearYouCity,
-        @Schema(description = "Physical evening events, or STARTING_SOON when no evening events match, across all cities.")
-        EventRail tonight,
-        @Schema(description = "Physical events this weekend across all cities; no fallback.") EventRail thisWeekend,
-        @Schema(description = "Physical events in the selected city over 30 days; no location substitution.") EventRail nearYou,
-        @Schema(description = "Online events over 30 days. The broader link also includes later events.") EventRail online,
-        @Schema(description = "Relative API URL for ordinary browsing without city, date, place, or search restrictions.")
-        String browseUrl
+        @Schema(description = "Rails with at least one event, in order TONIGHT, WEEKEND, NEAR_YOU, ONLINE. "
+                + "Empty rails are omitted, so this can be an empty list.")
+        List<EventRail> rails
 ) {
 }
