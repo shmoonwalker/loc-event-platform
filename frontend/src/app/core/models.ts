@@ -14,6 +14,11 @@ export interface EventCard {
   cityName: string | null;
   venueName: string | null;
   imageUrl: string | null;
+  /**
+   * Category slug or label, when the payload includes one.
+   * Omitted or blank means the image fallback uses the generic default.
+   */
+  category?: string | null;
 }
 
 export interface City {
