@@ -278,6 +278,45 @@ class PublicEventsHttpTest {
     }
 
     @Test
+    void eventDetailShowsOrganizerCategoriesAndTagsButNotInternals() throws Exception {
+        ResultActions result = mockMvc.perform(get("/api/events/" + music.id()));
+        result.andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Late night jazz"))
+                .andExpect(jsonPath("$.place").value("PHYSICAL"))
+                .andExpect(jsonPath("$.venueName").value("Paradiso"))
+                .andExpect(jsonPath("$.citySlug").value("amsterdam"))
+                .andExpect(jsonPath("$.categories[0].value").value("music-nightlife"))
+                .andExpect(jsonPath("$.tags[0].value").value("jazz"))
+                .andExpect(jsonPath("$.organizers[0].name").value("Hidden Organizer"))
+                .andExpect(jsonPath("$.occurrences", hasSize(1)));
+        assertThat(body(result)).doesNotContain("ext-org-secret", "tm-998877");
+    }
+
+    @Test
+    void unknownOrEndedEventAndOrganizerReturn404() throws Exception {
+        mockMvc.perform(get("/api/events/" + EXPIRED_ID)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/events/" + WITHDRAWN_ID)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/organizers/" + UUID.randomUUID())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void organizerDetailListsTheirUpcomingEventsAsCards() throws Exception {
+        mockMvc.perform(get("/api/organizers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organizer.name").value("Hidden Organizer"))
+                .andExpect(jsonPath("$.events", hasSize(discoverable.size())))
+                .andExpect(jsonPath("$.events[0].id").exists());
+    }
+
+    @Test
+    void categoriesAndTagsEndpointsMatchFilterOptions() throws Exception {
+        mockMvc.perform(get("/api/categories")).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(EventCategory.values().length)));
+        mockMvc.perform(get("/api/tags")).andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(EventTag.values().length)));
+    }
+
+    @Test
     void equalStartTimesStayOrderedByEventId() throws Exception {
         ResultActions first = mockMvc.perform(events().param("tag", "coding").param("sort", "start_time"));
         first.andExpect(status().isOk())
