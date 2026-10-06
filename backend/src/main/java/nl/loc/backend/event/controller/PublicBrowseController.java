@@ -120,8 +120,9 @@ public class PublicBrowseController {
 
     @GetMapping("/organizers/{id}")
     @Operation(summary = "Organizer detail",
-            description = "Organizer profile and one page of their upcoming events (page from 0, size 1-20, default 20, same as /api/events). 404 when unknown or "
-                    + "they have no discoverable event.")
+            description = "Organizer profile and one page of their upcoming events "
+                    + "(page from 0, size 1-20, default 20, same as /api/events). "
+                    + "404 when unknown or they have no discoverable event.")
     public OrganizerDetail organizer(@PathVariable UUID id,
                                      @RequestParam(required = false) Integer page,
                                      @RequestParam(required = false) Integer size) {
