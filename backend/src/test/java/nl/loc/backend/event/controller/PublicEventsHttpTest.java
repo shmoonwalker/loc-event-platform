@@ -473,7 +473,7 @@ class PublicEventsHttpTest {
         JsonNode home = response(mockMvc.perform(get("/api/home")));
         assertThat(home.get("nearYouCity").get("slug").asText()).isEqualTo("amsterdam");
         assertThat(modes(home)).containsExactly("ONLINE");
-        assertThat(rail(home, "ONLINE").get("total").asInt()).isEqualTo(6);
+        assertThat(rail(home, "ONLINE").get("total").asInt()).isEqualTo(11);
         assertThat(home.has("categories")).isFalse();
         assertThat(home.has("tags")).isFalse();
         JsonNode events = response(mockMvc.perform(events()));
