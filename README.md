@@ -33,6 +33,7 @@ For the high-level technical design, see:
 
 - [System Architecture](docs/architecture/system-architecture.md)
 - [Data Architecture](docs/architecture/data-architecture.md)
+- [Authentication](docs/architecture/authentication.md)
 - [Backend Guide](backend/README.md)
 - [Data Guide](data/README.md)
 - [Frontend Guide](frontend/README.md)

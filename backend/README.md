@@ -179,7 +179,7 @@ The exact similarity and ranking implementation may evolve independently of the 
 
 ## Authentication and Users
 
-User registration and JWT-based authentication are planned; they are not implemented in the current discovery API.
+User registration and JWT-based authentication are in progress. The design, decisions and status are in [Authentication](../docs/architecture/authentication.md).
 
 Authentication is not required for public event discovery.
 
@@ -284,15 +284,15 @@ PostgreSQL
 ├── publication
 │   └── qualified product read contract owned by the data application
 │
-└── backend-owned schema (to be created)
-    └── owned by the redesigned backend
+└── app
+    └── application data owned by the backend (users, and later user activity)
 ```
 
 The data application has write access to catalog data.
 
-The backend reads qualified publication data through JdbcClient. It will have
-read/write access to its own application data when that schema is created. Product
-event reads do not rely on intermediate catalog rows.
+The backend reads qualified publication data through JdbcClient and owns the
+`app` schema, migrated by its own Flyway history (`app.flyway_backend_history`).
+Product event reads do not rely on intermediate catalog rows.
 
 This keeps service responsibilities separate without requiring separate databases.
 
