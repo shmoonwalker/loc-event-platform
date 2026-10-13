@@ -24,6 +24,13 @@ spring:
       repositories:
         enabled: false
 
+app:
+  rate-limit:
+    policies:
+      register:
+        capacity: 3
+        period: 1m
+
 server:
   port: 8080
 

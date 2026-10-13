@@ -10,14 +10,14 @@ import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
-import nl.loc.backend.category.model.EventCategory;
-import nl.loc.backend.city.model.City;
+import nl.loc.backend.event.model.EventCategory;
+import nl.loc.backend.event.model.City;
 import nl.loc.backend.event.dto.request.EventsQuery;
 import nl.loc.backend.event.model.BrowseCriteria;
 import nl.loc.backend.event.model.EventSort;
 import nl.loc.backend.event.model.Place;
 import nl.loc.backend.event.model.When;
-import nl.loc.backend.tag.model.EventTag;
+import nl.loc.backend.event.model.EventTag;
 import org.springframework.stereotype.Component;
 
 @Component

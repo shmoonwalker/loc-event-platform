@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
-import nl.loc.backend.city.model.City;
+import nl.loc.backend.event.model.City;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.dto.response.EventRail;
 import nl.loc.backend.event.dto.response.HomeView;

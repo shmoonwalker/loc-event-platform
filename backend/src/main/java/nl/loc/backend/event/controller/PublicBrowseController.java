@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
-import nl.loc.backend.city.model.City;
+import nl.loc.backend.event.model.City;
 import nl.loc.backend.event.dto.request.CitiesQuery;
 import nl.loc.backend.event.dto.request.EventsQuery;
 import nl.loc.backend.event.dto.request.HomeQuery;

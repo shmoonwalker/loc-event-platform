@@ -3,8 +3,6 @@ package nl.loc.backend.event.model;
 import java.util.List;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import nl.loc.backend.category.model.EventCategory;
-import nl.loc.backend.tag.model.EventTag;
 
 public record BrowseCriteria(
         String q,

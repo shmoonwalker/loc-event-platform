@@ -3,12 +3,12 @@ package nl.loc.backend.event.service;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import nl.loc.backend.category.model.EventCategory;
+import nl.loc.backend.event.model.EventCategory;
 import nl.loc.backend.event.dto.response.FilterOption;
 import nl.loc.backend.event.dto.response.FilterOptions;
 import nl.loc.backend.event.model.BrowseLimits;
 import nl.loc.backend.event.model.TimeWindow;
-import nl.loc.backend.tag.model.EventTag;
+import nl.loc.backend.event.model.EventTag;
 import org.springframework.stereotype.Service;
 
 @Service

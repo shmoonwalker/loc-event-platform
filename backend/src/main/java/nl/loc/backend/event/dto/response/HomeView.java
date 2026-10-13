@@ -2,7 +2,7 @@ package nl.loc.backend.event.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import nl.loc.backend.city.model.City;
+import nl.loc.backend.event.model.City;
 
 @Schema(description = "Homepage highlight rails. The event list itself comes from GET /api/events.")
 public record HomeView(
