@@ -1,5 +1,6 @@
 package nl.loc.backend.config;
 
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -8,6 +9,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -22,6 +24,8 @@ public class SecurityConfig {
                         .requestMatchers("/error", "/api/docs/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/home", "/api/events", "/api/events/filter-options", "/api/cities",
                                 "/api/events/*", "/api/organizers/*", "/api/categories", "/api/tags").permitAll()
+                        // auth routes are opened one by one; never /api/auth/**
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -32,6 +36,11 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+        PasswordEncoder bcryptEncoder = new BCryptPasswordEncoder(12);
+
+        return new DelegatingPasswordEncoder(
+                "bcrypt",
+                Map.of("bcrypt", bcryptEncoder)
+        );
     }
 }

@@ -1,15 +1,16 @@
 # Development scripts
 
-The data worker and backend are at different stages of the redesign.
+| Script | What it does |
+|---|---|
+| `dev-up.sh` | Starts PostgreSQL and RabbitMQ (`docker compose up -d db rabbitmq`), the infrastructure the data application needs |
+| `dev-down.sh` | Stops the local Docker Compose stack |
 
-- `dev-up.sh` starts PostgreSQL and RabbitMQ for the data worker. It does not
-  start the backend shell, which has no product endpoints or database access yet.
-- `dev-down.sh` stops the local Compose stack.
+The backend also uses Redis for rate limiting. Start it with `docker compose up -d redis`, or
+see the [backend guide](../backend/README.md).
 
-Plain `docker compose up` also leaves the backend shell out. To preview it,
-use the explicit `backend-preview` Compose profile. The shell has no old
-Flyway migrations and cannot recreate the removed schemas.
+Plain `docker compose up` does not start the backend container. To run it in Docker, use the
+`backend-preview` profile:
 
-For the current data worker, follow [`data/README.md`](../data/README.md).
-The current PostgreSQL data model uses `catalog` for normalized data and
-`publication` for qualified product snapshots.
+```bash
+docker compose --profile backend-preview up -d
+```

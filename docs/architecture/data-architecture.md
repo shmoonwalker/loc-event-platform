@@ -942,9 +942,9 @@ The data architecture follows these principles:
 
 ---
 
-## Deferred Implementation Decisions
+## Open Decisions
 
-These future decisions may evolve independently of this architecture document:
+These decisions are not made yet and may evolve independently of this architecture document:
 
 ```text
 cross-source fuzzy deduplication
@@ -958,10 +958,9 @@ Implemented rules, mappings, tables, and schedules are documented in
 
 ---
 
-## Next Integration Goal
+## Backend Integration
 
-Data collection and publication are implemented. The next integration step is
-the redesigned backend reading qualified publication data:
+The backend reads qualified publication data and never the intermediate catalog:
 
 ```text
 External sources

@@ -2,15 +2,9 @@
 
 ## Purpose
 
-This document defines the high-level architecture for the personal redesign of Loc.
+This document describes the high-level architecture of Loc: the major components, their ownership boundaries, the data flow, and the principles behind them.
 
-The data worker and its `catalog` and `publication` schemas are implemented.
-The backend product API and frontend experience below are the redesign target;
-the current backend is a minimal shell and the frontend is a holding page.
-
-It describes the major system components, ownership boundaries, data flow, and architecture principles.
-
-Implementation details, delivery steps, source-specific ingestion logic, database schemas, queue definitions, and feature-specific designs are intentionally kept out of this document. Those belong in focused design documents and implementation tickets.
+Source-specific ingestion logic, database schemas, queue definitions and feature designs are kept out of this document. They are described in the focused documents listed at the end.
 
 ---
 
@@ -65,7 +59,7 @@ The architecture should support multiple external event sources over time withou
               ▼             ▼             ▼
         ┌──────────┐  ┌────────────┐  Product /
         │ Redis    │  │ RabbitMQ   │  user ops
-        │ Cache    │  │ Async work │
+        │ Limits   │  │ Async work │
         └──────────┘  └─────▲──────┘
                             │
                     optional events /
@@ -91,12 +85,12 @@ It does not communicate directly with PostgreSQL, RabbitMQ, Redis, object storag
 
 | Component | Responsibility |
 |---|---|
-| **Backend API** | Public/product HTTP API. Reads qualified `publication` snapshots. Owns product and user operations, security, caching, and product-side asynchronous messaging. |
+| **Backend API** | Public/product HTTP API. Reads qualified `publication` snapshots. Owns product and user operations, security, rate limiting, and product-side asynchronous messaging. |
 | **Data worker** | Scheduled external data collection. Fetches source data, stores raw payloads, processes data, and publishes catalog data into PostgreSQL. It exposes no public product API. |
 | **Frontend** | User interface. Communicates only with the backend API over HTTPS. |
 | **PostgreSQL** | System of record for published catalog data and product/application data. One database with clear logical ownership boundaries. |
 | **Object storage** | Durable storage for raw external payloads before processing and publication. |
-| **Redis** | Disposable cache and temporary derived state. Never the system of record. |
+| **Redis** | Temporary state such as rate-limit counters. Never the system of record; losing it loses no data. |
 | **RabbitMQ** | Asynchronous work and integration events. Not authoritative storage. |
 | **Scheduler** | Starts data collection runs in the data worker. |
 
@@ -124,7 +118,7 @@ The backend owns:
 - authentication and security
 - user and product data
 - reading the published catalog
-- Redis caching
+- rate limiting with Redis
 - product-side RabbitMQ messaging
 - admin moderation
 
@@ -146,9 +140,9 @@ The data and backend applications share only the contracts required to interact 
 - identifiers and shared domain concepts
 - optional asynchronous event or signal definitions
 
-Published snapshots remain occurrence-granular in `publication`; the backend may expose an event-granular discovery list DTO derived from those snapshots. Identifier semantics: `loc_event_id` is the logical event (list unit); `loc_occurrence_id` is one dated instance (schedule unit). See [Backend direction](../../backend/README.md) for discovery grouping rules.
+Published snapshots remain occurrence-granular in `publication`; the backend may expose an event-granular discovery list DTO derived from those snapshots. Identifier semantics: `loc_event_id` is the logical event (list unit); `loc_occurrence_id` is one dated instance (schedule unit). See the [backend guide](../../backend/README.md) for discovery grouping rules.
 
-A shared Java library should only be introduced later if real duplication or contract-management needs justify it.
+There is no shared Java library between the applications. One is only introduced if real duplication or contract-management needs justify it.
 
 ---
 
@@ -223,8 +217,6 @@ Optional RabbitMQ event / signal
    ↓
 Backend reads published catalog
    ↓
-Optional Redis cache
-   ↓
 Frontend
 ```
 
@@ -254,8 +246,8 @@ The authoritative published state exists in PostgreSQL.
 
 | Role | Meaning |
 |---|---|
-| **Member** | Standard member capabilities exposed through the backend API. |
-| **Admin** | Human moderation and administrative capabilities exposed through the backend API. Admin actions do not replace or own the external catalog publication pipeline. |
+| **User** | A registered account (`USER`): standard member capabilities exposed through the backend API. |
+| **Admin** | An account with the `ADMIN` role: human moderation and administrative capabilities exposed through the backend API. Admin actions do not replace or own the external catalog publication pipeline. |
 
 ---
 
@@ -277,12 +269,9 @@ The applications remain in one repository with explicit boundaries.
 └── docs/
     └── architecture/
         ├── system-architecture.md
-        └── data-architecture.md
+        ├── data-architecture.md
+        └── authentication.md
 ```
-
-The frontend can remain unchanged until its redesign begins.
-
-A shared library should not be introduced unless a concrete need appears.
 
 ---
 
@@ -291,7 +280,7 @@ A shared library should not be introduced unless a concrete need appears.
 - Backend and data are independently runnable Java applications.
 - PostgreSQL is the system of record for published catalog and product data.
 - Object storage retains raw external payloads.
-- Redis contains disposable cache or temporary state.
+- Redis contains only temporary state.
 - RabbitMQ carries asynchronous work and events, not authoritative state.
 - Data owns catalog publication.
 - Backend owns product and user operations.
@@ -311,15 +300,7 @@ This document intentionally stays high-level.
 Focused architecture documents:
 
 - [Data Architecture](data-architecture.md) — data worker runtime, pipeline, sources, catalog contract, and publication
-- [Backend direction](../../backend/README.md) — product API behaviour and ownership
-
-```text
-docs/architecture/
-├── system-architecture.md
-└── data-architecture.md
-```
-
-Application-specific operational instructions belong in the corresponding application README, for example:
-
-- `data/README.md` — how to build, configure, test, and run the data worker
-- `backend/README.md` — current product direction for the backend redesign
+- [Authentication](authentication.md) — registration, passwords, rate limiting, and the planned login design
+- [Backend guide](../../backend/README.md) — product API behaviour, ownership, and how to run it
+- [Data guide](../../data/README.md) — how to build, configure, test, and run the data worker
+- [Frontend guide](../../frontend/README.md) — pages and deployment

@@ -18,9 +18,23 @@ spring:
     properties:
       hibernate:
         default_schema: app
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      repositories:
+        enabled: false
+
+app:
+  rate-limit:
+    policies:
+      register:
+        capacity: 3
+        period: 1m
 
 server:
   port: 8080
+  # behind Railway's edge proxy and nginx: take the client IP from X-Forwarded-For, trusting only private proxies
+  forward-headers-strategy: native
 
 springdoc:
   api-docs:

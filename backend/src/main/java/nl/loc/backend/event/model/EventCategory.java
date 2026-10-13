@@ -1,4 +1,4 @@
-package nl.loc.backend.category.model;
+package nl.loc.backend.event.model;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Arrays;

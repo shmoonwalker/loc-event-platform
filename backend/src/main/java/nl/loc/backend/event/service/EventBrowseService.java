@@ -3,7 +3,7 @@ package nl.loc.backend.event.service;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import nl.loc.backend.city.model.City;
+import nl.loc.backend.event.model.City;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.model.BrowseCriteria;
 import nl.loc.backend.event.model.EventSort;
