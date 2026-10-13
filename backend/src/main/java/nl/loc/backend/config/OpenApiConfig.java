@@ -4,8 +4,10 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.filter.ForwardedHeaderFilter;
 
 import java.util.Map;
 
@@ -32,5 +34,17 @@ public class OpenApiConfig {
                     .forEach(entry -> sorted.addPathItem(entry.getKey(), entry.getValue()));
             openApi.setPaths(sorted);
         };
+    }
+
+    /**
+     * The Scalar starter registers a ForwardedHeaderFilter unless this bean exists. That filter trusts the
+     * left-most X-Forwarded-For entry, which the client controls, so anyone could fake their IP and bypass
+     * rate limits. Tomcat resolves the client IP instead (server.forward-headers-strategy: native).
+     */
+    @Bean
+    public FilterRegistrationBean<ForwardedHeaderFilter> forwardedHeaderFilter() {
+        FilterRegistrationBean<ForwardedHeaderFilter> registration = new FilterRegistrationBean<>(new ForwardedHeaderFilter());
+        registration.setEnabled(false);
+        return registration;
     }
 }

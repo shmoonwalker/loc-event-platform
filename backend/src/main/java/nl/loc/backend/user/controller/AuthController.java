@@ -6,7 +6,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import nl.loc.backend.config.ratelimit.RateLimitPolicy;
+import nl.loc.backend.config.ratelimit.RateLimiter;
 import nl.loc.backend.user.dto.request.RegisterRequest;
 import nl.loc.backend.user.service.RegistrationService;
 import org.springframework.http.HttpStatus;
@@ -23,9 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final RegistrationService registrationService;
+    private final RateLimiter rateLimiter;
 
-    public AuthController(RegistrationService registrationService) {
+    public AuthController(RegistrationService registrationService, RateLimiter rateLimiter) {
         this.registrationService = registrationService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/register")
@@ -40,9 +45,15 @@ public class AuthController {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid input or malformed JSON.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many registrations from this IP. Retry-After says how many seconds to wait.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public void register(@Valid @RequestBody RegisterRequest request) {
+    public void register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+        // before BCrypt, so blocked requests cost almost nothing
+        rateLimiter.consume(RateLimitPolicy.REGISTER, httpRequest.getRemoteAddr());
         registrationService.register(request.email(), request.password(), request.displayName());
     }
 }
