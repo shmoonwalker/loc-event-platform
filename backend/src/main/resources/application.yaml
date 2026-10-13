@@ -18,6 +18,11 @@ spring:
     properties:
       hibernate:
         default_schema: app
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      repositories:
+        enabled: false
 
 server:
   port: 8080
