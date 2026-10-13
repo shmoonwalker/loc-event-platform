@@ -1,12 +1,17 @@
 # Frontend
 
-This Angular application is Loc's public home page: highlight rails (tonight, this
-weekend, near you, online) and a searchable, filterable event list. Filters live in the
-URL query string, so every filtered view is a shareable link. The previous holding page
-is still available at `/holding`. Event detail pages do not exist yet, so event links
-currently land on the not-found page.
+This Angular application is Loc's user interface. It has these pages:
 
-Planned discovery home: one card per `locEventId`, showing the next upcoming date and optionally a count of further dates (for example "+ N more dates"). The event detail route loads by event id and renders all occurrences returned by the backend. Weather on the list is omitted by default; per-date weather appears on detail. If the list ever shows weather, it may only reflect the next occurrence when that date is inside the forecast window. Full rules are in the [backend guide](../backend/README.md).
+| Route | Page |
+|---|---|
+| `/` | Home: highlight rails (tonight, this weekend, near you, online) and a searchable, filterable event list |
+| `/events/:id` | Event detail: description, location, organizers, every upcoming date and per-date weather |
+| `/organizers/:id` | Organizer profile and their upcoming events |
+| `/holding` | Holding page from the earlier version of the site |
+
+Filters live in the URL query string, so every filtered view is a shareable link. The
+list shows one card per event; the event page lists all of its dates. The frontend talks
+only to the backend API, described in the [Discovery API](../backend/docs/discovery.md).
 
 From `frontend/`, install dependencies with `npm ci`. Use `npm start` for the
 development server at `http://localhost:4200/` (it proxies `/api` to the backend on
@@ -24,7 +29,5 @@ address, for example `http://<backend-service>.railway.internal:8080`. It defaul
 `http://backend:8080` (the Docker Compose service name). Without a reachable backend every
 API call answers `502`. See `nginx.conf.template` and `Dockerfile`.
 
-The intended product boundary is described in the
-[system architecture](../docs/architecture/system-architecture.md): the
-frontend will communicate with the backend API, not directly with PostgreSQL
-or the data worker.
+The frontend never talks to PostgreSQL or the data application directly; see the
+[system architecture](../docs/architecture/system-architecture.md).

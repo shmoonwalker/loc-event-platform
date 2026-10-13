@@ -1,32 +1,30 @@
 package nl.loc.backend.user.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import nl.loc.backend.user.repository.UserAccountRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-@SpringBootTest(properties = {
-        "app.rate-limit.policies.register.capacity=2",
-        "app.rate-limit.policies.register.period=1h"})
-@AutoConfigureMockMvc
+// real HTTP through embedded Tomcat, so forward-headers-strategy resolves the client IP like in production
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
+                "app.rate-limit.policies.register.capacity=2",
+                "app.rate-limit.policies.register.period=1h"})
 @Testcontainers
 class RegisterRateLimitHttpTest {
     @Container
@@ -41,36 +39,46 @@ class RegisterRateLimitHttpTest {
         registry.add("spring.data.redis.url", () -> "redis://" + redis.getHost() + ":" + redis.getMappedPort(6379));
     }
 
-    @Autowired
-    private MockMvc mockMvc;
+    private final HttpClient http = HttpClient.newHttpClient();
+
+    @LocalServerPort
+    private int port;
     @Autowired
     private UserAccountRepository repository;
 
     @Test
-    void blocksTheSameIpAfterTheLimitWithRetryAfter() throws Exception {
-        register("203.0.113.1", "first@example.com").andExpect(status().isAccepted());
-        register("203.0.113.1", "second@example.com").andExpect(status().isAccepted());
+    void blocksTheForwardedClientIpAfterTheLimitWithRetryAfter() throws Exception {
+        assertThat(register("203.0.113.1", "first@example.com").statusCode()).isEqualTo(202);
+        assertThat(register("203.0.113.1", "second@example.com").statusCode()).isEqualTo(202);
 
-        register("203.0.113.1", "third@example.com")
-                .andExpect(status().isTooManyRequests())
-                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
-                .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.title").value("Too many requests"));
-
+        HttpResponse<String> blocked = register("203.0.113.1", "third@example.com");
+        assertThat(blocked.statusCode()).isEqualTo(429);
+        assertThat(blocked.headers().firstValue("Retry-After")).hasValueSatisfying(
+                seconds -> assertThat(Long.parseLong(seconds)).isPositive());
+        assertThat(blocked.body()).contains("\"title\":\"Too many requests\"");
         assertThat(repository.existsByEmail("third@example.com")).isFalse();
-        // another IP has its own bucket
-        register("203.0.113.2", "fourth@example.com").andExpect(status().isAccepted());
+
+        // the test client connects from 127.0.0.1 every time, so a fresh bucket proves the forwarded IP is the key
+        assertThat(register("203.0.113.2", "fourth@example.com").statusCode()).isEqualTo(202);
     }
 
-    private ResultActions register(String ip, String email) throws Exception {
-        return mockMvc.perform(post("/api/auth/register")
-                .with(request -> {
-                    request.setRemoteAddr(ip);
-                    return request;
-                })
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+    @Test
+    void ignoresClientSuppliedForwardedForEntries() throws Exception {
+        // a proxy appends the real client (198.51.100.1) after whatever the client sent itself
+        assertThat(register("1.1.1.1, 198.51.100.1", "spoof1@example.com").statusCode()).isEqualTo(202);
+        assertThat(register("2.2.2.2, 198.51.100.1", "spoof2@example.com").statusCode()).isEqualTo(202);
+
+        assertThat(register("3.3.3.3, 198.51.100.1", "spoof3@example.com").statusCode()).isEqualTo(429);
+    }
+
+    private HttpResponse<String> register(String forwardedFor, String email) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/auth/register"))
+                .header("Content-Type", "application/json")
+                .header("X-Forwarded-For", forwardedFor)
+                .POST(HttpRequest.BodyPublishers.ofString("""
                         {"email": "%s", "password": "correct-horse-battery", "displayName": "Alice"}
-                        """.formatted(email)));
+                        """.formatted(email)))
+                .build();
+        return http.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }

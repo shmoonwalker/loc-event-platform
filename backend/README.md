@@ -1,367 +1,146 @@
-# Backend Architecture
+# Backend
 
-## Purpose
+The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration, and in the future all other user-owned features.
 
-The Loc backend is the product API between the frontend and the event catalog.
-
-It serves public event discovery and owns application-specific behaviour such as users, saved events, comments, moderation and administration.
-
-The backend does not collect or normalize external event data.
-
-**Implementation status:** public discovery is implemented: homepage rails (only
-rails with events are returned), event search/filtering/sorting/pagination, filter
-options, and city suggestions. PostgreSQL reads use the qualified publication
-contract. Event detail, authentication, saved events, comments, moderation, and
-the backend-owned schema remain future work. The sections below include those
-planned product responsibilities; they are not all implemented endpoints.
-
-- [Discovery API](docs/discovery.md): endpoints, homepage behavior, filters,
-  response shapes, and implementation notes.
-
-
----
-
-## System Boundary
+The backend does not collect or normalize external event data. That is the job of the [data application](../data/README.md).
 
 ```text
-External Event Sources
-        ↓
-Data Application
-        ↓
-Published Event Catalog
-        ↓
-Backend API
-        ↓
-Frontend
+External sources → Data application → publication schema → Backend API → Frontend
 ```
 
 The frontend communicates only with the backend API.
 
-The data application and backend have separate responsibilities and data ownership.
+---
+
+## Features
+
+| Area | Endpoints | Documentation |
+|---|---|---|
+| Event discovery | `GET /api/home`, `/api/events`, `/api/events/{id}`, `/api/events/filter-options`, `/api/cities`, `/api/organizers/{id}`, `/api/categories`, `/api/tags` | [Discovery API](docs/discovery.md) |
+| Registration | `POST /api/auth/register` | [Authentication](../docs/architecture/authentication.md) |
+
+Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI document at `/api/docs/openapi.yaml`.
 
 ---
 
-## Responsibilities
+## Running locally
 
-The backend is responsible for:
+Requirements: Java 25 and Docker.
 
-- public event discovery
-- event search and filtering
-- event detail
-- organizer pages
-- related event discovery
-- authentication and user accounts
-- saved events
-- comments
-- administration and moderation
-- application-owned state
+1. Start PostgreSQL and Redis from the repository root:
 
-The backend is not responsible for:
+   ```bash
+   docker compose up -d db redis
+   ```
 
-- collecting events from external sources
-- parsing provider-specific event data
-- normalizing external events
-- enriching external event data
-- publishing or modifying catalog-owned event data
+2. Start the backend from `backend/`:
 
-These responsibilities belong to the data application.
+   ```bash
+   ./mvnw spring-boot:run
+   ```
 
----
+   Add `-Dspring-boot.run.profiles=dev` for debug logging of `nl.loc.backend`.
 
-## Event Catalog
+The API runs on `http://localhost:8080`. On startup, Flyway creates or migrates the backend's `app` schema.
 
-The data application owns event collection, the permissive normalized catalog,
-and final publication. The backend's event read contract is the qualified,
-enriched data in the `publication` schema, not the intermediate `catalog` schema.
+Discovery endpoints read the `publication` schema, which the data application creates and fills. Run the data application at least once against the same database to get events (see [data/README.md](../data/README.md)).
 
-Catalog data includes:
-
-- events
-- organizer records in the publication payload (`locOrganizerId` UUID, name, optional description and site)
-- categories
-- tags
-- event relationships required by the catalog
-
-The backend treats catalog data as read-only.
-
-Changes to catalog data are made through the data application rather than through backend product APIs.
-
-Data retains snapshots of previously published occurrences after they end or
-are withdrawn. The backend can use those snapshots for event detail and
-user-owned historical references. Events that never qualified for publication
-have no public detail snapshot.
+Redis is only needed for rate limiting. Without it the backend still starts and serves requests, but nothing is rate limited and a warning is logged per limited request.
 
 ---
 
-## Public Event Discovery
+## Configuration
 
-Anonymous users can browse and search published events without creating an account.
+| Variable | Default | Purpose |
+|---|---|---|
+| `DB_HOST`, `DB_PORT`, `DB_NAME` | `localhost`, `5432`, `POSTGRES_DB` or `project_db` | Database location |
+| `DB_USER`, `DB_PASSWORD` | `POSTGRES_USER` / `POSTGRES_PASSWORD`, then `admin` / `password` | Database credentials |
+| `REDIS_URL` | `redis://localhost:6379` | Redis for rate limiting; in production includes the password |
 
-Public discovery can use catalog attributes such as:
-
-- search text
-- category
-- tags
-- location
-- date and time
-
-Public discovery reads `publication.discoverable_events`, which contains only
-currently qualified occurrences. Backend-owned moderation visibility rules are
-planned alongside the future moderation feature.
-
-Publication eligibility and temporal filters exclude ended or withdrawn occurrences.
-Backend-owned administrative hiding is planned, not yet implemented.
-
-Discovery list results are grouped by `loc_event_id`: one card per logical event.
-Each card selects the earliest matching occurrence and exposes title, start/end,
-place, city, venue, and optional image. Categories/tags are filterable but are not
-card fields; the complete vocabulary comes from `/api/events/filter-options`.
-Pagination and totals count distinct events, not occurrence snapshots. Occurrence
-counts and richer detail are not part of the current card response.
-
-Occurrence-level filters (such as a date range or "this weekend") are applied to occurrences first. Results are then collapsed to events that retain at least one matching occurrence. The card's summary scheduling must reflect only the matched occurrences, not every occurrence of the event.
-
-If some occurrences are withdrawn or cancelled but at least one remains discoverable, the event still appears as one card. Partial discoverability is reflected on the detail page, not by duplicating cards on the list.
-
-Weather on grouped list cards must never blend forecasts across dates. By default, weather is omitted from the list card and shown per date on event detail. If a list card shows weather, it may only be the next occurrence's forecast and only when that date falls inside the data pipeline's forecast window.
-
-Occurrence-level rows in `publication.discoverable_events` remain the storage truth; grouping is computed in the product API.
+Rate limits are set under `app.rate-limit.policies` in `src/main/resources/application.yaml`.
 
 ---
 
-## Event Detail
+## Code structure
 
-An event detail page provides the available public information for a single event.
+The code is organized by feature. Each feature owns its controller, service, repository, model and DTOs.
 
-Event detail is keyed by `loc_event_id`. The page shows shared event information once and lists all relevant occurrences: upcoming discoverable times plus, where policy allows, past or cancelled occurrences still available through `publication.event_snapshot`. Each occurrence entry includes its `loc_occurrence_id`, schedule, state, and optional weather for that date when the data pipeline attached it. The primary entry from the discovery list is the event id; a deep link to a single occurrence may be supported as a secondary route.
+```text
+nl.loc.backend
+├── config/        security chain, password encoder, error handling, OpenAPI, clock
+│   └── ratelimit/ Redis-backed rate limiter
+├── event/         public discovery: events, organizers, cities, categories, tags
+└── user/          user accounts and registration
+```
 
-An occurrence that was previously published may remain directly accessible
-after it has ended or been cancelled through `publication.event_snapshot`.
+Within a feature:
 
-The API should expose its current state clearly so the frontend can communicate that the event is past or cancelled.
+| Package | Contains |
+|---|---|
+| `controller` | HTTP endpoints; no business rules |
+| `service` | Business rules |
+| `repository` | Persistence |
+| `model` | Domain types and entities |
+| `dto/request`, `dto/response` | The public API contract |
 
-Administratively hidden events are not publicly accessible.
+Conventions:
 
----
-
-## Organizers
-
-Organizer identity is a data-owned publication contract. Each published
-occurrence includes organizer records with a stable `locOrganizerId` UUID (the
-same type as `loc_event_id` / `loc_occurrence_id`), the
-display name, and optional `description` and `site` when the source sent them.
-`publication.organizer_identity` reuses the same Loc UUID for the same
-source and source organizer key (Ticketmaster promoter id, or the RVO
-organizer name). A source-backed site or URL may be exposed when the source
-provides it; the backend must not infer one from the event URL or organizer name.
-
-An organizer page can show the stable ID, name, optional description and site,
-and published events associated with that organizer. Further profile details are
-outside the current data contract.
-
-Organizer accounts, organizer authentication and organizer-managed pages are not part of the current product design.
+- Controllers validate input at the boundary (`@Valid`) and use DTOs, never entities, in the API.
+- Every error is a `ProblemDetail`, produced by `config/GlobalExceptionHandler`.
+- The security chain denies every route that is not explicitly opened in `config/SecurityConfig`.
+- Time comes from the injected `Clock` (`config/TimeConfig`), so tests can fix it.
 
 ---
 
-## Related Events
+## Data ownership
 
-The planned backend will provide related-event discovery using available catalog information such as:
-
-- categories
-- tags
-- location
-- schedule
-- other relevant event attributes
-
-The exact similarity and ranking implementation may evolve independently of the public product behaviour.
-
----
-
-## Authentication and Users
-
-User registration and JWT-based authentication are in progress. The design, decisions and status are in [Authentication](../docs/architecture/authentication.md).
-
-Authentication is not required for public event discovery.
-
-Authenticated users can access account-specific functionality including:
-
-- saving events
-- viewing their saved events
-- commenting on events
-
-User-specific state belongs to the backend.
-
----
-
-## Saved Events
-
-Saving an event creates backend-owned user state referencing a stable published
-Loc event or occurrence identity. The choice of event versus occurrence for
-each user action belongs to the backend design.
-
-Saved events remain available in the user's account even when the event later becomes:
-
-- past
-- cancelled
-
-The event's current status should still be visible to the user.
-
-Saving an event does not modify the catalog event itself.
-
----
-
-## Comments
-
-Authenticated users can comment on events.
-
-Comments and their moderation state are owned by the backend.
-
-Comment functionality is separate from catalog ownership and does not modify event data.
-
----
-
-## Administration
-
-Administrators use a separate administration interface from normal users.
-
-Administrative behaviour can include:
-
-- responding to platform messages
-- moderating comments
-- reviewing reports
-- hiding an event from the Loc product when necessary
-
-Administrative actions that affect visibility do not modify the source catalog record.
-
-For example, hiding an event is backend-owned state keyed by `loc_event_id`
-without modifying catalog rows or publication source snapshots.
-
-Product hiding for discovery list purposes applies at `loc_event_id` unless a future design explicitly supports hiding individual occurrences.
-
----
-
-## Data Ownership
-
-The platform separates catalog data from application data.
-
-### Data application owns
-
-- external event collection
-- normalization
-- enrichment
-- event publication
-- organizers
-- categories
-- tags
-- catalog event state
-
-### Backend owns
-
-- users
-- authentication
-- saved events
-- comments
-- reports
-- moderation
-- administrative product state
-
-Notifications are planned, but their triggers, channels, and persistence model
-have not been decided. Attendance or "going" is not part of the current backend
-scope.
-
----
-
-## PostgreSQL
-
-Loc uses one PostgreSQL database with separate ownership boundaries.
-
-Conceptually:
+Loc uses one PostgreSQL database with separate ownership per schema:
 
 ```text
 PostgreSQL
-├── catalog
-│   └── intermediate normalized data owned by the data application
-├── publication
-│   └── qualified product read contract owned by the data application
-│
-└── app
-    └── application data owned by the backend (users, and later user activity)
+├── catalog      intermediate normalized data, owned by the data application
+├── publication  qualified product read contract, owned by the data application
+└── app          application data, owned by the backend
 ```
 
-The data application has write access to catalog data.
+- The backend **reads** `publication` through `JdbcClient` and never writes to it. Product reads never use the intermediate `catalog` schema.
+- The backend **owns** `app`, migrated by its own Flyway history table `app.flyway_backend_history`. Entities in `app` use JPA.
+- Tables in `app` that reference published events store `loc_event_id` without a foreign key into `publication`.
 
-The backend reads qualified publication data through JdbcClient and owns the
-`app` schema, migrated by its own Flyway history (`app.flyway_backend_history`).
-Product event reads do not rely on intermediate catalog rows.
-
-This keeps service responsibilities separate without requiring separate databases.
+Published data keeps snapshots of occurrences after they end or are withdrawn, so user-owned references (such as saved events) can still show the event and its current state.
 
 ---
 
-## RabbitMQ
+## Discovery behaviour
 
-RabbitMQ is used for asynchronous work where components need to react to events or changes.
+- Anonymous users can browse and search without an account.
+- Lists are grouped by `loc_event_id`: one card per logical event, showing the earliest occurrence that matches the filters. Pagination and totals count events, not occurrences.
+- Occurrence-level filters (dates, "this weekend") are applied to occurrences first; an event is shown when at least one occurrence matches.
+- An event detail page shows the shared event information once and lists its upcoming occurrences, with per-date weather when the data application attached a forecast.
+- Organizer identity comes from the data application (`locOrganizerId`, name, optional description and site). The backend never infers an organizer site from other fields.
 
-It is not the source of truth for the event catalog and is not required for normal event reads.
+Endpoint details, parameters and response shapes are in the [Discovery API](docs/discovery.md).
 
-Normal product reads follow:
+---
 
-```text
-Backend
-   ↓
-Qualified Publication
+## Tests
+
+Integration tests run against real PostgreSQL and Redis containers (Testcontainers), so Docker must be running.
+
+```bash
+./mvnw clean test checkstyle:check
 ```
 
-RabbitMQ may later carry messages such as catalog changes when asynchronous backend behaviour needs them.
+CI runs Checkstyle and the tests on every pull request that changes `backend/`.
 
 ---
 
-## Backend Structure
+## Planned features
 
-The backend is organized primarily by feature.
+These features are part of the product design and are not built yet:
 
-Conceptually:
-
-```text
-backend
-├── event
-├── organizer
-├── category
-├── user
-├── comment
-├── admin
-└── config
-```
-
-Each feature owns the controller, business logic, persistence and DTOs required for that area.
-
-Cross-cutting infrastructure belongs outside individual product features.
-
----
-
-## API Principles
-
-Backend APIs should:
-
-- expose product behaviour rather than provider-specific external data
-- keep HTTP concerns in controllers
-- keep business rules in services
-- keep persistence concerns in repositories
-- use DTOs as the public API contract
-- validate input at the API boundary
-- return explicit event state where it affects product behaviour
-- preserve clear ownership between catalog data and backend-owned state
-
-The generated OpenAPI specification documents the implemented discovery endpoints.
-See the linked API guide for examples and product semantics. Authentication
-endpoints and their security scheme remain future work.
-
-This document defines high-level backend behaviour and ownership rather than individual endpoint implementation.
-
----
-
-## Documentation Rule
-
-High-level documentation should describe stable product behaviour and ownership boundaries.
-
-Implementation-specific details should only be documented when they are actively maintained.
+- **Login and tokens:** see the planned design in [Authentication](../docs/architecture/authentication.md).
+- **Saved events:** backend-owned user state referencing a published Loc event or occurrence. Saved events stay visible when the event later becomes past or cancelled, together with its current state.
+- **Comments:** authenticated users comment on events; comments and their moderation state belong to the backend.
+- **Administration:** a separate admin interface for moderating comments, reviewing reports and hiding events. Hiding is backend-owned state keyed by `loc_event_id`; it never modifies catalog or publication data.
+- **Related events:** suggestions based on categories, tags, location and schedule.

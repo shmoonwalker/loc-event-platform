@@ -1,236 +1,201 @@
 # Authentication
 
-## Purpose
-
-This document is the source of truth for how users register, verify their email, sign in, stay signed in, and recover their account. It records the decisions and the reasons behind them. GitHub issues track the delivery work; when an issue and this document disagree, update one of them so they match again.
-
-Epic: #63 (backend), #70 (frontend).
-
----
-
-## Status
-
-| Part | Issue | Status |
-|---|---|---|
-| Foundation: `app` schema, Flyway, `app_user`, JPA, error format | #64 | Implemented |
-| Register with email, password and display name; shared rate limiter | #65 | Planned (next) |
-| Email verification | #78 | Planned |
-| Login, JWT access tokens, roles | #66 | Planned |
-| Refresh tokens, rotation, reuse detection, logout | #67 | Planned |
-| Google sign-in | #68 | Planned |
-| Forgot and reset password | #69 | Planned |
-
-Build order: #64 → #65 → #78 → #66 → #67 → #68 → #69. Login needs verification, so #78 comes before #66.
+How users register with Loc, how their passwords are stored, and how the authentication endpoints are protected against abuse. The last section describes the design for the parts that are not built yet: email verification, login, tokens, Google sign-in and password reset.
 
 ---
 
 ## Principles
 
-- **No account enumeration.** No response, error or timing difference may reveal whether an email is registered. Only the owner of the inbox learns what happened, by email.
-- **Spring Security first.** Use its building blocks (password encoders, `AuthenticationManager`, resource-server JWT, entry points) before writing custom security code.
-- **Store secrets only as hashes.** Passwords use BCrypt; random tokens (refresh, verification, reset) use SHA-256.
-- **Every public auth endpoint is rate limited** before it ships.
+- **No account enumeration.** No response, error or timing difference reveals whether an email is registered. Only the owner of the inbox learns what happened, by email.
+- **Spring Security first.** Its building blocks (password encoders, `AuthenticationManager`, resource-server JWT, entry points) are used before any custom security code.
+- **Secrets are stored only as hashes.** Passwords use BCrypt; random tokens (refresh, verification, reset) use SHA-256.
+- **Every public auth endpoint is rate limited.**
 - **One error format.** Every error response is an RFC 7807 `ProblemDetail`.
-- **Deny by default.** The security chain rejects every route that is not explicitly opened, and each auth route is opened on its own.
+- **Deny by default.** The security chain rejects every route that is not explicitly opened, and each auth route is opened on its own. `/api/auth/**` is never opened as a whole.
 
 ---
 
-## Request path in production
+## Registration
 
-```text
-Browser → Railway edge proxy → frontend nginx (/api/) → backend (Railway private network)
+`POST /api/auth/register`
+
+```json
+{ "email": "anouk.devries@example.com", "password": "correct-horse-battery", "displayName": "Anouk de Vries" }
 ```
 
-The backend never sees the browser's connection. `request.getRemoteAddr()` is the nginx container unless forwarded headers are resolved.
+1. The client IP is checked against the register rate limit. Over the limit returns `429`.
+2. The body is validated. Invalid input or malformed JSON returns `400`.
+3. The email is normalised and the password is hashed. The hash is computed **before** the duplicate check, so new and existing emails take the same time.
+4. A new email creates the user with role `USER`. An existing email creates nothing.
+5. The response is always `202 Accepted` with an empty body: no id and no account details, so the response never reveals which emails have an account.
 
-- `server.forward-headers-strategy: native` lets Tomcat walk `X-Forwarded-For` from the right, skip trusted private proxies, and expose the real client IP through `getRemoteAddr()`.
-- Code never parses `X-Forwarded-For` itself; its left-most entries are whatever the client sent.
-- After a change to the proxy chain, verify in production that the resolved IP is the real client IP and that a forged `X-Forwarded-For` header does not change it.
+Two simultaneous registrations for the same email are resolved by the database: the unique constraint `app_user_email_key` rejects the second insert, and that violation is treated like an existing email. Any other constraint violation is a bug and surfaces as an error.
+
+### Validation
+
+| Field | Rules |
+|---|---|
+| `email` | Required, valid email address, at most 254 characters |
+| `password` | Required, at least 10 characters, at most 72 bytes in UTF-8 |
+| `displayName` | Required, not blank, at most 100 characters |
+
+Validation errors return a `ProblemDetail` with an `errors` map of field name to message.
+
+### Code
+
+| Class | Role |
+|---|---|
+| `user/controller/AuthController` | HTTP endpoint; applies the rate limit, then calls the service |
+| `user/dto/request/RegisterRequest` | Request body and its validation rules |
+| `user/service/RegistrationService` | Normalises, hashes, checks for duplicates and saves |
+| `user/repository/UserAccountRepository` | Spring Data JPA repository for `app_user` |
+| `user/model/UserAccount` | JPA entity |
+
+---
+
+## Passwords and emails
+
+- **Encoder:** `DelegatingPasswordEncoder` with `bcrypt` (strength 12) as the only and default encoder. Hashes are stored as `{bcrypt}$2a$12$…`; the prefix allows a later algorithm change without breaking stored passwords.
+- **Length limit in bytes:** BCrypt uses only the first 72 bytes, and Spring Security rejects longer input with an exception. The limit is therefore checked in bytes, so a password with multi-byte characters (such as `€` or emoji) gets a `400` instead of causing a `500`.
+- **Emails** are trimmed and lower-cased (`UserAccount.normalizeEmail`) before every write and lookup. `Sam@x.com` and `sam@x.com` are the same account.
 
 ---
 
 ## Data model
 
-All authentication tables live in the backend-owned `app` schema. Flyway history for this schema is `app.flyway_backend_history`, separate from the data application's migrations.
+Authentication tables live in the backend-owned `app` schema, migrated by Flyway with its own history table `app.flyway_backend_history`.
 
-### `app.app_user` (implemented)
+### `app.app_user`
 
 | Column | Notes |
 |---|---|
 | `id` | UUIDv7, generated by Hibernate; the database default `uuidv7()` covers manual inserts |
 | `email` | Unique; a CHECK keeps it lower-case, which makes uniqueness case-insensitive |
-| `password_hash` | Nullable for accounts that only use Google |
+| `password_hash` | Nullable, for accounts that only use Google |
 | `display_name` | 1–100 characters after trimming |
 | `role` | `USER` or `ADMIN`; new accounts are always `USER` |
 | `created_at` | Set by the application from the injected `Clock` |
 
-### Planned additions
-
-| Change | Issue | Notes |
-|---|---|---|
-| `app_user.email_verified_at` | #78 | `null` means unverified |
-| `app.email_verification_token` | #78 | `token_hash`, `user_id`, `expires_at`, `used_at` |
-| `app.refresh_token` | #67 | `token_hash`, `family_id`, `user_id`, `expires_at`, `revoked_at`, `replaced_by` |
-| `app_user.google_sub` | #68 | Unique. Added together with a CHECK that `password_hash` or `google_sub` is set |
-| `app.password_reset_token` | #69 | `token_hash`, `user_id`, `expires_at`, `used_at` |
-
-Tables that reference published events store `loc_event_id` without a foreign key into `publication`, which the data application owns.
-
----
-
-## Passwords
-
-- Encoder: `DelegatingPasswordEncoder` with `bcrypt` (strength 12) as the only and default encoder. Hashes are stored as `{bcrypt}$2a$12$…`; the prefix allows a later algorithm change without breaking stored passwords.
-- Rule: at least 10 characters and at most **72 bytes** in UTF-8. BCrypt uses only the first 72 bytes, and Spring Security rejects longer input with an exception, so the limit is checked in bytes.
-- Emails are trimmed and lower-cased (`UserAccount.normalizeEmail`) before every write and lookup.
-
----
-
-## Flows
-
-### Register (#65)
-
-`POST /api/auth/register` with email, password and display name.
-
-1. Validate input; invalid input returns `400`.
-2. Normalise the email and hash the password. The hash is computed **before** the duplicate check, so both paths take the same time.
-3. New email: create the user (`USER`, unverified) and send a verification email (#78).
-4. Existing email: create nothing; email the existing owner instead (#78).
-5. Respond `202 Accepted` with the same body in every case: no id and no account details.
-
-Two simultaneous registrations are resolved by the unique constraint: the violation is caught and treated like an existing email.
-
-### Email verification (#78)
-
-- The verification email links to a frontend page (`FRONTEND_URL/verify-email?token=…`). That page calls `POST /api/auth/verify-email`. A plain `GET` link must never verify, because mail security scanners open links and would use up the token.
-- Token: 32 random bytes from `SecureRandom`, URL-safe Base64, stored as a SHA-256 hash, single use, valid for 24 hours. A new token invalidates the user's older unused ones.
-- Expired, used and unknown tokens get the same error.
-- `POST /api/auth/resend-verification` always returns the same response.
-- Register sends, depending on the account state:
-
-| Account state | Email sent |
-|---|---|
-| New | Verification link |
-| Exists, unverified | Fresh verification link |
-| Exists, verified | "Someone tried to sign up with your address" with a link to password reset |
-
-- Mail is sent asynchronously after the transaction commits, so a slow mail server neither breaks registration nor changes its timing.
-- Local development uses Mailpit; no real email is sent.
-
-### Login (#66)
-
-`POST /api/auth/login` with email and password.
-
-- Authentication goes through Spring Security's `AuthenticationManager` with `DaoAuthenticationProvider` and an application `UserDetailsService`. The provider already compares a dummy hash when the email is unknown, so unknown and wrong-password logins take the same time.
-- Wrong email and wrong password return the same `401` "invalid credentials".
-- Email verification is checked **after** the password is accepted. It must not be mapped to `UserDetails.isEnabled()`: the provider checks account status before the password, which would reveal unverified accounts to anyone. After a correct password, an unverified account gets `403` saying the email is not verified.
-- Success returns a JWT access token and sets the refresh cookie (#67).
-
-### Access tokens (#66)
-
-- Issued and validated with `spring-boot-starter-oauth2-resource-server` (`JwtEncoder` / `JwtDecoder`); there is no custom JWT filter.
-- Signed with `JWT_SECRET` (at least 256 bits). The application refuses to start without a valid secret.
-- Lifetime 15 minutes by default. The token carries a `roles` claim.
-- The frontend keeps the access token in memory only.
-- `GET /api/auth/me` returns the current user without password material.
-
-### Refresh tokens and logout (#67)
-
-- `POST /api/auth/refresh` exchanges a valid refresh token for a new access token **and** a new refresh token (rotation). The old refresh token stops working.
-- Each login starts a token family. Reusing an already rotated token revokes the **whole family**, since it means the token was stolen.
-- `POST /api/auth/logout` revokes the current family.
-- Lifetime from env, default 14 days.
-- Delivered as a cookie: `HttpOnly; Secure; SameSite=Strict; Path=/api/auth; Max-Age=<refresh TTL>`. The dev profile may relax `Secure` for localhost.
-- The refresh endpoint is authenticated by a cookie, so it is the one place where CSRF matters. `SameSite=Strict` and the narrow path cover it.
-
-### Google sign-in (#68)
-
-- Spring Security OAuth2 Client with OpenID Connect; the ID token's issuer, audience and expiry are verified.
-- Returning users are matched on Google's `sub`, never on email.
-- A new Google user is created as `USER` and verified, but only if Google's `email_verified` claim is true.
-- If the Google email already belongs to a password account, nothing is created and the user is redirected with `error=account_exists`. Linking Google to an existing account happens only through an explicit, authenticated linking flow.
-- After the callback, the backend sets the refresh cookie and redirects to `FRONTEND_URL/auth/callback`; the frontend then calls `/api/auth/refresh`. Tokens never appear in a URL.
-
-### Forgot and reset password (#69)
-
-- `POST /api/auth/forgot-password` always returns the same response; the email is sent only when the account exists.
-- Reset token: same design as the verification token, valid for 30 minutes, single use.
-- `POST /api/auth/reset-password` validates the token, stores the new BCrypt hash, invalidates the token, and revokes all of the user's refresh tokens.
-- A successful reset also marks an unverified account as verified, because the user proved they control the inbox.
-
----
-
-## Endpoints
-
-| Method | Path | Auth | Issue |
-|---|---|---|---|
-| POST | `/api/auth/register` | Public | #65 |
-| POST | `/api/auth/verify-email` | Public | #78 |
-| POST | `/api/auth/resend-verification` | Public | #78 |
-| POST | `/api/auth/login` | Public | #66 |
-| GET | `/api/auth/me` | Access token | #66 |
-| POST | `/api/auth/refresh` | Refresh cookie | #67 |
-| POST | `/api/auth/logout` | Refresh cookie | #67 |
-| GET | Spring Security OAuth2 routes | Public | #68 |
-| POST | `/api/auth/forgot-password` | Public | #69 |
-| POST | `/api/auth/reset-password` | Public | #69 |
-
-Each route is opened individually in the security chain; `/api/auth/**` is never opened as a whole.
-
----
-
-## Responses and errors
-
-Every error is a `ProblemDetail`. Spring Security errors are raised in filters before `@RestControllerAdvice` runs, so a custom `AuthenticationEntryPoint` (401) and `AccessDeniedHandler` (403) write the same format (#66).
-
-| Status | When |
-|---|---|
-| `202` | Register, resend verification, forgot password: same body whatever the account state |
-| `400` | Invalid input or malformed JSON; invalid, expired or used verification or reset token |
-| `401` | Invalid credentials; missing, invalid or expired access token |
-| `403` | Role not allowed; correct password but email not verified |
-| `429` | Rate limit exceeded, with a `Retry-After` header in seconds |
+Administrators are promoted manually in SQL. Registration never accepts a role.
 
 ---
 
 ## Rate limiting
 
-- **Algorithm:** token bucket via Bucket4j. A small burst is allowed, then tokens refill steadily, so there is no burst at window edges as with a fixed window.
-- **Storage:** Redis, through Bucket4j's Lettuce proxy manager. Every backend instance shares the counters, they survive redeploys, and updates are atomic. Keys expire once their bucket would be full again.
-- **Redis unavailable:** fail open. The request is allowed and a warning is logged; the limiter is a defence layer, and an outage should not block sign-ups.
-- **Usage:** one `RateLimiter` component, called explicitly by controllers with a named policy and a key, before any expensive work (BCrypt, database, email).
-- **Configuration:** limits come from application config, so tests can use small limits.
-- **Scope:** this protects specific endpoints from abuse. Protection against floods belongs at the edge proxy or CDN.
+Public auth endpoints are rate limited with a token bucket per key.
 
-| Policy | Limit | Key | Issue |
-|---|---|---|---|
-| Register | 3 / minute | IP | #65 |
-| Resend verification | 3 / minute | IP | #78 |
-| Emails to one address | 3 / hour | Email | #78 |
-| Login | 5 / minute | IP + email | #66 |
-| Login, distributed guessing | 20 / hour | Email | #66 |
-| Forgot password | 5 / minute | IP + email | #69 |
+- **Algorithm:** token bucket via Bucket4j. A bucket holds a few tokens, each request takes one, and tokens refill steadily. Unlike a fixed window, there is no double burst at the window edge.
+- **Storage:** Redis, through Bucket4j's Lettuce integration. All backend instances share the buckets, the buckets survive redeploys, and each update is atomic in Redis. A key expires once its bucket would be full again.
+- **Redis unavailable:** fail open. The request is allowed and a warning is logged. The limiter is a defence layer; a Redis outage must not block sign-ups. The backend connects to Redis on first use, so it also starts while Redis is down. Redis calls time out after 500 ms.
+- **Usage:** controllers call `RateLimiter.consume(policy, key)` before any expensive work (BCrypt, database, email). An empty bucket throws `RateLimitExceededException`, which becomes `429 Too Many Requests` with a `Retry-After` header in seconds.
+- **Configuration:** each policy's limit comes from `app.rate-limit.policies.<policy>` (`capacity` and `period`). The application refuses to start when a policy has no configuration.
+- **Scope:** this protects specific endpoints from abuse. Protection against floods belongs at the edge proxy.
 
-Accounts are never locked after failed logins; a lockout would let anyone lock a victim out. The login limits slow attackers down instead.
+| Policy | Limit | Key |
+|---|---|---|
+| `REGISTER` | 3 per minute | Client IP |
+
+Redis keys have the form `rate-limit:<policy>:<key>`, for example `rate-limit:register:203.0.113.5`.
+
+### Client IP behind the proxy
+
+In production a request travels:
+
+```text
+Browser → Railway edge proxy → frontend nginx (/api/) → backend (Railway private network)
+```
+
+The backend never sees the browser's connection, so `request.getRemoteAddr()` would be the nginx container and every user would share one bucket.
+
+- nginx appends the connecting address to `X-Forwarded-For` (`frontend/nginx.conf.template`).
+- `server.forward-headers-strategy: native` makes Tomcat read `X-Forwarded-For` from the right, skip trusted private proxies, and expose the real client IP through `getRemoteAddr()`.
+- Code never parses `X-Forwarded-For` itself; its left-most entries are whatever the client sent.
+- Spring's `ForwardedHeaderFilter` is disabled (`config/OpenApiConfig`). The Scalar API-docs starter would otherwise register it, and it trusts the left-most entry, which would let anyone fake their IP and bypass rate limits. `RegisterRateLimitHttpTest` covers this.
+- After any change to the proxy chain, check in production that the resolved IP is the real client IP and that a forged `X-Forwarded-For` header does not change it.
+
+---
+
+## Responses and errors
+
+| Status | When |
+|---|---|
+| `202` | Registration accepted, whatever the account state |
+| `400` | Invalid input or malformed JSON |
+| `429` | Rate limit exceeded, with a `Retry-After` header in seconds |
 
 ---
 
 ## Configuration
 
-| Variable | Used by | Notes |
+| Variable | Used for | Notes |
 |---|---|---|
-| `DB_*` / `POSTGRES_*` | All | Existing database connection |
-| `REDIS_URL` | Rate limiting | Railway Redis on the private network; password required |
-| `JWT_SECRET` | Access tokens | At least 256 bits; startup fails without it |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Email | Mailpit locally |
-| `FRONTEND_URL` | Email links, Google redirect | |
-| Google client id and secret | Google sign-in | |
-| Access and refresh token lifetimes | Tokens | Defaults 15 minutes and 14 days |
+| `DB_*` / `POSTGRES_*` | Database | Shared with the rest of the backend |
+| `REDIS_URL` | Rate limiting | Defaults to `redis://localhost:6379`. In production: Railway Redis on the private network, with password |
 
 ---
 
-## Open topics
+## Planned design
 
-- **Creating administrators.** There is no flow yet. Accounts are promoted manually in SQL; registration never accepts a role.
-- **Unverified accounts.** Whether to delete accounts that stay unverified for a long time is not decided.
-- **Database users per application.** Both applications currently connect with the same database user. Separate users (backend: read `publication`, write `app`; data: write `catalog` and `publication`) are a later hardening step for both environments.
+The following parts are designed but not built. They follow the principles above.
+
+### Email verification
+
+- `app_user.email_verified_at` (`null` means unverified) and `app.email_verification_token` (`token_hash`, `user_id`, `expires_at`, `used_at`).
+- Registration sends an email depending on the account state:
+
+| Account state | Email sent |
+|---|---|
+| New | Verification link |
+| Exists, unverified | Fresh verification link |
+| Exists, verified | "Someone tried to sign up with your address", with a link to password reset |
+
+- The link opens a frontend page (`FRONTEND_URL/verify-email?token=…`) that calls `POST /api/auth/verify-email`. A plain `GET` link never verifies, because mail security scanners open links and would use up the token.
+- Token: 32 random bytes from `SecureRandom`, URL-safe Base64, stored as a SHA-256 hash, single use, valid for 24 hours. A new token invalidates older unused ones. Expired, used and unknown tokens get the same error.
+- `POST /api/auth/resend-verification` always returns the same response.
+- Mail is sent asynchronously after the transaction commits, so a slow mail server neither breaks registration nor changes its timing. Local development uses Mailpit.
+
+### Login and access tokens
+
+- `POST /api/auth/login` authenticates through Spring Security's `AuthenticationManager` with `DaoAuthenticationProvider` and an application `UserDetailsService`. The provider compares a dummy hash when the email is unknown, so unknown and wrong-password logins take the same time.
+- Wrong email and wrong password return the same `401`.
+- Email verification is checked **after** the password is accepted, and is not mapped to `UserDetails.isEnabled()`: the provider checks account status before the password, which would reveal unverified accounts to anyone. A correct password on an unverified account returns `403`.
+- Access tokens are JWTs issued and validated with `spring-boot-starter-oauth2-resource-server`, signed with `JWT_SECRET` (at least 256 bits; startup fails without it), valid for 15 minutes, with a `roles` claim. The frontend keeps them in memory only.
+- `GET /api/auth/me` returns the current user without password material.
+- Spring Security errors are raised in filters before `@RestControllerAdvice` runs, so a custom `AuthenticationEntryPoint` (`401`) and `AccessDeniedHandler` (`403`) write `ProblemDetail` responses.
+
+### Refresh tokens and logout
+
+- `app.refresh_token` (`token_hash`, `family_id`, `user_id`, `expires_at`, `revoked_at`, `replaced_by`).
+- `POST /api/auth/refresh` exchanges a refresh token for a new access token and a new refresh token (rotation). Each login starts a token family; reusing a rotated token revokes the whole family.
+- `POST /api/auth/logout` revokes the current family.
+- Delivered as a cookie: `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`, default lifetime 14 days. `SameSite=Strict` and the narrow path protect the cookie-authenticated refresh endpoint against CSRF.
+
+### Google sign-in
+
+- Spring Security OAuth2 Client with OpenID Connect. `app_user.google_sub` (unique), together with a CHECK that `password_hash` or `google_sub` is set.
+- Returning users are matched on Google's `sub`, never on email. A new Google user is created verified, but only when Google's `email_verified` claim is true.
+- If the Google email already belongs to a password account, nothing is created and the user is redirected with `error=account_exists`. Linking happens only through an explicit, authenticated flow.
+- After the callback, the backend sets the refresh cookie and redirects to `FRONTEND_URL/auth/callback`. Tokens never appear in a URL.
+
+### Forgot and reset password
+
+- `app.password_reset_token` (`token_hash`, `user_id`, `expires_at`, `used_at`), same design as the verification token, valid for 30 minutes.
+- `POST /api/auth/forgot-password` always returns the same response; the email is sent only when the account exists.
+- `POST /api/auth/reset-password` stores the new hash, invalidates the token and revokes all refresh tokens. It also marks an unverified account as verified.
+
+### Further rate limits
+
+| Policy | Limit | Key |
+|---|---|---|
+| Resend verification | 3 per minute | IP |
+| Emails to one address | 3 per hour | Email |
+| Login | 5 per minute | IP + email |
+| Login, distributed guessing | 20 per hour | Email |
+| Forgot password | 5 per minute | IP + email |
+
+Accounts are never locked after failed logins; a lockout would let anyone lock a victim out. The login limits slow attackers down instead.
+
+### Open questions
+
+- Whether accounts that stay unverified for a long time are deleted.
+- Separate database users per application (backend: read `publication`, write `app`; data: write `catalog` and `publication`).

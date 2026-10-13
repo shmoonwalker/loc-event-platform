@@ -1,61 +1,57 @@
 # Loc Event Platform
 
-Loc is a local-events platform for discovering events and interacting with them through a single product.
+Loc is a platform for discovering local events in the Netherlands. It collects events from external sources, publishes the ones that meet its quality rules, and lets visitors search, filter and explore them.
 
-This repository is the personal continuation and redesign of the original HackYourFuture Class 55 Group A final project.
+Loc started as the HackYourFuture Class 55 Group A final project and is now independently designed and maintained.
 
-## Current Direction
+## Architecture
 
-The platform is being redesigned around three clear application areas:
+Loc consists of three applications:
 
-- **Backend** — Java Spring Boot product API
-- **Data** — separate Java worker for external event collection and catalog publication
-- **Frontend** — user interface communicating only with the backend API
+| Application | Technology | Responsibility |
+|---|---|---|
+| [Backend](backend/README.md) | Java 25, Spring Boot | Product API: event discovery, user accounts, authentication |
+| [Data](data/README.md) | Java 25, Spring Boot | Collects external events, normalizes and enriches them, publishes qualified events |
+| [Frontend](frontend/README.md) | Angular, Tailwind CSS | User interface; talks only to the backend API |
 
-Supporting infrastructure includes PostgreSQL, S3-compatible object storage, Redis, and RabbitMQ.
+Supporting infrastructure: PostgreSQL, Redis, RabbitMQ and S3-compatible object storage (Cloudflare R2).
 
-For the high-level technical design, see:
+```text
+External sources → Data → PostgreSQL (publication) → Backend API → Frontend
+```
 
-**[System Architecture](docs/architecture/system-architecture.md)**
+The [system architecture](docs/architecture/system-architecture.md) describes the components and their boundaries.
 
-## Repository Structure
+## Repository structure
 
 ```text
 .
 ├── backend/      Spring Boot product API
-├── data/         Data application / ingestion work
-├── frontend/     Frontend application
-├── docs/         Cross-system technical documentation
+├── data/         Data collection and publication application
+├── frontend/     Angular application
+├── docs/         Cross-system architecture documentation
+├── scripts/      Local development scripts
 └── screenshots/  Project screenshots
 ```
 
+## Getting started
+
+Requirements: Docker, Java 25 and Node.js.
+
+1. Copy `.env.example` to `.env` and fill in the values.
+2. Start the local infrastructure:
+
+   ```bash
+   docker compose up -d db redis rabbitmq
+   ```
+
+3. Start the applications by following their guides: [data](data/README.md), [backend](backend/README.md) and [frontend](frontend/README.md).
+
 ## Documentation
 
-- [System Architecture](docs/architecture/system-architecture.md)
-- [Data Architecture](docs/architecture/data-architecture.md)
+- [System architecture](docs/architecture/system-architecture.md)
+- [Data architecture](docs/architecture/data-architecture.md)
 - [Authentication](docs/architecture/authentication.md)
-- [Backend Guide](backend/README.md)
-- [Data Guide](data/README.md)
-- [Frontend Guide](frontend/README.md)
-
-More focused architecture documents will be added only when a part of the system needs a detailed design.
-
-## Project Status
-
-The data worker now collects RVO and Ticketmaster events and publishes qualified
-occurrences through the `publication` schema. The old backend implementation
-has been removed; a small Spring Boot shell retains security and OpenAPI
-configuration for the redesign. The frontend currently shows a holding page.
-
-Current redesign priorities include:
-
-- rebuilding the backend product API and its own application schema
-- redesigning the frontend, admin, and user experiences
-
-Discovery UX: grouped event cards on the home list and a full date/time list on event detail ([backend guide](backend/README.md)).
-
-## Background
-
-Loc started as the HackYourFuture Class 55 Group A final project.
-
-The current repository keeps the useful parts of that foundation while evolving the project into an independently designed and maintained platform.
+- [Backend guide](backend/README.md) and [Discovery API](backend/docs/discovery.md)
+- [Data guide](data/README.md)
+- [Frontend guide](frontend/README.md)

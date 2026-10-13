@@ -9,7 +9,6 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 | `GET /api/home?city=amsterdam` | Homepage highlight rails. Only rails with events are returned. |
 | `GET /api/events/filter-options` | Values and labels for the filter controls. |
 | `GET /api/cities?q=amster` | Up to ten city suggestions for the city picker. |
-
 | `GET /api/events/{id}` | Event page: description, address, coordinates, categories, tags, images, organizers, every upcoming date, forecast (`weather`, null when none). `404` when unknown or over. |
 | `GET /api/organizers/{id}` | Organizer profile (`name`, `description`, `site`) plus a page of upcoming event cards in `events` (same `page`/`size` and shape as `/api/events`). Organizer ids come from `EventDetail.organizers[].id`. `404` when none. |
 | `GET /api/categories`, `GET /api/tags` | `{ value, label }` lists, same as in filter-options. |
@@ -127,7 +126,8 @@ event/
   controller/  PublicBrowseController (HTTP), BrowseCriteriaParser (validation → BrowseCriteria)
   service/     EventBrowseService (time windows, sort), HomeService (rails), FilterOptionsService
   repository/  PublicEventRepository (SQL via JdbcClient), EventCardRowMapper
-  model/       BrowseCriteria, TimeWindow (Amsterdam calendar), When, Place, EventSort, RailMode
+  model/       BrowseCriteria, TimeWindow (Amsterdam calendar), When, Place, EventSort, RailMode,
+               City, EventCategory, EventTag
   dto/         request query records, response records
 ```
 
