@@ -37,6 +37,9 @@ public class UserAccount {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
     public UserAccount(String email, String displayName, String passwordHash, Instant createdAt) {
         this.email = normalizeEmail(email);
         this.displayName = displayName.trim();
@@ -48,5 +51,15 @@ public class UserAccount {
 
     public static String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
+    }
+
+    public void markEmailVerified(Instant now) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = now.truncatedTo(ChronoUnit.MICROS);
+        }
     }
 }
