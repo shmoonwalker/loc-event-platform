@@ -1,15 +1,15 @@
 # Authentication
 
-How users register with Loc, how their passwords are stored, and how the authentication endpoints are protected against abuse. The last section describes the design for the parts that are not built yet: email verification, login, tokens, Google sign-in and password reset.
+How users register with Loc, how their passwords are stored, and how registration is protected against abuse.
 
 ---
 
 ## Principles
 
-- **No account enumeration.** No response, error or timing difference reveals whether an email is registered. Only the owner of the inbox learns what happened, by email.
-- **Spring Security first.** Its building blocks (password encoders, `AuthenticationManager`, resource-server JWT, entry points) are used before any custom security code.
-- **Secrets are stored only as hashes.** Passwords use BCrypt; random tokens (refresh, verification, reset) use SHA-256.
-- **Every public auth endpoint is rate limited.**
+- **No account enumeration.** Registration returns the same response and follows the same password-hashing path whether an email is new or already registered.
+- **Spring Security first.** Passwords are encoded with Spring Security's password encoder.
+- **Secrets are stored only as hashes.** Passwords use BCrypt.
+- **The public registration endpoint is rate limited.**
 - **One error format.** Every error response is an RFC 7807 `ProblemDetail`.
 - **Deny by default.** The security chain rejects every route that is not explicitly opened, and each auth route is opened on its own. `/api/auth/**` is never opened as a whole.
 
@@ -133,69 +133,3 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 | `REDIS_URL` | Rate limiting | Defaults to `redis://localhost:6379`. In production: Railway Redis on the private network, with password |
 
 ---
-
-## Planned design
-
-The following parts are designed but not built. They follow the principles above.
-
-### Email verification
-
-- `app_user.email_verified_at` (`null` means unverified) and `app.email_verification_token` (`token_hash`, `user_id`, `expires_at`, `used_at`).
-- Registration sends an email depending on the account state:
-
-| Account state | Email sent |
-|---|---|
-| New | Verification link |
-| Exists, unverified | Fresh verification link |
-| Exists, verified | "Someone tried to sign up with your address", with a link to password reset |
-
-- The link opens a frontend page (`FRONTEND_URL/verify-email?token=…`) that calls `POST /api/auth/verify-email`. A plain `GET` link never verifies, because mail security scanners open links and would use up the token.
-- Token: 32 random bytes from `SecureRandom`, URL-safe Base64, stored as a SHA-256 hash, single use, valid for 24 hours. A new token invalidates older unused ones. Expired, used and unknown tokens get the same error.
-- `POST /api/auth/resend-verification` always returns the same response.
-- Mail is sent asynchronously after the transaction commits, so a slow mail server neither breaks registration nor changes its timing. Local development uses Mailpit.
-
-### Login and access tokens
-
-- `POST /api/auth/login` authenticates through Spring Security's `AuthenticationManager` with `DaoAuthenticationProvider` and an application `UserDetailsService`. The provider compares a dummy hash when the email is unknown, so unknown and wrong-password logins take the same time.
-- Wrong email and wrong password return the same `401`.
-- Email verification is checked **after** the password is accepted, and is not mapped to `UserDetails.isEnabled()`: the provider checks account status before the password, which would reveal unverified accounts to anyone. A correct password on an unverified account returns `403`.
-- Access tokens are JWTs issued and validated with `spring-boot-starter-oauth2-resource-server`, signed with `JWT_SECRET` (at least 256 bits; startup fails without it), valid for 15 minutes, with a `roles` claim. The frontend keeps them in memory only.
-- `GET /api/auth/me` returns the current user without password material.
-- Spring Security errors are raised in filters before `@RestControllerAdvice` runs, so a custom `AuthenticationEntryPoint` (`401`) and `AccessDeniedHandler` (`403`) write `ProblemDetail` responses.
-
-### Refresh tokens and logout
-
-- `app.refresh_token` (`token_hash`, `family_id`, `user_id`, `expires_at`, `revoked_at`, `replaced_by`).
-- `POST /api/auth/refresh` exchanges a refresh token for a new access token and a new refresh token (rotation). Each login starts a token family; reusing a rotated token revokes the whole family.
-- `POST /api/auth/logout` revokes the current family.
-- Delivered as a cookie: `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`, default lifetime 14 days. `SameSite=Strict` and the narrow path protect the cookie-authenticated refresh endpoint against CSRF.
-
-### Google sign-in
-
-- Spring Security OAuth2 Client with OpenID Connect. `app_user.google_sub` (unique), together with a CHECK that `password_hash` or `google_sub` is set.
-- Returning users are matched on Google's `sub`, never on email. A new Google user is created verified, but only when Google's `email_verified` claim is true.
-- If the Google email already belongs to a password account, nothing is created and the user is redirected with `error=account_exists`. Linking happens only through an explicit, authenticated flow.
-- After the callback, the backend sets the refresh cookie and redirects to `FRONTEND_URL/auth/callback`. Tokens never appear in a URL.
-
-### Forgot and reset password
-
-- `app.password_reset_token` (`token_hash`, `user_id`, `expires_at`, `used_at`), same design as the verification token, valid for 30 minutes.
-- `POST /api/auth/forgot-password` always returns the same response; the email is sent only when the account exists.
-- `POST /api/auth/reset-password` stores the new hash, invalidates the token and revokes all refresh tokens. It also marks an unverified account as verified.
-
-### Further rate limits
-
-| Policy | Limit | Key |
-|---|---|---|
-| Resend verification | 3 per minute | IP |
-| Emails to one address | 3 per hour | Email |
-| Login | 5 per minute | IP + email |
-| Login, distributed guessing | 20 per hour | Email |
-| Forgot password | 5 per minute | IP + email |
-
-Accounts are never locked after failed logins; a lockout would let anyone lock a victim out. The login limits slow attackers down instead.
-
-### Open questions
-
-- Whether accounts that stay unverified for a long time are deleted.
-- Separate database users per application (backend: read `publication`, write `app`; data: write `catalog` and `publication`).

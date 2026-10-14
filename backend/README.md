@@ -1,6 +1,6 @@
 # Backend
 
-The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration, and in the future all other user-owned features.
+The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery and user registration.
 
 The backend does not collect or normalize external event data. That is the job of the [data application](../data/README.md).
 
@@ -134,13 +134,3 @@ Integration tests run against real PostgreSQL and Redis containers (Testcontaine
 CI runs Checkstyle and the tests on every pull request that changes `backend/`.
 
 ---
-
-## Planned features
-
-These features are part of the product design and are not built yet:
-
-- **Login and tokens:** see the planned design in [Authentication](../docs/architecture/authentication.md).
-- **Saved events:** backend-owned user state referencing a published Loc event or occurrence. Saved events stay visible when the event later becomes past or cancelled, together with its current state.
-- **Comments:** authenticated users comment on events; comments and their moderation state belong to the backend.
-- **Administration:** a separate admin interface for moderating comments, reviewing reports and hiding events. Hiding is backend-owned state keyed by `loc_event_id`; it never modifies catalog or publication data.
-- **Related events:** suggestions based on categories, tags, location and schedule.
