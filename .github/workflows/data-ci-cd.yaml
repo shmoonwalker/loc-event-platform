@@ -1,0 +1,39 @@
+name: Data CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/**"
+      - ".github/workflows/data-ci-cd.yaml"
+  pull_request:
+    paths:
+      - "data/**"
+      - ".github/workflows/data-ci-cd.yaml"
+
+# Cancel previous runs on new pushes
+concurrency:
+  group: docker-build-data-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # The data application has no tests yet; the image build compiles it.
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./data
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha,scope=data
+          cache-to: type=gha,scope=data,mode=max

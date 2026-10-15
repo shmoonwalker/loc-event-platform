@@ -25,8 +25,7 @@ Styling uses Tailwind CSS v4. The design tokens (light and dark) are CSS variabl
 
 The production image serves the built app with nginx and forwards `/api/` to the backend.
 Set the `BACKEND_URL` environment variable on the frontend service to the backend's
-address, for example `http://<backend-service>.railway.internal:8080`. It defaults to
-`http://backend:8080` (the Docker Compose service name). Without a reachable backend every
+address. It defaults to `http://backend:8080`, the backend's alias in `docker-compose.prod.yml`. Without a reachable backend every
 API call answers `502`. See `nginx.conf.template` and `Dockerfile`.
 
 The frontend never talks to PostgreSQL or the data application directly; see the
