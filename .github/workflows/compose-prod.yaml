@@ -1,0 +1,30 @@
+name: Production Compose
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.prod.yml"
+      - ".env.production.example"
+      - ".github/workflows/compose-prod.yaml"
+  pull_request:
+    paths:
+      - "docker-compose.prod.yml"
+      - ".env.production.example"
+      - ".github/workflows/compose-prod.yaml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Every <placeholder> in the template becomes a dummy value, so a variable the Compose file
+      # requires but the template lacks fails here.
+      - name: Validate with the template
+        run: |
+          sed 's/<[^>]*>/dummy/g' .env.production.example > "$RUNNER_TEMP/dummy.env"
+          docker compose -f docker-compose.prod.yml --env-file "$RUNNER_TEMP/dummy.env" config --quiet

@@ -60,7 +60,7 @@ public class RateLimiter {
         ConsumptionProbe probe;
         try {
             probe = buckets()
-                    .getProxy("rate-limit:" + policy.name().toLowerCase(Locale.ROOT) + ":" + key,
+                    .getProxy("loc:rate-limit:" + policy.name().toLowerCase(Locale.ROOT) + ":" + key,
                             () -> configurations.get(policy))
                     .tryConsumeAndReturnRemaining(1);
         } catch (RuntimeException ex) {

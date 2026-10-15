@@ -63,6 +63,14 @@ class RegisterRateLimitHttpTest {
     }
 
     @Test
+    void namespacesBucketKeysForASharedRedis() throws Exception {
+        assertThat(register("192.0.2.7", "namespaced@example.com").statusCode()).isEqualTo(202);
+
+        assertThat(redis.execInContainer("redis-cli", "--scan", "--pattern", "*192.0.2.7*").getStdout().strip())
+                .isEqualTo("loc:rate-limit:register:192.0.2.7");
+    }
+
+    @Test
     void ignoresClientSuppliedForwardedForEntries() throws Exception {
         // a proxy appends the real client (198.51.100.1) after whatever the client sent itself
         assertThat(register("1.1.1.1, 198.51.100.1", "spoof1@example.com").statusCode()).isEqualTo(202);

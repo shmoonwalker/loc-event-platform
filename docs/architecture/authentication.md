@@ -95,19 +95,20 @@ Public auth endpoints are rate limited with a token bucket per key.
 |---|---|---|
 | `REGISTER` | 3 per minute | Client IP |
 
-Redis keys have the form `rate-limit:<policy>:<key>`, for example `rate-limit:register:203.0.113.5`.
+Redis keys have the form `loc:rate-limit:<policy>:<key>`, for example `loc:rate-limit:register:203.0.113.5`; the `loc:` prefix keeps them apart from other applications on a shared Redis.
 
 ### Client IP behind the proxy
 
 In production a request travels:
 
 ```text
-Browser → Railway edge proxy → frontend nginx (/api/) → backend (Railway private network)
+Browser → Cloudflare edge → cloudflared (host) → 127.0.0.1:3001 → frontend nginx (/api/) → backend (private Docker network)
 ```
 
 The backend never sees the browser's connection, so `request.getRemoteAddr()` would be the nginx container and every user would share one bucket.
 
-- nginx appends the connecting address to `X-Forwarded-For` (`frontend/nginx.conf.template`).
+- Cloudflare appends the visitor IP to `X-Forwarded-For`; cloudflared passes it on. The host port is bound to 127.0.0.1, so only the tunnel reaches nginx.
+- nginx appends the connecting address to `X-Forwarded-For` (`frontend/nginx.conf.template`). Through the published port that address is the Docker gateway, a private address.
 - `server.forward-headers-strategy: native` makes Tomcat read `X-Forwarded-For` from the right, skip trusted private proxies, and expose the real client IP through `getRemoteAddr()`.
 - Code never parses `X-Forwarded-For` itself; its left-most entries are whatever the client sent.
 - Spring's `ForwardedHeaderFilter` is disabled (`config/OpenApiConfig`). The Scalar API-docs starter would otherwise register it, and it trusts the left-most entry, which would let anyone fake their IP and bypass rate limits. `RegisterRateLimitHttpTest` covers this.
@@ -130,7 +131,7 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 | Variable | Used for | Notes |
 |---|---|---|
 | `DB_*` / `POSTGRES_*` | Database | Shared with the rest of the backend |
-| `REDIS_URL` | Rate limiting | Defaults to `redis://localhost:6379`. In production: Railway Redis on the private network, with password |
+| `REDIS_URL` | Rate limiting | Defaults to `redis://localhost:6379`. In production: the shared Redis with password, e.g. `redis://:<password>@<host>:6379/0` |
 
 ---
 

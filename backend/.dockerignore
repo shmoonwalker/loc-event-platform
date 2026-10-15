@@ -38,3 +38,7 @@ README.md
 # Docker
 Dockerfile
 .dockerignore
+
+# Local environment files
+.env
+.env.*
