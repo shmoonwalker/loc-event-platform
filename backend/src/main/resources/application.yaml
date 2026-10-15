@@ -23,11 +23,25 @@ spring:
       url: ${REDIS_URL:redis://localhost:6379}
       repositories:
         enabled: false
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
 
 app:
+  mail:
+    from: "${MAIL_FROM:Loc <no-reply@loc.local>}"
+    frontend-url: ${FRONTEND_URL:http://localhost:4200}
   rate-limit:
     policies:
       register:
+        capacity: 3
+        period: 1m
+      account-mail:
+        capacity: 3
+        period: 1h
+      resend-verification:
         capacity: 3
         period: 1m
 

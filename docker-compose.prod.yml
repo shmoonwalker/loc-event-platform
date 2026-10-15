@@ -44,6 +44,13 @@ services:
       DB_USER: ${BACKEND_DB_USER:?set BACKEND_DB_USER}
       DB_PASSWORD: ${BACKEND_DB_PASSWORD:?set BACKEND_DB_PASSWORD}
       REDIS_URL: ${REDIS_URL:?set REDIS_URL (redis://:password@host:6379)}
+      # Spring binds these names to spring.mail.* and app.mail.* directly.
+      SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.resend.com}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-resend}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:?set MAIL_PASSWORD (Resend API key)}
+      APP_MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM}
+      APP_MAIL_FRONTEND_URL: ${FRONTEND_URL:?set FRONTEND_URL}
       JAVA_TOOL_OPTIONS: ${LOC_BACKEND_JAVA_OPTS:--XX:MaxRAMPercentage=75}
     networks:
       app:

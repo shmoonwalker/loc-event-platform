@@ -300,7 +300,7 @@ This document intentionally stays high-level.
 Focused architecture documents:
 
 - [Data Architecture](data-architecture.md) — data worker runtime, pipeline, sources, catalog contract, and publication
-- [Authentication](authentication.md) — registration, passwords, rate limiting, and the planned login design
+- [Authentication](authentication.md) — registration, password storage, and rate limiting
 - [Backend guide](../../backend/README.md) — product API behaviour, ownership, and how to run it
 - [Data guide](../../data/README.md) — how to build, configure, test, and run the data worker
 - [Frontend guide](../../frontend/README.md) — pages and deployment

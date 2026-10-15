@@ -1,6 +1,6 @@
 # Backend
 
-The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration, and in the future all other user-owned features.
+The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery and user registration.
 
 The backend does not collect or normalize external event data. That is the job of the [data application](../data/README.md).
 
@@ -17,7 +17,7 @@ The frontend communicates only with the backend API.
 | Area | Endpoints | Documentation |
 |---|---|---|
 | Event discovery | `GET /api/home`, `/api/events`, `/api/events/{id}`, `/api/events/filter-options`, `/api/cities`, `/api/organizers/{id}`, `/api/categories`, `/api/tags` | [Discovery API](docs/discovery.md) |
-| Registration | `POST /api/auth/register` | [Authentication](../docs/architecture/authentication.md) |
+| Registration | `POST /api/auth/register`, with a verification email | [Authentication](../docs/architecture/authentication.md) |
 
 Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI document at `/api/docs/openapi.yaml`.
 
@@ -27,10 +27,10 @@ Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI
 
 Requirements: Java 25 and Docker.
 
-1. Start PostgreSQL and Redis from the repository root:
+1. Start PostgreSQL, Redis and Mailpit from the repository root:
 
    ```bash
-   docker compose up -d db redis
+   docker compose up -d db redis mailpit
    ```
 
 2. Start the backend from `backend/`:
@@ -45,6 +45,8 @@ The API runs on `http://localhost:8080`. On startup, Flyway creates or migrates 
 
 Discovery endpoints read the `publication` schema, which the data application creates and fills. Run the data application at least once against the same database to get events (see [data/README.md](../data/README.md)).
 
+Emails the backend sends (such as the verification email after registering) arrive in Mailpit at `http://localhost:8025`. Nothing is delivered to real inboxes. Without Mailpit the backend still works, and each failed email is logged as a warning.
+
 Redis is only needed for rate limiting. Without it the backend still starts and serves requests, but nothing is rate limited and a warning is logged per limited request.
 
 ---
@@ -56,6 +58,10 @@ Redis is only needed for rate limiting. Without it the backend still starts and 
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | `localhost`, `5432`, `POSTGRES_DB` or `project_db` | Database location |
 | `DB_USER`, `DB_PASSWORD` | `POSTGRES_USER` / `POSTGRES_PASSWORD`, then `admin` / `password` | Database credentials |
 | `REDIS_URL` | `redis://localhost:6379` | Redis for rate limiting; in production includes the password |
+| `MAIL_HOST`, `MAIL_PORT` | `localhost`, `1025` | SMTP server (Mailpit locally) |
+| `MAIL_USERNAME`, `MAIL_PASSWORD` | empty | SMTP login |
+| `MAIL_FROM` | `Loc <no-reply@loc.local>` | Sender of account emails |
+| `FRONTEND_URL` | `http://localhost:4200` | Base of links in emails |
 
 Rate limits are set under `app.rate-limit.policies` in `src/main/resources/application.yaml`.
 
@@ -67,10 +73,10 @@ The code is organized by feature. Each feature owns its controller, service, rep
 
 ```text
 nl.loc.backend
-├── config/        security chain, password encoder, error handling, OpenAPI, clock
+├── config/        security chain, password encoder, error handling, OpenAPI, clock, async
 │   └── ratelimit/ Redis-backed rate limiter
 ├── event/         public discovery: events, organizers, cities, categories, tags
-└── user/          user accounts and registration
+└── user/          user accounts, registration and account emails
 ```
 
 Within a feature:
@@ -134,13 +140,3 @@ Integration tests run against real PostgreSQL and Redis containers (Testcontaine
 CI runs Checkstyle and the tests on every pull request that changes `backend/`.
 
 ---
-
-## Planned features
-
-These features are part of the product design and are not built yet:
-
-- **Login and tokens:** see the planned design in [Authentication](../docs/architecture/authentication.md).
-- **Saved events:** backend-owned user state referencing a published Loc event or occurrence. Saved events stay visible when the event later becomes past or cancelled, together with its current state.
-- **Comments:** authenticated users comment on events; comments and their moderation state belong to the backend.
-- **Administration:** a separate admin interface for moderating comments, reviewing reports and hiding events. Hiding is backend-owned state keyed by `loc_event_id`; it never modifies catalog or publication data.
-- **Related events:** suggestions based on categories, tags, location and schedule.

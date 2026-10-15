@@ -1,15 +1,15 @@
 # Authentication
 
-How users register with Loc, how their passwords are stored, and how the authentication endpoints are protected against abuse. The last section describes the design for the parts that are not built yet: email verification, login, tokens, Google sign-in and password reset.
+How users register with Loc and verify their email, how passwords and tokens are stored, and how the authentication endpoints are protected against abuse.
 
 ---
 
 ## Principles
 
 - **No account enumeration.** No response, error or timing difference reveals whether an email is registered. Only the owner of the inbox learns what happened, by email.
-- **Spring Security first.** Its building blocks (password encoders, `AuthenticationManager`, resource-server JWT, entry points) are used before any custom security code.
-- **Secrets are stored only as hashes.** Passwords use BCrypt; random tokens (refresh, verification, reset) use SHA-256.
-- **Every public auth endpoint is rate limited.**
+- **Spring Security first.** Its building blocks (password encoder, security filter chain) are used before any custom security code.
+- **Secrets are stored only as hashes.** Passwords use BCrypt; random tokens use SHA-256.
+- **Endpoints that hash passwords or send email are rate limited.**
 - **One error format.** Every error response is an RFC 7807 `ProblemDetail`.
 - **Deny by default.** The security chain rejects every route that is not explicitly opened, and each auth route is opened on its own. `/api/auth/**` is never opened as a whole.
 
@@ -26,10 +26,19 @@ How users register with Loc, how their passwords are stored, and how the authent
 1. The client IP is checked against the register rate limit. Over the limit returns `429`.
 2. The body is validated. Invalid input or malformed JSON returns `400`.
 3. The email is normalised and the password is hashed. The hash is computed **before** the duplicate check, so new and existing emails take the same time.
-4. A new email creates the user with role `USER`. An existing email creates nothing.
+4. What happens next depends on the account state:
+
+| Account state | Account change | Email sent |
+|---|---|---|
+| New | User created with role `USER`, unverified | Verification link |
+| Exists, unverified | Password and display name replaced | Fresh verification link |
+| Exists, verified | None | "Someone tried to sign up with your address", with a link to password reset |
+
 5. The response is always `202 Accepted` with an empty body: no id and no account details, so the response never reveals which emails have an account.
 
-Two simultaneous registrations for the same email are resolved by the database: the unique constraint `app_user_email_key` rejects the second insert, and that violation is treated like an existing email. Any other constraint violation is a bug and surfaces as an error.
+An unverified account takes the password of the latest registration, so whoever registered the address first cannot keep their password on the account the owner later verifies.
+
+Two simultaneous registrations for the same email are resolved by the database: the unique constraint `app_user_email_key` rejects the second insert, and that violation is treated like an existing email; the winning registration sends the mail. Any other constraint violation is a bug and surfaces as an error.
 
 ### Validation
 
@@ -47,9 +56,69 @@ Validation errors return a `ProblemDetail` with an `errors` map of field name to
 |---|---|
 | `user/controller/AuthController` | HTTP endpoint; applies the rate limit, then calls the service |
 | `user/dto/request/RegisterRequest` | Request body and its validation rules |
-| `user/service/RegistrationService` | Normalises, hashes, checks for duplicates and saves |
+| `user/service/RegistrationService` | Normalises, hashes, checks for duplicates, saves and triggers the email |
 | `user/repository/UserAccountRepository` | Spring Data JPA repository for `app_user` |
 | `user/model/UserAccount` | JPA entity |
+
+---
+
+## Email verification
+
+`POST /api/auth/verify-email`
+
+```json
+{ "token": "<token from the link>" }
+```
+
+The verification email links to the frontend page `FRONTEND_URL/verify-email?token=…`, which posts the token to this endpoint. A plain `GET` link never verifies, because mail security scanners open links and would use up the token.
+
+1. The body is validated: `token` is required and at most 64 characters. Invalid input or malformed JSON returns `400`.
+2. The token is hashed and looked up, with a row lock so two parallel requests cannot both use it.
+3. A token that is unknown, expired or already used returns `400` with the title `Invalid token`. All three cases get the same response.
+4. Otherwise the token is marked used, the account is marked verified, and the response is `204 No Content`.
+
+### Resending the link
+
+`POST /api/auth/resend-verification`
+
+```json
+{ "email": "anouk.devries@example.com" }
+```
+
+1. The client IP is checked against the resend rate limit. Over the limit returns `429`.
+2. The body is validated with the same email rules as registration. Invalid input or malformed JSON returns `400`.
+3. If the normalised email belongs to an unverified account, a new token is issued and a fresh link is emailed. Unknown and verified emails get no email.
+4. The response is always `202 Accepted` with an empty body, so it never reveals which emails have an account.
+
+### Tokens
+
+- 32 random bytes from `SecureRandom`, encoded as URL-safe Base64 without padding (43 characters).
+- Only the SHA-256 hash is stored; the raw token exists only in the email.
+- Single use and valid for 24 hours.
+- Issuing a new token marks the user's older unused tokens as used, so only the latest link works.
+
+### Sending mail
+
+- `AccountMailer` sends plain-text emails through Spring's `JavaMailSender`.
+- Mail is sent `@Async`, after the database step has committed. A slow or failing mail server neither breaks registration nor makes new and existing emails take different time.
+- One user receives at most 3 emails per hour, whatever triggers them (`ACCOUNT_MAIL` rate limit, keyed on the user id). Further emails are skipped and logged as a warning; the HTTP response does not change, so the limit reveals nothing about the account.
+- A failed send is logged with the user id only and is not retried. The address is personal data and the message holds the token, so neither is logged.
+- Local development sends to Mailpit (`docker-compose.yml`, web UI on port 8025); no real email leaves the machine. Production sends through Resend's SMTP server.
+
+### Code
+
+| Class | Role |
+|---|---|
+| `user/controller/AuthController` | HTTP endpoints for verify-email and resend-verification |
+| `user/dto/request/VerifyEmailRequest` | Verify-email request body and its validation rules |
+| `user/dto/request/ResendVerificationRequest` | Resend request body and its validation rules |
+| `user/service/RegistrationService` | Decides whether a resend sends a new link |
+| `user/service/EmailVerificationService` | Issues and verifies tokens |
+| `user/service/SecureTokens` | Generates random tokens and hashes them |
+| `user/service/InvalidTokenException` | Unknown, expired or used token; becomes `400` |
+| `user/repository/EmailVerificationTokenRepository` | Spring Data JPA repository for `email_verification_token` |
+| `user/model/EmailVerificationToken` | JPA entity |
+| `user/mail/AccountMailer` | Builds the links and sends the emails |
 
 ---
 
@@ -75,8 +144,20 @@ Authentication tables live in the backend-owned `app` schema, migrated by Flyway
 | `display_name` | 1–100 characters after trimming |
 | `role` | `USER` or `ADMIN`; new accounts are always `USER` |
 | `created_at` | Set by the application from the injected `Clock` |
+| `email_verified_at` | `null` while the email is unverified |
 
 Administrators are promoted manually in SQL. Registration never accepts a role.
+
+### `app.email_verification_token`
+
+| Column | Notes |
+|---|---|
+| `id` | UUIDv7 |
+| `user_id` | The account; tokens are deleted with it |
+| `token_hash` | Unique SHA-256 hash, exactly 32 bytes |
+| `expires_at` | 24 hours after issue |
+| `used_at` | Set when the token is used or replaced by a newer one |
+| `created_at` | Set by the database |
 
 ---
 
@@ -87,13 +168,17 @@ Public auth endpoints are rate limited with a token bucket per key.
 - **Algorithm:** token bucket via Bucket4j. A bucket holds a few tokens, each request takes one, and tokens refill steadily. Unlike a fixed window, there is no double burst at the window edge.
 - **Storage:** Redis, through Bucket4j's Lettuce integration. All backend instances share the buckets, the buckets survive redeploys, and each update is atomic in Redis. A key expires once its bucket would be full again.
 - **Redis unavailable:** fail open. The request is allowed and a warning is logged. The limiter is a defence layer; a Redis outage must not block sign-ups. The backend connects to Redis on first use, so it also starts while Redis is down. Redis calls time out after 500 ms.
-- **Usage:** controllers call `RateLimiter.consume(policy, key)` before any expensive work (BCrypt, database, email). An empty bucket throws `RateLimitExceededException`, which becomes `429 Too Many Requests` with a `Retry-After` header in seconds.
+- **Usage:** code calls `RateLimiter.consume(policy, key)`. An empty bucket throws `RateLimitExceededException`.
+  - Limits per request are checked in the controller, before any expensive work (BCrypt, database, email). The exception becomes `429 Too Many Requests` with a `Retry-After` header in seconds.
+  - The limit on emails per user is checked in `AccountMailer`, so every email goes through it. The mailer catches the exception and skips the email.
 - **Configuration:** each policy's limit comes from `app.rate-limit.policies.<policy>` (`capacity` and `period`). The application refuses to start when a policy has no configuration.
-- **Scope:** this protects specific endpoints from abuse. Protection against floods belongs at the edge proxy.
+- **Scope:** this protects specific endpoints and inboxes from abuse. Protection against floods belongs at the edge proxy.
 
 | Policy | Limit | Key |
 |---|---|---|
 | `REGISTER` | 3 per minute | Client IP |
+| `RESEND_VERIFICATION` | 3 per minute | Client IP |
+| `ACCOUNT_MAIL` | 3 per hour | User id |
 
 Redis keys have the form `loc:rate-limit:<policy>:<key>`, for example `loc:rate-limit:register:203.0.113.5`; the `loc:` prefix keeps them apart from other applications on a shared Redis.
 
@@ -120,8 +205,9 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 
 | Status | When |
 |---|---|
-| `202` | Registration accepted, whatever the account state |
-| `400` | Invalid input or malformed JSON |
+| `202` | Registration or resend accepted, whatever the account state |
+| `204` | Email verified |
+| `400` | Invalid input, malformed JSON, or an unknown, expired or used verification token |
 | `429` | Rate limit exceeded, with a `Retry-After` header in seconds |
 
 ---
@@ -132,71 +218,8 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 |---|---|---|
 | `DB_*` / `POSTGRES_*` | Database | Shared with the rest of the backend |
 | `REDIS_URL` | Rate limiting | Defaults to `redis://localhost:6379`. In production: the shared Redis with password, e.g. `redis://:<password>@<host>:6379/0` |
+| `MAIL_HOST`, `MAIL_PORT` | SMTP server | Default to Mailpit on `localhost:1025` |
+| `MAIL_USERNAME`, `MAIL_PASSWORD` | SMTP login | Empty locally; in production the Resend API key is the password |
+| `MAIL_FROM` | Sender address | Defaults to `Loc <no-reply@loc.local>` |
+| `FRONTEND_URL` | Base of the links in emails | Defaults to `http://localhost:4200` |
 
----
-
-## Planned design
-
-The following parts are designed but not built. They follow the principles above.
-
-### Email verification
-
-- `app_user.email_verified_at` (`null` means unverified) and `app.email_verification_token` (`token_hash`, `user_id`, `expires_at`, `used_at`).
-- Registration sends an email depending on the account state:
-
-| Account state | Email sent |
-|---|---|
-| New | Verification link |
-| Exists, unverified | Fresh verification link |
-| Exists, verified | "Someone tried to sign up with your address", with a link to password reset |
-
-- The link opens a frontend page (`FRONTEND_URL/verify-email?token=…`) that calls `POST /api/auth/verify-email`. A plain `GET` link never verifies, because mail security scanners open links and would use up the token.
-- Token: 32 random bytes from `SecureRandom`, URL-safe Base64, stored as a SHA-256 hash, single use, valid for 24 hours. A new token invalidates older unused ones. Expired, used and unknown tokens get the same error.
-- `POST /api/auth/resend-verification` always returns the same response.
-- Mail is sent asynchronously after the transaction commits, so a slow mail server neither breaks registration nor changes its timing. Local development uses Mailpit.
-
-### Login and access tokens
-
-- `POST /api/auth/login` authenticates through Spring Security's `AuthenticationManager` with `DaoAuthenticationProvider` and an application `UserDetailsService`. The provider compares a dummy hash when the email is unknown, so unknown and wrong-password logins take the same time.
-- Wrong email and wrong password return the same `401`.
-- Email verification is checked **after** the password is accepted, and is not mapped to `UserDetails.isEnabled()`: the provider checks account status before the password, which would reveal unverified accounts to anyone. A correct password on an unverified account returns `403`.
-- Access tokens are JWTs issued and validated with `spring-boot-starter-oauth2-resource-server`, signed with `JWT_SECRET` (at least 256 bits; startup fails without it), valid for 15 minutes, with a `roles` claim. The frontend keeps them in memory only.
-- `GET /api/auth/me` returns the current user without password material.
-- Spring Security errors are raised in filters before `@RestControllerAdvice` runs, so a custom `AuthenticationEntryPoint` (`401`) and `AccessDeniedHandler` (`403`) write `ProblemDetail` responses.
-
-### Refresh tokens and logout
-
-- `app.refresh_token` (`token_hash`, `family_id`, `user_id`, `expires_at`, `revoked_at`, `replaced_by`).
-- `POST /api/auth/refresh` exchanges a refresh token for a new access token and a new refresh token (rotation). Each login starts a token family; reusing a rotated token revokes the whole family.
-- `POST /api/auth/logout` revokes the current family.
-- Delivered as a cookie: `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`, default lifetime 14 days. `SameSite=Strict` and the narrow path protect the cookie-authenticated refresh endpoint against CSRF.
-
-### Google sign-in
-
-- Spring Security OAuth2 Client with OpenID Connect. `app_user.google_sub` (unique), together with a CHECK that `password_hash` or `google_sub` is set.
-- Returning users are matched on Google's `sub`, never on email. A new Google user is created verified, but only when Google's `email_verified` claim is true.
-- If the Google email already belongs to a password account, nothing is created and the user is redirected with `error=account_exists`. Linking happens only through an explicit, authenticated flow.
-- After the callback, the backend sets the refresh cookie and redirects to `FRONTEND_URL/auth/callback`. Tokens never appear in a URL.
-
-### Forgot and reset password
-
-- `app.password_reset_token` (`token_hash`, `user_id`, `expires_at`, `used_at`), same design as the verification token, valid for 30 minutes.
-- `POST /api/auth/forgot-password` always returns the same response; the email is sent only when the account exists.
-- `POST /api/auth/reset-password` stores the new hash, invalidates the token and revokes all refresh tokens. It also marks an unverified account as verified.
-
-### Further rate limits
-
-| Policy | Limit | Key |
-|---|---|---|
-| Resend verification | 3 per minute | IP |
-| Emails to one address | 3 per hour | Email |
-| Login | 5 per minute | IP + email |
-| Login, distributed guessing | 20 per hour | Email |
-| Forgot password | 5 per minute | IP + email |
-
-Accounts are never locked after failed logins; a lockout would let anyone lock a victim out. The login limits slow attackers down instead.
-
-### Open questions
-
-- Whether accounts that stay unverified for a long time are deleted.
-- Separate database users per application (backend: read `publication`, write `app`; data: write `catalog` and `publication`).

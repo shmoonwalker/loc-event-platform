@@ -2,6 +2,7 @@ package nl.loc.backend.config;
 
 import nl.loc.backend.config.ratelimit.RateLimitExceededException;
 import nl.loc.backend.event.controller.InvalidBrowseQueryException;
+import nl.loc.backend.user.service.InvalidTokenException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -41,6 +42,14 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
         problem.setTitle("Invalid browse query");
         problem.setDetail(ex.getMessage());
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ProblemDetail handleInvalidToken(InvalidTokenException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Invalid token");
+        problem.setDetail("This link is invalid or has expired");
         return problem;
     }
 
