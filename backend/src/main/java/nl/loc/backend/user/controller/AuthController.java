@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import nl.loc.backend.config.ratelimit.RateLimitPolicy;
 import nl.loc.backend.config.ratelimit.RateLimiter;
 import nl.loc.backend.user.dto.request.RegisterRequest;
+import nl.loc.backend.user.dto.request.VerifyEmailRequest;
+import nl.loc.backend.user.service.EmailVerificationService;
 import nl.loc.backend.user.service.RegistrationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -26,10 +28,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final RegistrationService registrationService;
+    private final EmailVerificationService emailVerificationService;
     private final RateLimiter rateLimiter;
 
-    public AuthController(RegistrationService registrationService, RateLimiter rateLimiter) {
+    public AuthController(RegistrationService registrationService,
+                          EmailVerificationService emailVerificationService,
+                          RateLimiter rateLimiter) {
         this.registrationService = registrationService;
+        this.emailVerificationService = emailVerificationService;
         this.rateLimiter = rateLimiter;
     }
 
@@ -55,5 +61,22 @@ public class AuthController {
         // before BCrypt, so blocked requests cost almost nothing
         rateLimiter.consume(RateLimitPolicy.REGISTER, httpRequest.getRemoteAddr());
         registrationService.register(request.email(), request.password(), request.displayName());
+    }
+
+    @PostMapping("/verify-email")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+            summary = "Verify email",
+            description = "Marks the account's email as verified using the token from the verification link. "
+                    + "Unknown, expired and already used tokens all get the same 400.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Email verified."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid, expired or used token, invalid input or malformed JSON.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public void verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        emailVerificationService.verify(request.token());
     }
 }
