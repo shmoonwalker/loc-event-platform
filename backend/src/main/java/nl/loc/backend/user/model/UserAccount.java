@@ -64,11 +64,11 @@ public class UserAccount {
     }
 
     // latest registration wins, so an attacker who registered this email first can't keep their password
-    public void replaceRegistration(String passwordHash, String displayName) {
+    public void replaceRegistration(String replacementPasswordHash, String replacementDisplayName) {
         if (isEmailVerified()) {
             throw new IllegalStateException("A verified account's registration can't be replaced");
         }
-        this.passwordHash = passwordHash;
-        this.displayName = displayName.trim();
+        this.passwordHash = replacementPasswordHash;
+        this.displayName = replacementDisplayName.trim();
     }
 }
