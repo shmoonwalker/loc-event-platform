@@ -8,7 +8,7 @@ RUN npm run build
 FROM nginx:alpine
 # Rendered into /etc/nginx/conf.d/default.conf at start-up (official image feature).
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-# BACKEND_URL: where /api is forwarded. Override per environment (on Railway: the backend's private URL).
+# BACKEND_URL: where /api is forwarded. Override per environment.
 ENV BACKEND_URL=http://backend:8080
 # Fill ${NGINX_LOCAL_RESOLVERS} from /etc/resolv.conf for the lazy upstream lookup.
 ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1

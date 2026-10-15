@@ -33,7 +33,7 @@ app:
 
 server:
   port: 8080
-  # behind Railway's edge proxy and nginx: take the client IP from X-Forwarded-For, trusting only private proxies
+  # behind Cloudflare Tunnel and the frontend nginx: take the client IP from X-Forwarded-For, trusting only private proxies
   forward-headers-strategy: native
 
 springdoc:
