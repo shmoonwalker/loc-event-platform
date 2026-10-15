@@ -1,6 +1,9 @@
 package nl.loc.backend.user.mail;
 
 import lombok.extern.slf4j.Slf4j;
+import nl.loc.backend.config.ratelimit.RateLimitExceededException;
+import nl.loc.backend.config.ratelimit.RateLimitPolicy;
+import nl.loc.backend.config.ratelimit.RateLimiter;
 import nl.loc.backend.user.model.UserAccount;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
@@ -15,10 +18,12 @@ public class AccountMailer {
 
     private final JavaMailSender mailSender;
     private final AccountMailProperties properties;
+    private final RateLimiter rateLimiter;
 
-    public AccountMailer(JavaMailSender mailSender, AccountMailProperties properties) {
+    public AccountMailer(JavaMailSender mailSender, AccountMailProperties properties, RateLimiter rateLimiter) {
         this.mailSender = mailSender;
         this.properties = properties;
+        this.rateLimiter = rateLimiter;
     }
 
     @Async
@@ -70,6 +75,13 @@ public class AccountMailer {
 
     // logs the user id only: the address is personal data and the text holds the token
     private void send(UserAccount user, String type, String subject, String text) {
+        try {
+            rateLimiter.consume(RateLimitPolicy.ACCOUNT_MAIL, user.getId().toString());
+        } catch (RateLimitExceededException ex) {
+            log.warn("Skipped {} mail to user {}: hourly mail limit reached", type, user.getId());
+            return;
+        }
+
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(properties.from());
         message.setTo(user.getEmail());

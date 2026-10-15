@@ -39,6 +39,10 @@ app:
         capacity: 3
         period: 1m
 
+      account-mail:
+        capacity: 3
+        period: 1h
+
 server:
   port: 8080
   # behind Cloudflare Tunnel and the frontend nginx: take the client IP from X-Forwarded-For, trusting only private proxies

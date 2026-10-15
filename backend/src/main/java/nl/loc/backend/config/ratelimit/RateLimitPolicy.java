@@ -1,5 +1,6 @@
 package nl.loc.backend.config.ratelimit;
 
 public enum RateLimitPolicy {
-    REGISTER
+    REGISTER,
+    ACCOUNT_MAIL
 }
