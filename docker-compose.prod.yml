@@ -1,0 +1,98 @@
+# Production stack: frontend, backend and data only. PostgreSQL, RabbitMQ and Redis are shared
+# infrastructure reached over an existing external network.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+name: loc-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  # Service names are prefixed: Compose registers every service name as a DNS alias on each network
+  # it joins, and a bare "backend" on the shared network could answer for another application.
+  loc-frontend:
+    build: ./frontend
+    container_name: loc-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      BACKEND_URL: http://backend:8080
+    networks:
+      - app
+    mem_limit: ${LOC_FRONTEND_MEM_LIMIT:-128m}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  loc-backend:
+    build: ./backend
+    container_name: loc-backend
+    restart: unless-stopped
+    # No host port: only loc-frontend reaches it, as http://backend:8080 on the app network.
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: ${DB_HOST:?set DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:?set DB_NAME}
+      DB_USER: ${BACKEND_DB_USER:?set BACKEND_DB_USER}
+      DB_PASSWORD: ${BACKEND_DB_PASSWORD:?set BACKEND_DB_PASSWORD}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL (redis://:password@host:6379)}
+      JAVA_TOOL_OPTIONS: ${LOC_BACKEND_JAVA_OPTS:--XX:MaxRAMPercentage=75}
+    networks:
+      app:
+        aliases: [backend]
+      shared: {}
+    mem_limit: ${LOC_BACKEND_MEM_LIMIT:-768m}
+    # Spring Boot shuts down gracefully within 30s per phase; Docker's default 10s would cut it short.
+    stop_grace_period: 40s
+    healthcheck:
+      # The backend has no health endpoint; this only proves the HTTP port accepts connections.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    logging: *logging
+
+  loc-data:
+    build: ./data
+    container_name: loc-data
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: ${DB_HOST:?set DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:?set DB_NAME}
+      DB_USER: ${DATA_DB_USER:?set DATA_DB_USER}
+      DB_PASSWORD: ${DATA_DB_PASSWORD:?set DATA_DB_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?set RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:?set RABBITMQ_VHOST}
+      R2_ENDPOINT: ${R2_ENDPOINT:?set R2_ENDPOINT}
+      R2_REGION: ${R2_REGION:-auto}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:?set R2_ACCESS_KEY}
+      R2_SECRET_KEY: ${R2_SECRET_KEY:?set R2_SECRET_KEY}
+      R2_BUCKET: ${R2_BUCKET:?set R2_BUCKET}
+      Ticketmaster: ${Ticketmaster:?set Ticketmaster (API key)}
+      GeminiAPIKey: ${GeminiAPIKey:?set GeminiAPIKey}
+      JAVA_TOOL_OPTIONS: ${LOC_DATA_JAVA_OPTS:--XX:MaxRAMPercentage=75}
+    networks:
+      - shared
+    mem_limit: ${LOC_DATA_MEM_LIMIT:-768m}
+    stop_grace_period: 40s
+    logging: *logging
+
+networks:
+  app: {}
+  shared:
+    external: true
+    name: ${LOC_SHARED_NETWORK:?set LOC_SHARED_NETWORK to the existing infrastructure network}

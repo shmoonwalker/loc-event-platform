@@ -3,3 +3,5 @@ raw-data/
 .git/
 .idea/
 *.iml
+.env
+.env.*

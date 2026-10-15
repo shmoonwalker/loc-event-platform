@@ -1,4 +1,5 @@
-FROM maven:3.9.16-eclipse-temurin-25 AS build
+# Compile on the build machine: the JAR is the same for every architecture.
+FROM --platform=$BUILDPLATFORM maven:3.9.16-eclipse-temurin-25 AS build
 
 WORKDIR /workspace
 COPY .mvn .mvn
@@ -8,6 +9,7 @@ COPY src src
 RUN ./mvnw -DskipTests package
 
 FROM eclipse-temurin:25-jre
+USER 1000
 
 WORKDIR /app
 COPY --from=build /workspace/target/data-0.1.0-SNAPSHOT.jar app.jar
