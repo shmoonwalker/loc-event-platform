@@ -56,7 +56,7 @@ class RegisterRateLimitHttpTest {
         assertThat(blocked.headers().firstValue("Retry-After")).hasValueSatisfying(
                 seconds -> assertThat(Long.parseLong(seconds)).isPositive());
         assertThat(blocked.body()).contains("\"title\":\"Too many requests\"");
-        assertThat(repository.existsByEmail("third@example.com")).isFalse();
+        assertThat(repository.findByEmail("third@example.com")).isEmpty();
 
         // the test client connects from 127.0.0.1 every time, so a fresh bucket proves the forwarded IP is the key
         assertThat(register("203.0.113.2", "fourth@example.com").statusCode()).isEqualTo(202);

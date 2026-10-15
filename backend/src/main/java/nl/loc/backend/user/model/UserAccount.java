@@ -62,4 +62,13 @@ public class UserAccount {
             emailVerifiedAt = now.truncatedTo(ChronoUnit.MICROS);
         }
     }
+
+    // latest registration wins, so an attacker who registered this email first can't keep their password
+    public void replaceRegistration(String passwordHash, String displayName) {
+        if (isEmailVerified()) {
+            throw new IllegalStateException("A verified account's registration can't be replaced");
+        }
+        this.passwordHash = passwordHash;
+        this.displayName = displayName.trim();
+    }
 }

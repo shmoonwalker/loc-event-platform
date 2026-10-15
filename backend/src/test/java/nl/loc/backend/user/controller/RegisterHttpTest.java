@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -70,9 +71,11 @@ class RegisterHttpTest {
     }
 
     @Test
-    void duplicateEmailReturnsAcceptedWithoutChangingAccount() throws Exception {
+    void duplicateOfVerifiedEmailReturnsAcceptedWithoutChangingAccount() throws Exception {
         register(validRequest()).andExpect(status().isAccepted()).andExpect(content().string(""));
         UserAccount original = repository.findAll().getFirst();
+        original.markEmailVerified(Instant.now());
+        repository.save(original);
         Map<String, String> duplicate = Map.of(
                 "email", "alice@example.com", "password", "different-password", "displayName", "Someone else");
 
@@ -83,6 +86,23 @@ class RegisterHttpTest {
             assertThat(account.getPasswordHash()).isEqualTo(original.getPasswordHash());
             assertThat(account.getDisplayName()).isEqualTo(original.getDisplayName());
             assertThat(account.getCreatedAt()).isEqualTo(original.getCreatedAt());
+        });
+    }
+
+    @Test
+    void duplicateOfUnverifiedEmailReplacesPasswordAndDisplayName() throws Exception {
+        register(validRequest()).andExpect(status().isAccepted()).andExpect(content().string(""));
+        UserAccount original = repository.findAll().getFirst();
+        Map<String, String> duplicate = Map.of(
+                "email", "alice@example.com", "password", "different-password", "displayName", "Someone else");
+
+        register(duplicate).andExpect(status().isAccepted()).andExpect(content().string(""));
+
+        assertThat(repository.findAll()).singleElement().satisfies(account -> {
+            assertThat(account.getId()).isEqualTo(original.getId());
+            assertThat(passwordEncoder.matches("different-password", account.getPasswordHash())).isTrue();
+            assertThat(account.getDisplayName()).isEqualTo("Someone else");
+            assertThat(account.isEmailVerified()).isFalse();
         });
     }
 
