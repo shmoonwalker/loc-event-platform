@@ -1,3 +1,10 @@
 logging:
   level:
     root: INFO
+
+spring:
+  mail:
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
