@@ -148,6 +148,35 @@ class RegistrationServiceTest {
                 .isSameAs(failure);
     }
 
+    @Test
+    void resendSendsFreshLinkToUnverifiedAccount() {
+        UserAccount unverified = new UserAccount("alice@example.com", "Alice", "hash", NOW);
+        when(repository.findByEmail("alice@example.com")).thenReturn(Optional.of(unverified));
+        when(emailVerificationService.issueToken(unverified)).thenReturn("raw-token");
+
+        service.resendVerification("  Alice@Example.COM  ");
+
+        verify(accountMailer).sendVerificationLink(unverified, "raw-token");
+    }
+
+    @Test
+    void resendDoesNothingForVerifiedAccount() {
+        when(repository.findByEmail("alice@example.com")).thenReturn(Optional.of(verifiedAccount()));
+
+        service.resendVerification("alice@example.com");
+
+        verify(emailVerificationService, never()).issueToken(any(UserAccount.class));
+        verify(accountMailer, never()).sendVerificationLink(any(UserAccount.class), any());
+    }
+
+    @Test
+    void resendDoesNothingForUnknownEmail() {
+        service.resendVerification("nobody@example.com");
+
+        verify(emailVerificationService, never()).issueToken(any(UserAccount.class));
+        verify(accountMailer, never()).sendVerificationLink(any(UserAccount.class), any());
+    }
+
     private static UserAccount verifiedAccount() {
         UserAccount account = new UserAccount("alice@example.com", "Alice", "old-hash", NOW);
         account.markEmailVerified(NOW);

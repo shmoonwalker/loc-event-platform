@@ -2,5 +2,6 @@ package nl.loc.backend.config.ratelimit;
 
 public enum RateLimitPolicy {
     REGISTER,
-    ACCOUNT_MAIL
+    ACCOUNT_MAIL,
+    RESEND_VERIFICATION
 }

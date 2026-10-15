@@ -77,6 +77,19 @@ The verification email links to the frontend page `FRONTEND_URL/verify-email?tok
 3. A token that is unknown, expired or already used returns `400` with the title `Invalid token`. All three cases get the same response.
 4. Otherwise the token is marked used, the account is marked verified, and the response is `204 No Content`.
 
+### Resending the link
+
+`POST /api/auth/resend-verification`
+
+```json
+{ "email": "anouk.devries@example.com" }
+```
+
+1. The client IP is checked against the resend rate limit. Over the limit returns `429`.
+2. The body is validated with the same email rules as registration. Invalid input or malformed JSON returns `400`.
+3. If the normalised email belongs to an unverified account, a new token is issued and a fresh link is emailed. Unknown and verified emails get no email.
+4. The response is always `202 Accepted` with an empty body, so it never reveals which emails have an account.
+
 ### Tokens
 
 - 32 random bytes from `SecureRandom`, encoded as URL-safe Base64 without padding (43 characters).
@@ -96,8 +109,10 @@ The verification email links to the frontend page `FRONTEND_URL/verify-email?tok
 
 | Class | Role |
 |---|---|
-| `user/controller/AuthController` | HTTP endpoint for verify-email |
-| `user/dto/request/VerifyEmailRequest` | Request body and its validation rules |
+| `user/controller/AuthController` | HTTP endpoints for verify-email and resend-verification |
+| `user/dto/request/VerifyEmailRequest` | Verify-email request body and its validation rules |
+| `user/dto/request/ResendVerificationRequest` | Resend request body and its validation rules |
+| `user/service/RegistrationService` | Decides whether a resend sends a new link |
 | `user/service/EmailVerificationService` | Issues and verifies tokens |
 | `user/service/SecureTokens` | Generates random tokens and hashes them |
 | `user/service/InvalidTokenException` | Unknown, expired or used token; becomes `400` |
@@ -162,6 +177,7 @@ Public auth endpoints are rate limited with a token bucket per key.
 | Policy | Limit | Key |
 |---|---|---|
 | `REGISTER` | 3 per minute | Client IP |
+| `RESEND_VERIFICATION` | 3 per minute | Client IP |
 | `ACCOUNT_MAIL` | 3 per hour | User id |
 
 Redis keys have the form `loc:rate-limit:<policy>:<key>`, for example `loc:rate-limit:register:203.0.113.5`; the `loc:` prefix keeps them apart from other applications on a shared Redis.
@@ -189,7 +205,7 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 
 | Status | When |
 |---|---|
-| `202` | Registration accepted, whatever the account state |
+| `202` | Registration or resend accepted, whatever the account state |
 | `204` | Email verified |
 | `400` | Invalid input, malformed JSON, or an unknown, expired or used verification token |
 | `429` | Rate limit exceeded, with a `Retry-After` header in seconds |

@@ -59,6 +59,16 @@ public class RegistrationService {
         sendVerification(user);
     }
 
+    // unknown and verified emails get nothing, so callers can't tell the cases apart
+    public void resendVerification(String email) {
+        userAccountRepository.findByEmail(UserAccount.normalizeEmail(email))
+                .filter(user -> !user.isEmailVerified())
+                .ifPresent(user -> {
+                    log.info("Resending verification link to account {}", user.getId());
+                    sendVerification(user);
+                });
+    }
+
     private static boolean isDuplicateEmail(DataIntegrityViolationException ex) {
         return ex.getCause() instanceof ConstraintViolationException cve
                 && EMAIL_UNIQUE_CONSTRAINT.equals(cve.getConstraintName());

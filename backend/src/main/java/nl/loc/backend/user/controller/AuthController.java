@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import nl.loc.backend.config.ratelimit.RateLimitPolicy;
 import nl.loc.backend.config.ratelimit.RateLimiter;
 import nl.loc.backend.user.dto.request.RegisterRequest;
+import nl.loc.backend.user.dto.request.ResendVerificationRequest;
 import nl.loc.backend.user.dto.request.VerifyEmailRequest;
 import nl.loc.backend.user.service.EmailVerificationService;
 import nl.loc.backend.user.service.RegistrationService;
@@ -61,6 +62,29 @@ public class AuthController {
         // before BCrypt, so blocked requests cost almost nothing
         rateLimiter.consume(RateLimitPolicy.REGISTER, httpRequest.getRemoteAddr());
         registrationService.register(request.email(), request.password(), request.displayName());
+    }
+
+    @PostMapping("/resend-verification")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(
+            summary = "Resend verification email",
+            description = "Sends a new verification link when the email belongs to an unverified account. "
+                    + "Always returns 202 with no body, so the response never reveals which emails have an account.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "202", description = "Request accepted."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid input or malformed JSON.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many requests from this IP. Retry-After says how many seconds to wait.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public void resendVerification(@Valid @RequestBody ResendVerificationRequest request,
+                                   HttpServletRequest httpRequest) {
+        rateLimiter.consume(RateLimitPolicy.RESEND_VERIFICATION, httpRequest.getRemoteAddr());
+        registrationService.resendVerification(request.email());
     }
 
     @PostMapping("/verify-email")

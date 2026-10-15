@@ -38,10 +38,12 @@ app:
       register:
         capacity: 3
         period: 1m
-
       account-mail:
         capacity: 3
         period: 1h
+      resend-verification:
+        capacity: 3
+        period: 1m
 
 server:
   port: 8080
