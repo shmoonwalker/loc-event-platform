@@ -9,7 +9,7 @@ server {
   # The browser calls /api on this origin; forward it to the backend service.
   # The upstream is a variable + resolver so nginx resolves it lazily: the container still starts if the
   # backend is briefly down, and picks up address changes (Railway private network, Docker service names).
-  location /api/ {
+  location ^~ /api/ {
     resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
     set $backend "${BACKEND_URL}";
     proxy_pass $backend;
