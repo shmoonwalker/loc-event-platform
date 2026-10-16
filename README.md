@@ -29,6 +29,7 @@ The [system architecture](docs/architecture/system-architecture.md) describes th
 ├── backend/      Spring Boot product API
 ├── data/         Data collection and publication application
 ├── frontend/     Angular application
+├── deploy/       Production deployment script
 ├── docs/         Cross-system architecture documentation
 ├── scripts/      Local development scripts
 └── screenshots/  Project screenshots
@@ -55,3 +56,4 @@ Requirements: Docker, Java 25 and Node.js.
 - [Backend guide](backend/README.md) and [Discovery API](backend/docs/discovery.md)
 - [Data guide](data/README.md)
 - [Frontend guide](frontend/README.md)
+- [Production deployment](deploy/README.md)
