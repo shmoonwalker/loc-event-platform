@@ -1,0 +1,105 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "screenshots/**"
+  workflow_dispatch:
+
+# One production run at a time. A running deployment is never cancelled; a newer run waiting behind
+# it replaces an older waiting one, so the server only moves forward.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    uses: ./.github/workflows/backend-ci-cd.yaml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      push: ${{ github.ref == 'refs/heads/main' }}
+
+  data:
+    uses: ./.github/workflows/data-ci-cd.yaml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      push: ${{ github.ref == 'refs/heads/main' }}
+
+  frontend:
+    uses: ./.github/workflows/frontend-ci-cd.yaml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      push: ${{ github.ref == 'refs/heads/main' }}
+
+  compose:
+    uses: ./.github/workflows/compose-prod.yaml
+    permissions:
+      contents: read
+
+  deploy:
+    needs: [backend, data, frontend, compose]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://loc.shadibuilds.dev
+    permissions:
+      contents: read
+      # The server pulls with this job's token, which can only read packages and expires with the job.
+      packages: read
+    env:
+      TARGET: ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}
+      RELEASE: ${{ vars.DEPLOY_PATH }}/releases/${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: |
+          for name in SSH_KEY KNOWN_HOSTS DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
+            [ -n "${!name}" ] || { echo "::error::$name is not configured for the production environment"; exit 1; }
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host *\n  StrictHostKeyChecking yes\n  BatchMode yes\n  ServerAliveInterval 30\n' > ~/.ssh/config
+
+      - name: Upload release files
+        run: tar -c docker-compose.prod.yml -C deploy deploy.sh | ssh "$TARGET" "mkdir -p '$RELEASE' && tar -x -C '$RELEASE'"
+
+      - name: Pull images on the server
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GITHUB_TOKEN" | ssh "$TARGET" "'$RELEASE/deploy.sh' pull '$GITHUB_ACTOR'"
+
+      # nohup keeps the rollout going on the server if this job is cancelled or the connection drops.
+      # Its output is streamed here and kept in the release directory as deploy.log.
+      - name: Roll out
+        run: |
+          ssh "$TARGET" "cd '$RELEASE' && : > deploy.log && { nohup ./deploy.sh > deploy.log 2>&1 & pid=\$!; tail -n +1 -f --pid=\$pid deploy.log; wait \$pid; }"
+
+      # Cloudflare can challenge requests from GitHub's runners, so this only warns.
+      - name: Check the public site
+        run: |
+          curl -fsS -o /dev/null --max-time 20 --retry 3 --retry-all-errors https://loc.shadibuilds.dev/api/categories \
+            || echo "::warning::https://loc.shadibuilds.dev did not answer from GitHub; the server-side checks passed"

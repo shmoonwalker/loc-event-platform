@@ -1,7 +1,8 @@
 # Production stack: frontend, backend and data only. PostgreSQL, RabbitMQ and Redis are shared
 # infrastructure reached over an existing external network.
 #
-#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# Images are built by the Deploy workflow and tagged with the Git commit SHA. deploy/deploy.sh sets
+# LOC_IMAGE_TAG and rolls the services out one by one; see deploy/README.md.
 name: loc-prod
 
 x-logging: &logging
@@ -14,7 +15,7 @@ services:
   # Service names are prefixed: Compose registers every service name as a DNS alias on each network
   # it joins, and a bare "backend" on the shared network could answer for another application.
   loc-frontend:
-    build: ./frontend
+    image: ghcr.io/shmoonwalker/loc-frontend:${LOC_IMAGE_TAG:?set LOC_IMAGE_TAG to a release commit SHA}
     container_name: loc-frontend
     restart: unless-stopped
     ports:
@@ -32,7 +33,7 @@ services:
     logging: *logging
 
   loc-backend:
-    build: ./backend
+    image: ghcr.io/shmoonwalker/loc-backend:${LOC_IMAGE_TAG:?set LOC_IMAGE_TAG to a release commit SHA}
     container_name: loc-backend
     restart: unless-stopped
     # No host port: only loc-frontend reaches it, as http://backend:8080 on the app network.
@@ -69,7 +70,7 @@ services:
     logging: *logging
 
   loc-data:
-    build: ./data
+    image: ghcr.io/shmoonwalker/loc-data:${LOC_IMAGE_TAG:?set LOC_IMAGE_TAG to a release commit SHA}
     container_name: loc-data
     restart: unless-stopped
     environment:

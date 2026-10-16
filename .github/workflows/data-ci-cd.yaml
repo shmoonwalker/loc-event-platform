@@ -1,20 +1,21 @@
 name: Data CI/CD
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "data/**"
-      - ".github/workflows/data-ci-cd.yaml"
   pull_request:
     paths:
       - "data/**"
       - ".github/workflows/data-ci-cd.yaml"
+  # Called by deploy.yaml on main, which pushes the image.
+  workflow_call:
+    inputs:
+      push:
+        type: boolean
+        default: false
 
-# Cancel previous runs on new pushes
+# Cancel superseded pull request runs; a run called by deploy.yaml gets its own group.
 concurrency:
-  group: docker-build-data-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: data-ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   # The data application has no tests yet; the image build compiles it.
@@ -22,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -29,11 +31,21 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Log in to GHCR
+        if: inputs.push
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build Docker image
         uses: docker/build-push-action@v7
         with:
           context: ./data
           platforms: linux/amd64,linux/arm64
-          push: false
+          push: ${{ inputs.push }}
+          tags: ghcr.io/${{ github.repository_owner }}/loc-data:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=data
           cache-to: type=gha,scope=data,mode=max
