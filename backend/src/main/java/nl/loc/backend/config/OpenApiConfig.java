@@ -3,12 +3,14 @@ package nl.loc.backend.config;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.servers.Server;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
+import java.util.List;
 import java.util.Map;
 
 @Configuration
@@ -19,7 +21,9 @@ public class OpenApiConfig {
         return new OpenAPI().info(new Info()
                 .title("Loc Backend API")
                 .description("Product API for qualified Loc events and user features.")
-                .version("0.1.0"));
+                .version("0.1.0"))
+                // Relative to the page's own origin: behind the frontend proxy the backend only sees Host "backend".
+                .servers(List.of(new Server().url("/")));
     }
 
     @Bean
