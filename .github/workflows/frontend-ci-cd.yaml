@@ -60,7 +60,7 @@ jobs:
         with:
           context: ./frontend
           platforms: linux/amd64,linux/arm64
-          push: ${{ inputs.push }}
+          push: ${{ inputs.push == true }}
           tags: ghcr.io/${{ github.repository_owner }}/loc-frontend:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
