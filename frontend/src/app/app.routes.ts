@@ -31,6 +31,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/organizer/organizer-page').then((m) => m.OrganizerPage),
       },
       {
+        path: 'register',
+        title: 'Create account – Loc',
+        loadComponent: () => import('./features/auth/register/register-page').then((m) => m.RegisterPage),
+      },
+      {
         path: '**',
         title: 'Page not found – Loc',
         loadComponent: () => import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
