@@ -1,0 +1,4 @@
+# Loaded on top of src/main/resources/application.yaml (config/ wins), so tests start without JWT_SECRET.
+app:
+  jwt:
+    secret: n7bnao9xAfkJrxJHGeJPlgCURpkQNnJDWzcjdEkot3k=
