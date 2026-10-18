@@ -34,7 +34,6 @@ export class RegisterPage {
   /** A message about the whole form (rate limit, network), shown above the button. */
   protected readonly formError = signal<string | null>(null);
 
-
   protected submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -48,10 +47,9 @@ export class RegisterPage {
         this.showPassword.set(false);
         this.status.set('sent');
       },
-      error: (err: HttpErrorResponse) =>
-      {
+      error: (err: HttpErrorResponse) => {
         this.status.set('form');
-          this.showApiError(err);
+        this.showApiError(err);
       },
     });
   }

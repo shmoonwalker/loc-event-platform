@@ -1,0 +1,21 @@
+<section class="wrap max-w-xl py-16" aria-live="polite">
+  @switch (status()) {
+    @case ('verifying') {
+      <h1 class="display text-[clamp(36px,5vw,60px)]">Verifying your email…</h1>
+    }
+    @case ('verified') {
+      <h1 class="display text-[clamp(36px,5vw,60px)]">Email verified</h1>
+      <p class="mt-4 text-muted">Your account is ready. You can log in now.</p>
+      <a routerLink="/login" class="btn-dark mt-6">Log in</a>
+    }
+    @case ('invalid') {
+      <h1 class="display text-[clamp(36px,5vw,60px)]">This link is invalid or has expired</h1>
+      <p class="mt-4 text-muted">Verification links work once and expire after 24 hours.</p>
+    }
+    @case ('failed') {
+      <h1 class="display text-[clamp(36px,5vw,60px)]">We couldn't reach Loc</h1>
+      <p class="mt-4 text-muted">Check your connection and try again.</p>
+      <button type="button" class="btn-dark mt-6" (click)="verify()">Try again</button>
+    }
+  }
+</section>

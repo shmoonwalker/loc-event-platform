@@ -18,4 +18,9 @@ export class AuthApi {
   register(body: RegisterRequest): Observable<void> {
     return this.http.post<void>('/api/auth/register', body);
   }
+
+  /** 204 when verified; 400 for an unknown, expired or used token. */
+  verifyEmail(token: string): Observable<void> {
+    return this.http.post<void>('/api/auth/verify-email', { token });
+  }
 }

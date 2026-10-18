@@ -41,6 +41,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/auth/login/login-page').then((m) => m.LoginPage),
       },
       {
+        path: 'verify-email',
+        title: 'Verify email – Loc',
+        loadComponent: () =>
+          import('./features/auth/verify-email/verify-email-page').then((m) => m.VerifyEmailPage),
+      },
+      {
         path: '**',
         title: 'Page not found – Loc',
         loadComponent: () => import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
