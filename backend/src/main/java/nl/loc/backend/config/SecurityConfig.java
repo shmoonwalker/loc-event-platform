@@ -24,7 +24,8 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityProblemHandler problemHandler)
+            throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error", "/api/docs/**").permitAll()
@@ -33,13 +34,20 @@ public class SecurityConfig {
                         // auth routes are opened one by one; never /api/auth/**
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/verify-email",
                                 "/api/auth/resend-verification", "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // validates "Authorization: Bearer <token>" with the JwtDecoder bean from JwtConfig
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(problemHandler)
+                        .accessDeniedHandler(problemHandler))
+                // validates "Authorization: Bearer <token>" with the JwtDecoder bean from JwtConfig;
+                // it has its own entry point for bad tokens, so it needs the problem handler too
                 .oauth2ResourceServer(resourceServer -> resourceServer
+                        .authenticationEntryPoint(problemHandler)
+                        .accessDeniedHandler(problemHandler)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(rolesConverter())));
         return http.build();
     }

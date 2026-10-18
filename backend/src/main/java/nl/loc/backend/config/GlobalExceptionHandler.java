@@ -2,6 +2,7 @@ package nl.loc.backend.config;
 
 import nl.loc.backend.config.ratelimit.RateLimitExceededException;
 import nl.loc.backend.event.controller.InvalidBrowseQueryException;
+import nl.loc.backend.user.service.AccountNotFoundException;
 import nl.loc.backend.user.service.EmailNotVerifiedException;
 import nl.loc.backend.user.service.InvalidTokenException;
 import org.springframework.http.HttpHeaders;
@@ -101,5 +102,11 @@ public class GlobalExceptionHandler {
         problem.setTitle("Email not verified");
         problem.setDetail("Please verify your email address before logging in");
         return problem;
+    }
+
+    // same answer as an invalid token: the token no longer belongs to an account
+    @ExceptionHandler(AccountNotFoundException.class)
+    public ProblemDetail handleAccountNotFound(AccountNotFoundException ex) {
+        return SecurityProblemHandler.unauthorized();
     }
 }
