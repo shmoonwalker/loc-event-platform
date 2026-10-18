@@ -23,4 +23,9 @@ export class AuthApi {
   verifyEmail(token: string): Observable<void> {
     return this.http.post<void>('/api/auth/verify-email', { token });
   }
+
+  /** Always 202, so the answer never reveals whether the email has an account. */
+  resendVerification(email: string): Observable<void> {
+    return this.http.post<void>('/api/auth/resend-verification', { email });
+  }
 }

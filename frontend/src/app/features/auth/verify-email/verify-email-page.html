@@ -15,6 +15,37 @@
     @case ('failed') {
       <h1 class="display text-[clamp(36px,5vw,60px)]">We couldn't reach Loc</h1>
       <p class="mt-4 text-muted">Check your connection and try again.</p>
+      @if (resendStatus() === 'sent') {
+        <p class="mt-6 font-semibold" role="status">
+          If this email still needs verifying, we've sent a new link. Check your inbox.
+        </p>
+      } @else {
+        <form [formGroup]="resendForm" (ngSubmit)="resend()" class="mt-8 flex flex-col gap-3">
+          <label for="resend-email" class="font-semibold">Send a new link</label>
+          <input
+            id="resend-email"
+            formControlName="email"
+            type="email"
+            autocomplete="email"
+            class="field-input"
+            aria-describedby="resend-email-error"
+            [attr.aria-invalid]="
+              resendForm.controls.email.touched && resendForm.controls.email.invalid ? true : null
+            "
+          />
+          <p id="resend-email-error" class="text-sm text-danger">
+            @if (resendForm.controls.email.touched && resendForm.controls.email.invalid) {
+              Enter a valid email.
+            }
+          </p>
+          @if (resendError(); as message) {
+            <p role="alert" class="text-sm text-danger">{{ message }}</p>
+          }
+          <button type="submit" class="btn-dark self-start" [disabled]="resendStatus() === 'sending'">
+            {{ resendStatus() === 'sending' ? 'Sending…' : 'Send link' }}
+          </button>
+        </form>
+      }
       <button type="button" class="btn-dark mt-6" (click)="verify()">Try again</button>
     }
   }
