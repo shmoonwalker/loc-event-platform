@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import {
   NonNullableFormBuilder,
   ReactiveFormsModule,
@@ -22,6 +22,8 @@ export class RegisterPage {
     email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
     password: ['', [Validators.required, Validators.minLength(10), maxBytes(72)]],
   });
+
+  protected readonly showPassword = signal(false);
 
   protected submit(): void {
     if (this.form.invalid) {
