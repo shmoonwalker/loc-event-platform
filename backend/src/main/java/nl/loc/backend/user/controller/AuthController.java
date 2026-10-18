@@ -138,6 +138,10 @@ public class AuthController {
             @ApiResponse(
                     responseCode = "403",
                     description = "Correct password, but the email is not verified yet.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many login attempts for this email. Retry-After says how many seconds to wait.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {

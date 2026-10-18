@@ -2,6 +2,7 @@ package nl.loc.backend.user.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -123,6 +124,14 @@ class LoginHttpTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.email").value("Please provide an email"))
                 .andExpect(jsonPath("$.errors.password").value("Please provide a password"));
+    }
+
+    @Test
+    void malformedJsonReturnsProblemDetail() throws Exception {
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Malformed request body"));
     }
 
     private ResultActions login(String email, String password) throws Exception {
