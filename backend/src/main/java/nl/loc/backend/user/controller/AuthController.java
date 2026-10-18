@@ -8,15 +8,25 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import nl.loc.backend.config.ratelimit.RateLimitPolicy;
 import nl.loc.backend.config.ratelimit.RateLimiter;
+import nl.loc.backend.user.dto.request.LoginRequest;
 import nl.loc.backend.user.dto.request.RegisterRequest;
 import nl.loc.backend.user.dto.request.ResendVerificationRequest;
 import nl.loc.backend.user.dto.request.VerifyEmailRequest;
+import nl.loc.backend.user.dto.response.LoginResponse;
+import nl.loc.backend.user.dto.response.UserResponse;
+import nl.loc.backend.user.model.UserAccount;
+import nl.loc.backend.user.service.CurrentUserService;
 import nl.loc.backend.user.service.EmailVerificationService;
+import nl.loc.backend.user.service.LoginService;
 import nl.loc.backend.user.service.RegistrationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,13 +41,18 @@ public class AuthController {
     private final RegistrationService registrationService;
     private final EmailVerificationService emailVerificationService;
     private final RateLimiter rateLimiter;
+    private final LoginService loginService;
+    private final CurrentUserService currentUserService;
 
     public AuthController(RegistrationService registrationService,
                           EmailVerificationService emailVerificationService,
-                          RateLimiter rateLimiter) {
+                          RateLimiter rateLimiter, LoginService loginService,
+                          CurrentUserService currentUserService) {
         this.registrationService = registrationService;
         this.emailVerificationService = emailVerificationService;
         this.rateLimiter = rateLimiter;
+        this.loginService = loginService;
+        this.currentUserService = currentUserService;
     }
 
     @PostMapping("/register")
@@ -102,5 +117,53 @@ public class AuthController {
     })
     public void verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
         emailVerificationService.verify(request.token());
+    }
+
+    @PostMapping("/login")
+    @Operation(
+            summary = "Log in",
+            description = "Checks email and password and returns a short-lived access token. "
+                    + "A wrong password and an unknown email get the same 401, "
+                    + "so the response never reveals which emails have an account.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Logged in."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid input or malformed JSON.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Invalid email or password.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Correct password, but the email is not verified yet.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many login attempts for this email. Retry-After says how many seconds to wait.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        // before BCrypt, so blocked requests cost almost nothing; slow down only, never lock the account
+        String email = UserAccount.normalizeEmail(request.email());
+        rateLimiter.consume(RateLimitPolicy.LOGIN, httpRequest.getRemoteAddr() + ":" + email);
+        rateLimiter.consume(RateLimitPolicy.LOGIN_EMAIL, email);
+        return loginService.login(request);
+    }
+
+    @GetMapping("/me")
+    @Operation(
+            summary = "Current user",
+            description = "Returns the account of the access token in the Authorization header. Never returns password material.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "The logged-in user."),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Missing, invalid or expired access token, or the account no longer exists.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
+        return currentUserService.currentUser(UUID.fromString(jwt.getSubject()));
     }
 }

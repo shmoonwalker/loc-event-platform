@@ -2,12 +2,15 @@ package nl.loc.backend.config;
 
 import nl.loc.backend.config.ratelimit.RateLimitExceededException;
 import nl.loc.backend.event.controller.InvalidBrowseQueryException;
+import nl.loc.backend.user.service.AccountNotFoundException;
+import nl.loc.backend.user.service.EmailNotVerifiedException;
 import nl.loc.backend.user.service.InvalidTokenException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -83,5 +86,27 @@ public class GlobalExceptionHandler {
         problem.setDetail("One or more fields are invalid");
         problem.setProperty("errors", errors);
         return problem;
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ProblemDetail handleBadCredentials(BadCredentialsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.UNAUTHORIZED);
+        problem.setTitle("Invalid credentials");
+        problem.setDetail("Invalid email or password");
+        return problem;
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ProblemDetail handleEmailNotVerified(EmailNotVerifiedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+        problem.setTitle("Email not verified");
+        problem.setDetail("Please verify your email address before logging in");
+        return problem;
+    }
+
+    // same answer as an invalid token: the token no longer belongs to an account
+    @ExceptionHandler(AccountNotFoundException.class)
+    public ProblemDetail handleAccountNotFound(AccountNotFoundException ex) {
+        return SecurityProblemHandler.unauthorized();
     }
 }

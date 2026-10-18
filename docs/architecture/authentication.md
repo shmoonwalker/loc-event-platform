@@ -1,13 +1,13 @@
 # Authentication
 
-How users register with Loc and verify their email, how passwords and tokens are stored, and how the authentication endpoints are protected against abuse.
+How users register with Loc, verify their email and log in, how passwords and tokens are stored, how requests are authorized, and how the authentication endpoints are protected against abuse.
 
 ---
 
 ## Principles
 
 - **No account enumeration.** No response, error or timing difference reveals whether an email is registered. Only the owner of the inbox learns what happened, by email.
-- **Spring Security first.** Its building blocks (password encoder, security filter chain) are used before any custom security code.
+- **Spring Security first.** Its building blocks (password encoder, security filter chain, `AuthenticationManager`, OAuth2 resource server) are used before any custom security code.
 - **Secrets are stored only as hashes.** Passwords use BCrypt; random tokens use SHA-256.
 - **Endpoints that hash passwords or send email are rate limited.**
 - **One error format.** Every error response is an RFC 7807 `ProblemDetail`.
@@ -122,6 +122,89 @@ The verification email links to the frontend page `FRONTEND_URL/verify-email?tok
 
 ---
 
+## Login
+
+`POST /api/auth/login`
+
+```json
+{ "email": "anouk.devries@example.com", "password": "correct-horse-battery" }
+```
+
+1. The login rate limits are checked: per client IP and email, and per email across all IPs. Over either limit returns `429`.
+2. The body is validated: both fields are required, and the email is at most 254 characters. The password rules of registration are not applied, so a later change to those rules never locks out existing accounts. Invalid input or malformed JSON returns `400`.
+3. Spring Security's `AuthenticationManager` (a `DaoAuthenticationProvider`) loads the account by normalised email and checks the password with the password encoder.
+   - A wrong password, an unknown email and an account without a password all return the same `401` with the title `Invalid credentials`.
+   - For an unknown email the provider still runs a BCrypt check against a dummy hash, so a missing account does not answer faster.
+4. Only after the password is proven, an unverified account returns `403` with the title `Email not verified`. Checking this before the password would let anyone find unverified accounts. For the same reason `UserDetails.isEnabled()` always returns `true`: `DaoAuthenticationProvider` checks it before the password.
+5. Otherwise the response is `200` with an access token:
+
+```json
+{ "accessToken": "<jwt>", "tokenType": "Bearer", "expiresIn": 900 }
+```
+
+Successful and refused logins are logged with the account id only. Failed logins are not logged with the email, because a mistyped address can belong to someone else.
+
+### Access tokens
+
+- A JWT signed with HS256 using `JWT_SECRET`, through Spring Security's `NimbusJwtEncoder` and `NimbusJwtDecoder`.
+- Valid for `JWT_ACCESS_TOKEN_TTL` (15 minutes by default).
+- Claims: `sub` (the account id), `roles` (for example `["USER"]`), `iat` and `exp`. The token holds no email, name or password material: a JWT is signed, not encrypted, so anyone holding it can read it.
+- `JWT_SECRET` must be Base64 of at least 32 bytes (256 bits). The application refuses to start when it is missing or too short.
+- The role is read when the token is issued. A role change in the database takes effect at the next login, at most one token lifetime later.
+
+### Current user
+
+`GET /api/auth/me` with `Authorization: Bearer <accessToken>` returns the account of the token:
+
+```json
+{ "id": "0190a6b2-…", "email": "anouk.devries@example.com", "displayName": "Anouk de Vries", "role": "USER" }
+```
+
+It never returns password material. When the account no longer exists, the response is the same `401` as for an invalid token.
+
+### Code
+
+| Class | Role |
+|---|---|
+| `user/controller/AuthController` | HTTP endpoints for login and the current user; applies the login rate limits |
+| `user/dto/request/LoginRequest` | Login request body and its validation rules |
+| `user/dto/response/LoginResponse` | Access token, token type and lifetime in seconds |
+| `user/dto/response/UserResponse` | The current user, without password material |
+| `user/service/LoginService` | Authenticates through the `AuthenticationManager`, checks email verification, issues the token |
+| `user/service/AccountUserDetailsService` | Loads an account by normalised email for Spring Security |
+| `user/service/AccountUserDetails` | Adapts `UserAccount` to Spring Security's `UserDetails` |
+| `user/service/AccessTokenService` | Builds and signs the access token |
+| `user/service/CurrentUserService` | Loads the account of the current token |
+| `user/service/EmailNotVerifiedException` | Correct password on an unverified account; becomes `403` |
+| `user/service/AccountNotFoundException` | Token of a deleted account; becomes `401` |
+| `config/jwt/JwtProperties` | Secret and token lifetime; validates the secret at startup |
+| `config/jwt/JwtConfig` | JWT encoder and decoder beans |
+
+---
+
+## Authorization
+
+Every request passes Spring Security's filter chain (`config/SecurityConfig`):
+
+- `Authorization: Bearer <token>` is validated by the OAuth2 resource server with the same key: signature, `exp` and `nbf` (with 60 seconds of clock skew).
+- The `roles` claim becomes Spring authorities with the `ROLE_` prefix, so `["ADMIN"]` becomes `ROLE_ADMIN` and matches `hasRole("ADMIN")`.
+- The token's `sub` is the principal name.
+
+| Routes | Access |
+|---|---|
+| Public discovery `GET` routes, `/api/docs/**` | Everyone |
+| `POST /api/auth/register`, `/verify-email`, `/resend-verification`, `/login` | Everyone |
+| `GET /api/auth/me` | Any valid access token |
+| `/api/admin/**` | Role `ADMIN` |
+| Anything else | Denied |
+
+- A missing, malformed, expired or wrongly signed token gets the same `401` with the title `Unauthorized` and a `WWW-Authenticate: Bearer` header, so the response does not reveal which check failed.
+- A valid token without the required role gets `403` with the title `Forbidden`.
+- A request to a public route that carries an invalid token also gets `401`; clients should drop an expired token instead of sending it.
+- Errors from the security filters never reach `@RestControllerAdvice`. `config/SecurityProblemHandler` writes them as `ProblemDetail`, and is registered both as the chain's entry point and as the resource server's entry point, which handles bad tokens.
+
+---
+
 ## Passwords and emails
 
 - **Encoder:** `DelegatingPasswordEncoder` with `bcrypt` (strength 12) as the only and default encoder. Hashes are stored as `{bcrypt}$2a$12$…`; the prefix allows a later algorithm change without breaking stored passwords.
@@ -179,6 +262,10 @@ Public auth endpoints are rate limited with a token bucket per key.
 | `REGISTER` | 3 per minute | Client IP |
 | `RESEND_VERIFICATION` | 3 per minute | Client IP |
 | `ACCOUNT_MAIL` | 3 per hour | User id |
+| `LOGIN` | 5 per minute | Client IP and normalised email |
+| `LOGIN_EMAIL` | 20 per hour | Normalised email |
+
+The login limits slow guessing down and never lock the account: a lockout would let anyone lock a victim out. `LOGIN_EMAIL` stops guessing spread over many IPs.
 
 Redis keys have the form `loc:rate-limit:<policy>:<key>`, for example `loc:rate-limit:register:203.0.113.5`; the `loc:` prefix keeps them apart from other applications on a shared Redis.
 
@@ -205,9 +292,12 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 
 | Status | When |
 |---|---|
+| `200` | Logged in, or the current user |
 | `202` | Registration or resend accepted, whatever the account state |
 | `204` | Email verified |
 | `400` | Invalid input, malformed JSON, or an unknown, expired or used verification token |
+| `401` | Wrong email or password, or a missing, invalid or expired access token |
+| `403` | Correct password on an unverified account, or an access token without the required role |
 | `429` | Rate limit exceeded, with a `Retry-After` header in seconds |
 
 ---
@@ -222,4 +312,6 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 | `MAIL_USERNAME`, `MAIL_PASSWORD` | SMTP login | Empty locally; in production the Resend API key is the password |
 | `MAIL_FROM` | Sender address | Defaults to `Loc <no-reply@loc.local>` |
 | `FRONTEND_URL` | Base of the links in emails | Defaults to `http://localhost:4200` |
+| `JWT_SECRET` | Signing access tokens | Required, Base64 of at least 32 bytes: `openssl rand -base64 32`. Locally in the shell or IDE; in production in `.env.production` |
+| `JWT_ACCESS_TOKEN_TTL` | Access-token lifetime | Defaults to `15m` |
 

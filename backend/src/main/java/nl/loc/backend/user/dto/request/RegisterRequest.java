@@ -38,4 +38,10 @@ public record RegisterRequest(
     public boolean isPasswordWithinByteLimit() {
         return password == null || password.getBytes(StandardCharsets.UTF_8).length <= 72;
     }
+
+    // records print every field; keep the password out of logs
+    @Override
+    public String toString() {
+        return "RegisterRequest[email=" + email + ", password=***, displayName=" + displayName + "]";
+    }
 }

@@ -52,6 +52,7 @@ services:
       SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:?set MAIL_PASSWORD (Resend API key)}
       APP_MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM}
       APP_MAIL_FRONTEND_URL: ${FRONTEND_URL:?set FRONTEND_URL}
+      APP_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -base64 32)}
       JAVA_TOOL_OPTIONS: ${LOC_BACKEND_JAVA_OPTS:--XX:MaxRAMPercentage=75}
     networks:
       app:

@@ -1,6 +1,6 @@
 # Backend
 
-The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery and user registration.
+The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration and login.
 
 The backend does not collect or normalize external event data. That is the job of the [data application](../data/README.md).
 
@@ -17,7 +17,8 @@ The frontend communicates only with the backend API.
 | Area | Endpoints | Documentation |
 |---|---|---|
 | Event discovery | `GET /api/home`, `/api/events`, `/api/events/{id}`, `/api/events/filter-options`, `/api/cities`, `/api/organizers/{id}`, `/api/categories`, `/api/tags` | [Discovery API](docs/discovery.md) |
-| Registration | `POST /api/auth/register`, with a verification email | [Authentication](../docs/architecture/authentication.md) |
+| Registration | `POST /api/auth/register`, `/api/auth/verify-email`, `/api/auth/resend-verification` | [Authentication](../docs/architecture/authentication.md) |
+| Login | `POST /api/auth/login` (JWT access token), `GET /api/auth/me` | [Authentication](../docs/architecture/authentication.md) |
 
 Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI document at `/api/docs/openapi.yaml`.
 
@@ -33,7 +34,13 @@ Requirements: Java 25 and Docker.
    docker compose up -d db redis mailpit
    ```
 
-2. Start the backend from `backend/`:
+2. Set a secret for signing access tokens. The backend refuses to start without one. Generate it once and keep it in your shell profile or IDE run configuration, never in the repository:
+
+   ```bash
+   export JWT_SECRET="$(openssl rand -base64 32)"
+   ```
+
+3. Start the backend from `backend/`:
 
    ```bash
    ./mvnw spring-boot:run
@@ -62,6 +69,8 @@ Redis is only needed for rate limiting. Without it the backend still starts and 
 | `MAIL_USERNAME`, `MAIL_PASSWORD` | empty | SMTP login |
 | `MAIL_FROM` | `Loc <no-reply@loc.local>` | Sender of account emails |
 | `FRONTEND_URL` | `http://localhost:4200` | Base of links in emails |
+| `JWT_SECRET` | none, required | Base64 key of at least 32 bytes that signs access tokens |
+| `JWT_ACCESS_TOKEN_TTL` | `15m` | Lifetime of an access token |
 
 Rate limits are set under `app.rate-limit.policies` in `src/main/resources/application.yaml`.
 
@@ -74,9 +83,10 @@ The code is organized by feature. Each feature owns its controller, service, rep
 ```text
 nl.loc.backend
 ├── config/        security chain, password encoder, error handling, OpenAPI, clock, async
+│   ├── jwt/       access-token signing key and JWT encoder/decoder
 │   └── ratelimit/ Redis-backed rate limiter
 ├── event/         public discovery: events, organizers, cities, categories, tags
-└── user/          user accounts, registration and account emails
+└── user/          user accounts, registration, login and account emails
 ```
 
 Within a feature:
@@ -92,7 +102,7 @@ Within a feature:
 Conventions:
 
 - Controllers validate input at the boundary (`@Valid`) and use DTOs, never entities, in the API.
-- Every error is a `ProblemDetail`, produced by `config/GlobalExceptionHandler`.
+- Every error is a `ProblemDetail`, produced by `config/GlobalExceptionHandler`, or by `config/SecurityProblemHandler` for 401 and 403 from the security filters.
 - The security chain denies every route that is not explicitly opened in `config/SecurityConfig`.
 - Time comes from the injected `Clock` (`config/TimeConfig`), so tests can fix it.
 

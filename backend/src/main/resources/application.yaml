@@ -30,6 +30,10 @@ spring:
     password: ${MAIL_PASSWORD:}
 
 app:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+
   mail:
     from: "${MAIL_FROM:Loc <no-reply@loc.local>}"
     frontend-url: ${FRONTEND_URL:http://localhost:4200}
@@ -44,6 +48,14 @@ app:
       resend-verification:
         capacity: 3
         period: 1m
+      # per IP + email
+      login:
+        capacity: 5
+        period: 1m
+      # per email across all IPs, against guessing spread over many addresses
+      login-email:
+        capacity: 20
+        period: 1h
 
 server:
   port: 8080
