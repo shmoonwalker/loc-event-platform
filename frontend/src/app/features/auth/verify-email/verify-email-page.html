@@ -11,10 +11,6 @@
     @case ('invalid') {
       <h1 class="display text-[clamp(36px,5vw,60px)]">This link is invalid or has expired</h1>
       <p class="mt-4 text-muted">Verification links work once and expire after 24 hours.</p>
-    }
-    @case ('failed') {
-      <h1 class="display text-[clamp(36px,5vw,60px)]">We couldn't reach Loc</h1>
-      <p class="mt-4 text-muted">Check your connection and try again.</p>
       @if (resendStatus() === 'sent') {
         <p class="mt-6 font-semibold" role="status">
           If this email still needs verifying, we've sent a new link. Check your inbox.
@@ -41,11 +37,19 @@
           @if (resendError(); as message) {
             <p role="alert" class="text-sm text-danger">{{ message }}</p>
           }
-          <button type="submit" class="btn-dark self-start" [disabled]="resendStatus() === 'sending'">
+          <button
+            type="submit"
+            class="btn-dark self-start"
+            [disabled]="resendStatus() === 'sending'"
+          >
             {{ resendStatus() === 'sending' ? 'Sending…' : 'Send link' }}
           </button>
         </form>
       }
+    }
+    @case ('failed') {
+      <h1 class="display text-[clamp(36px,5vw,60px)]">We couldn't reach Loc</h1>
+      <p class="mt-4 text-muted">Check your connection and try again.</p>
       <button type="button" class="btn-dark mt-6" (click)="verify()">Try again</button>
     }
   }

@@ -1,14 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthApi } from '../../../core/auth-api';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-
 
 /** Opened from the verification email; posts the link's token so the account becomes verified. */
 @Component({
   selector: 'app-verify-email-page',
-  imports: [ReactiveFormsModule,RouterLink],
+  imports: [ReactiveFormsModule, RouterLink],
   templateUrl: './verify-email-page.html',
 })
 export class VerifyEmailPage implements OnInit {
