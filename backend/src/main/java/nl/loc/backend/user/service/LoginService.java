@@ -1,16 +1,13 @@
 package nl.loc.backend.user.service;
 
-
 import lombok.extern.slf4j.Slf4j;
 import nl.loc.backend.config.jwt.JwtProperties;
 import nl.loc.backend.user.dto.request.LoginRequest;
 import nl.loc.backend.user.dto.response.LoginResponse;
 import nl.loc.backend.user.model.UserAccount;
-import nl.loc.backend.user.repository.UserAccountRepository;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -43,5 +40,3 @@ public class LoginService {
         return new LoginResponse(accessTokenService.issueAccessToken(user), jwtProperties.accessTokenTtl());
     }
 }
-
-
