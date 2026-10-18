@@ -7,6 +7,9 @@ This Angular application is Loc's user interface. It has these pages:
 | `/` | Home: highlight rails (tonight, this weekend, near you, online) and a searchable, filterable event list |
 | `/events/:id` | Event detail: description, location, organizers, every upcoming date and per-date weather |
 | `/organizers/:id` | Organizer profile and their upcoming events |
+| `/register` | Create an account with name, email and password, then "check your email" |
+| `/verify-email` | Opened from the verification email; verifies the account or offers a new link |
+| `/login` | Log in (placeholder until the login form exists) |
 | `/holding` | Holding page from the earlier version of the site |
 
 Filters live in the URL query string, so every filtered view is a shareable link. The
