@@ -48,6 +48,14 @@ app:
       resend-verification:
         capacity: 3
         period: 1m
+      # per IP + email
+      login:
+        capacity: 5
+        period: 1m
+      # per email across all IPs, against guessing spread over many addresses
+      login-email:
+        capacity: 20
+        period: 1h
 
 server:
   port: 8080

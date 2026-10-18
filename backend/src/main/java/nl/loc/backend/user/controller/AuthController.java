@@ -15,6 +15,7 @@ import nl.loc.backend.user.dto.request.RegisterRequest;
 import nl.loc.backend.user.dto.request.ResendVerificationRequest;
 import nl.loc.backend.user.dto.request.VerifyEmailRequest;
 import nl.loc.backend.user.dto.response.LoginResponse;
+import nl.loc.backend.user.model.UserAccount;
 import nl.loc.backend.user.service.EmailVerificationService;
 import nl.loc.backend.user.service.LoginService;
 import nl.loc.backend.user.service.RegistrationService;
@@ -130,7 +131,11 @@ public class AuthController {
                     description = "Correct password, but the email is not verified yet.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
+    public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        // before BCrypt, so blocked requests cost almost nothing; slow down only, never lock the account
+        String email = UserAccount.normalizeEmail(request.email());
+        rateLimiter.consume(RateLimitPolicy.LOGIN, httpRequest.getRemoteAddr() + ":" + email);
+        rateLimiter.consume(RateLimitPolicy.LOGIN_EMAIL, email);
         return loginService.login(request);
     }
 }
