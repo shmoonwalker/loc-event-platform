@@ -1,6 +1,6 @@
 <header class="sticky top-0 z-10 border-b border-line bg-bg">
   <div class="wrap flex flex-wrap items-center gap-3 py-3">
-    <a routerLink="/" class="mr-auto flex items-center gap-2" aria-label="Loc home">
+    <a routerLink="/" class="flex items-center gap-2" aria-label="Loc home">
       <span class="grid size-8 place-items-center rounded-[50%_50%_50%_4px] bg-blush" aria-hidden="true">
         <span class="size-2.5 rounded-full bg-panel"></span>
       </span>
@@ -30,5 +30,6 @@
       <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
       <span class="max-sm:hidden">{{ theme.theme() === 'dark' ? 'Light' : 'Dark' }}</span>
     </button>
+    <a routerLink="/login" class="btn-dark ml-auto min-h-11">Log in</a>
   </div>
 </header>
