@@ -77,6 +77,9 @@
         </p>
       </div>
 
+      @if (formError(); as message) {
+        <p role="alert" class="text-sm text-danger">{{ message }}</p>
+      }
       <button type="submit" class="btn-primary" [disabled]="status() === 'sending'">
         {{ status() === 'sending' ? 'Creating account…' : 'Create account' }}
       </button>
