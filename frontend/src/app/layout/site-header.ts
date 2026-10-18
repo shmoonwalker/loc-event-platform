@@ -7,7 +7,7 @@ import { valueOf } from '../core/resource';
 import { ThemeService } from '../core/theme';
 import { IconComponent } from '../shared/icon/icon';
 
-/** Brand, "Your city" picker (drives the Near-you rail) and the theme switch. */
+/** Brand, "Your city" picker (drives the Near-you rail), the theme switch and the Log in link. */
 @Component({
   selector: 'app-site-header',
   imports: [RouterLink, IconComponent],
