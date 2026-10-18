@@ -1,0 +1,45 @@
+<section class="wrap py-16">
+  <h1 class="display text-[clamp(36px,5vw,60px)]">Create account</h1>
+  <p class="mt-4 text-muted">
+    Already have an account? <a routerLink="/login" class="link">Log in</a>
+  </p>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="mt-8 flex max-w-md flex-col gap-5">
+    <div class="flex flex-col gap-1.5">
+      <label for="displayName" class="font-semibold">Name</label>
+      <input
+        id="displayName"
+        formControlName="displayName"
+        type="text"
+        autocomplete="name"
+        class="field-input"
+      />
+      <p class="text-sm text-muted">Shown to others on Loc.</p>
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <label for="email" class="font-semibold">Email</label>
+      <input
+        id="email"
+        formControlName="email"
+        type="email"
+        autocomplete="email"
+        class="field-input"
+      />
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <label for="password" class="font-semibold">Password</label>
+      <input
+        id="password"
+        formControlName="password"
+        type="password"
+        autocomplete="new-password"
+        class="field-input"
+      />
+      <p class="text-sm text-muted">At least 10 characters.</p>
+    </div>
+
+    <button type="submit" class="btn-primary">Create account</button>
+  </form>
+</section>

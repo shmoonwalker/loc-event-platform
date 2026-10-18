@@ -1,18 +1,27 @@
-import { Component } from '@angular/core';
-
+import { Component, inject } from '@angular/core';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 /** Sign-up page: email, password and display name. */
 @Component({
   selector: 'app-register-page',
-  imports: [RouterLink],
-  template: `
-    <section class="wrap py-16">
-      <h1 class="display text-[clamp(36px,5vw,60px)]">Create account</h1>
-      <p class="mt-4 text-muted">
-        Already have an account? <a routerLink="/login" class="link">Log in</a>
-      </p>
-    </section>
-  `,
+  imports: [RouterLink, ReactiveFormsModule],
+  templateUrl: './register-page.html',
 })
-export class RegisterPage {}
+export class RegisterPage {
+  private readonly fb = inject(NonNullableFormBuilder);
+
+  // Same rules as the backend's RegisterRequest, so most mistakes are caught before a request.
+  protected readonly form = this.fb.group({
+    displayName: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(100)]],
+    email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
+    password: ['', [Validators.required, Validators.minLength(10)]],
+  });
+
+  protected submit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+  }
+}
