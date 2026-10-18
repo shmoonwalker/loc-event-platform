@@ -1,75 +1,85 @@
 <section class="wrap py-16">
-  <h1 class="display text-[clamp(36px,5vw,60px)]">Create account</h1>
-  <p class="mt-4 text-muted">
-    Already have an account? <a routerLink="/login" class="link">Log in</a>
-  </p>
+  @if (status() === 'sent') {
+    <h1 class="display text-[clamp(36px,5vw,60px)]">Check your email</h1>
+    <p class="mt-4 max-w-md text-muted">
+      We sent a message to <strong class="text-ink">{{ form.controls.email.value }}</strong
+      >. Open the link in it to continue. It can take a few minutes, so check your spam folder too.
+    </p>
+  } @else {
+    <h1 class="display text-[clamp(36px,5vw,60px)]">Create account</h1>
+    <p class="mt-4 text-muted">
+      Already have an account? <a routerLink="/login" class="link">Log in</a>
+    </p>
 
-  <form [formGroup]="form" (ngSubmit)="submit()" class="mt-8 flex max-w-md flex-col gap-5">
-    <div class="flex flex-col gap-1.5">
-      <label for="displayName" class="font-semibold">Name</label>
-      <input
-        id="displayName"
-        formControlName="displayName"
-        type="text"
-        autocomplete="name"
-        class="field-input"
-        aria-describedby="displayName-hint displayName-error"
-        [attr.aria-invalid]="errorFor('displayName') ? true : null"
-      />
-      <p id="displayName-hint" class="text-sm text-muted">Shown to others on Loc.</p>
-      <p id="displayName-error" class="text-sm text-danger">
-        @if (errorFor('displayName'); as message) {
-          {{ message }}
-        }
-      </p>
-    </div>
-
-    <div class="flex flex-col gap-1.5">
-      <label for="email" class="font-semibold">Email</label>
-      <input
-        id="email"
-        formControlName="email"
-        type="email"
-        autocomplete="email"
-        class="field-input"
-        aria-describedby="email-error"
-        [attr.aria-invalid]="errorFor('email') ? true : null"
-      />
-      <p id="email-error" class="text-sm text-danger">
-        @if (errorFor('email'); as message) {
-          {{ message }}
-        }
-      </p>
-    </div>
-
-    <div class="flex flex-col gap-1.5">
-      <label for="password" class="font-semibold">Password</label>
-      <div class="relative">
+    <form [formGroup]="form" (ngSubmit)="submit()" class="mt-8 flex max-w-md flex-col gap-5">
+      <div class="flex flex-col gap-1.5">
+        <label for="displayName" class="font-semibold">Name</label>
         <input
-          id="password"
-          formControlName="password"
-          [type]="showPassword() ? 'text' : 'password'"
-          autocomplete="new-password"
-          class="field-input w-full pr-16"
-          aria-describedby="password-hint password-error"
-          [attr.aria-invalid]="errorFor('password') ? true : null"
+          id="displayName"
+          formControlName="displayName"
+          type="text"
+          autocomplete="name"
+          class="field-input"
+          aria-describedby="displayName-hint displayName-error"
+          [attr.aria-invalid]="errorFor('displayName') ? true : null"
         />
-        <button
-          type="button"
-          class="absolute inset-y-0 right-0 px-3 text-sm font-semibold text-muted hover:text-ink"
-          (click)="showPassword.update((shown) => !shown)"
-        >
-          {{ showPassword() ? 'Hide' : 'Show' }}<span class="sr-only"> password</span>
-        </button>
+        <p id="displayName-hint" class="text-sm text-muted">Shown to others on Loc.</p>
+        <p id="displayName-error" class="text-sm text-danger">
+          @if (errorFor('displayName'); as message) {
+            {{ message }}
+          }
+        </p>
       </div>
-      <p id="password-hint" class="text-sm text-muted">At least 10 characters.</p>
-      <p id="password-error" class="text-sm text-danger">
-        @if (errorFor('password'); as message) {
-          {{ message }}
-        }
-      </p>
-    </div>
 
-    <button type="submit" class="btn-primary">Create account</button>
-  </form>
+      <div class="flex flex-col gap-1.5">
+        <label for="email" class="font-semibold">Email</label>
+        <input
+          id="email"
+          formControlName="email"
+          type="email"
+          autocomplete="email"
+          class="field-input"
+          aria-describedby="email-error"
+          [attr.aria-invalid]="errorFor('email') ? true : null"
+        />
+        <p id="email-error" class="text-sm text-danger">
+          @if (errorFor('email'); as message) {
+            {{ message }}
+          }
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label for="password" class="font-semibold">Password</label>
+        <div class="relative">
+          <input
+            id="password"
+            formControlName="password"
+            [type]="showPassword() ? 'text' : 'password'"
+            autocomplete="new-password"
+            class="field-input w-full pr-16"
+            aria-describedby="password-hint password-error"
+            [attr.aria-invalid]="errorFor('password') ? true : null"
+          />
+          <button
+            type="button"
+            class="absolute inset-y-0 right-0 px-3 text-sm font-semibold text-muted hover:text-ink"
+            (click)="showPassword.update((shown) => !shown)"
+          >
+            {{ showPassword() ? 'Hide' : 'Show' }}<span class="sr-only"> password</span>
+          </button>
+        </div>
+        <p id="password-hint" class="text-sm text-muted">At least 10 characters.</p>
+        <p id="password-error" class="text-sm text-danger">
+          @if (errorFor('password'); as message) {
+            {{ message }}
+          }
+        </p>
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="status() === 'sending'">
+        {{ status() === 'sending' ? 'Creating account…' : 'Create account' }}
+      </button>
+    </form>
+  }
 </section>

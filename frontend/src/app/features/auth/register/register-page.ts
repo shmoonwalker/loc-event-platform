@@ -6,6 +6,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { AuthApi } from '../../../core/auth-api';
 
 /** Sign-up page: email, password and display name. */
 @Component({
@@ -15,6 +16,7 @@ import { RouterLink } from '@angular/router';
 })
 export class RegisterPage {
   private readonly fb = inject(NonNullableFormBuilder);
+  private readonly authApi = inject(AuthApi);
 
   // Same rules as the backend's RegisterRequest, so most mistakes are caught before a request.
   protected readonly form = this.fb.group({
@@ -25,11 +27,24 @@ export class RegisterPage {
 
   protected readonly showPassword = signal(false);
 
+  /** form → sending (request in flight) → sent (show "check your email"). */
+  protected readonly status = signal<'form' | 'sending' | 'sent'>('form');
+
   protected submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
+    this.status.set('sending');
+    this.authApi.register(this.form.getRawValue()).subscribe({
+      next: () => {
+        // The issue asks that a password is never shown after submit.
+        this.form.controls.password.reset();
+        this.showPassword.set(false);
+        this.status.set('sent');
+      },
+      error: () => this.status.set('form'),
+    });
   }
 
   /** The message to show under a field, or null while it is valid or not visited yet. */
