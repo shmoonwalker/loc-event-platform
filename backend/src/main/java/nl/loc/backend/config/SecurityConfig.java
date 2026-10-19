@@ -29,6 +29,8 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error", "/api/docs/**").permitAll()
+                        // container health checks; nginx only proxies /api/, so these stay internal
+                        .requestMatchers(HttpMethod.GET, "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/home", "/api/events", "/api/events/filter-options", "/api/cities",
                                 "/api/events/*", "/api/organizers/*", "/api/categories", "/api/tags").permitAll()
                         // auth routes are opened one by one; never /api/auth/**

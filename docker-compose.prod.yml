@@ -11,6 +11,22 @@ x-logging: &logging
     max-size: 10m
     max-file: "3"
 
+# OpenTelemetry Java agent settings shared by loc-backend and loc-data.
+# Logs stay on the server's log forwarder, so the agent exports traces and metrics only.
+x-otel: &otel
+  OTEL_SDK_DISABLED: ${LOC_OTEL_DISABLED:-false}
+  OTEL_EXPORTER_OTLP_ENDPOINT: https://otlp.eu01.nr-data.net
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_COMPRESSION: gzip
+  OTEL_EXPORTER_OTLP_HEADERS: api-key=${NEW_RELIC_LICENSE_KEY:?set NEW_RELIC_LICENSE_KEY (New Relic ingest license key)}
+  OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: delta
+  OTEL_LOGS_EXPORTER: none
+  # New Relic rejects attribute values longer than 4095 characters.
+  OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: "4095"
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment=production,deployment.environment.name=production,service.version=${LOC_IMAGE_TAG}
+  # Ticketmaster takes its API key as ?apikey=; the rest are the agent's defaults, which this list replaces.
+  OTEL_INSTRUMENTATION_SANITIZATION_URL_EXPERIMENTAL_SENSITIVE_QUERY_PARAMETERS: apikey,AWSAccessKeyId,Signature,X-Amz-Signature,X-Amz-Credential,X-Amz-Security-Token,sig,X-Goog-Signature
+
 services:
   # Service names are prefixed: Compose registers every service name as a DNS alias on each network
   # it joins, and a bare "backend" on the shared network could answer for another application.
@@ -38,6 +54,10 @@ services:
     restart: unless-stopped
     # No host port: only loc-frontend reaches it, as http://backend:8080 on the app network.
     environment:
+      <<: *otel
+      OTEL_SERVICE_NAME: loc-backend
+      # Redis span statements contain the rate-limit keys, which hold client IPs and email addresses.
+      OTEL_INSTRUMENTATION_LETTUCE_ENABLED: "false"
       SPRING_PROFILES_ACTIVE: prod
       DB_HOST: ${DB_HOST:?set DB_HOST}
       DB_PORT: ${DB_PORT:-5432}
@@ -53,7 +73,8 @@ services:
       APP_MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM}
       APP_MAIL_FRONTEND_URL: ${FRONTEND_URL:?set FRONTEND_URL}
       APP_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -base64 32)}
-      JAVA_TOOL_OPTIONS: ${LOC_BACKEND_JAVA_OPTS:--XX:MaxRAMPercentage=75}
+      # The agent's classes and metaspace live outside the heap, so the heap gets 65% of the limit.
+      JAVA_TOOL_OPTIONS: -javaagent:/opt/opentelemetry-javaagent.jar ${LOC_BACKEND_JAVA_OPTS:--XX:MaxRAMPercentage=65}
     networks:
       app:
         aliases: [backend]
@@ -62,8 +83,8 @@ services:
     # Spring Boot shuts down gracefully within 30s per phase; Docker's default 10s would cut it short.
     stop_grace_period: 40s
     healthcheck:
-      # The backend has no health endpoint; this only proves the HTTP port accepts connections.
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      # The image has no curl or wget: a plain HTTP/1.0 request through bash, healthy on 200.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -75,6 +96,13 @@ services:
     container_name: loc-data
     restart: unless-stopped
     environment:
+      <<: *otel
+      OTEL_SERVICE_NAME: loc-data
+      # The pipeline runs hundreds of thousands of SQL statements per collection run; a span for each
+      # would use up the New Relic free ingest allowance. Connection pool metrics stay on.
+      OTEL_INSTRUMENTATION_JDBC_ENABLED: "false"
+      OTEL_INSTRUMENTATION_HIBERNATE_ENABLED: "false"
+      OTEL_INSTRUMENTATION_SPRING_DATA_ENABLED: "false"
       SPRING_PROFILES_ACTIVE: prod
       DB_HOST: ${DB_HOST:?set DB_HOST}
       DB_PORT: ${DB_PORT:-5432}
@@ -93,7 +121,7 @@ services:
       R2_BUCKET: ${R2_BUCKET:?set R2_BUCKET}
       Ticketmaster: ${Ticketmaster:?set Ticketmaster (API key)}
       GeminiAPIKey: ${GeminiAPIKey:?set GeminiAPIKey}
-      JAVA_TOOL_OPTIONS: ${LOC_DATA_JAVA_OPTS:--XX:MaxRAMPercentage=75}
+      JAVA_TOOL_OPTIONS: -javaagent:/opt/opentelemetry-javaagent.jar ${LOC_DATA_JAVA_OPTS:--XX:MaxRAMPercentage=65}
     networks:
       - shared
     mem_limit: ${LOC_DATA_MEM_LIMIT:-768m}

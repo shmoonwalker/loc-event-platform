@@ -17,11 +17,15 @@ https://loc.shadibuilds.dev. **Actions → Deploy → Run workflow** on `main` d
 5. **Roll out.** `deploy.sh` replaces one container at a time, stopping the old one before starting the new one:
    - `loc-data` first, because its Flyway migrations own the `catalog` and `publication` schemas the backend reads.
      It must log Spring Boot's `Started … in … seconds` (migrations done) without stopping or restarting.
-   - `loc-backend` (runs its own Flyway migrations on `app`), until its health check is `healthy`.
+   - `loc-backend` (runs its own Flyway migrations on `app`), until its health check is `healthy`
+     (`/actuator/health/readiness`: started and database reachable).
    - `loc-frontend`, until its health check is `healthy`.
    - `GET http://127.0.0.1:3001/` and `/api/categories` must succeed: frontend, proxy, backend and database.
    - `loc-data` must still be running with zero restarts.
-6. **Public check.** The job requests `https://loc.shadibuilds.dev/api/categories`. Because Cloudflare can
+6. **Deployment marker.** The job records the commit SHA as a deployment of `loc-backend` and `loc-data`
+   in New Relic change tracking, with the `production` environment secret `NEW_RELIC_API_KEY` (a New Relic
+   User key). Without the secret, or when New Relic fails, it only warns.
+7. **Public check.** The job requests `https://loc.shadibuilds.dev/api/categories`. Because Cloudflare can
    challenge GitHub's runners, a failure here is a warning, not a failed deployment.
 
 A container that stops or restarts during its wait fails the deployment immediately, so a restart loop
