@@ -91,6 +91,32 @@ class RefreshTokenServiceTest {
         verify(repository, never()).save(any());
     }
 
+    @Test
+    void logoutRevokesFamilyWhenTokenIsKnown() {
+        storedActiveToken();
+
+        service.logout(RAW_TOKEN);
+
+        verify(repository).revokeActiveByFamilyId(FAMILY_ID, NOW);
+    }
+
+    @Test
+    void logoutDoesNotRevokeWhenTokenIsUnknown() {
+        when(repository.findByTokenHash(aryEq(SecureTokens.hash(RAW_TOKEN)))).thenReturn(Optional.empty());
+
+        service.logout(RAW_TOKEN);
+
+        verify(repository, never()).revokeActiveByFamilyId(any(), any());
+    }
+
+    @Test
+    void logoutDoesNotTouchRepositoryWhenTokenIsBlank() {
+        service.logout(" ");
+
+        verify(repository, never()).findByTokenHash(any());
+        verify(repository, never()).revokeActiveByFamilyId(any(), any());
+    }
+
     private RefreshToken storedActiveToken() {
         RefreshToken token = new RefreshToken(
                 user, SecureTokens.hash(RAW_TOKEN), FAMILY_ID, NOW, REFRESH_TTL);

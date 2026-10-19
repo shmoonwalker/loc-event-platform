@@ -217,6 +217,38 @@ public class AuthController {
                 .body(result.response());
     }
 
+    @PostMapping("/logout")
+    @Operation(
+            summary = "Log out",
+            description = "Revokes the refresh token family for the refresh_token cookie when it matches a stored "
+                    + "token, then clears the cookie (HttpOnly, Secure, SameSite=Strict, Path=/api/auth). "
+                    + "Always returns 204: missing, unknown, or already revoked cookies still clear the browser cookie.")
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "204",
+                    description = "Logged out.",
+                    headers = @Header(
+                            name = "Set-Cookie",
+                            description = "Clears refresh_token. HttpOnly, Secure, SameSite=Strict, Path=/api/auth. "
+                                    + "Max-Age=0.",
+                            schema = @Schema(
+                                    type = "string",
+                                    example = "refresh_token=; Path=/api/auth; Max-Age=0; "
+                                            + "Secure; HttpOnly; SameSite=Strict")))
+    })
+    public ResponseEntity<Void> logout(
+            @Parameter(
+                    name = RefreshTokenCookie.NAME,
+                    in = ParameterIn.COOKIE,
+                    description = "Refresh token from login or refresh (HttpOnly cookie).",
+                    required = false)
+            @CookieValue(name = RefreshTokenCookie.NAME, required = false) String rawRefreshToken) {
+        loginService.logout(rawRefreshToken);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, RefreshTokenCookie.clear().toString())
+                .build();
+    }
+
     @GetMapping("/me")
     @Operation(
             summary = "Current user",

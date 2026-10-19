@@ -55,4 +55,8 @@ public class LoginService {
                 rotation.rawRefreshToken(),
                 jwtProperties.refreshTokenTtl());
     }
+
+    public void logout(String rawRefreshToken) {
+        refreshTokenService.logout(rawRefreshToken);
+    }
 }

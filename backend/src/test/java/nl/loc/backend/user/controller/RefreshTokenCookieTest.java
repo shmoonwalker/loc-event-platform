@@ -20,4 +20,17 @@ class RefreshTokenCookieTest {
         assertThat(cookie.getPath()).isEqualTo("/api/auth");
         assertThat(cookie.getMaxAge()).isEqualTo(Duration.ofDays(14));
     }
+
+    @Test
+    void clearSetsSameAttributesWithMaxAgeZero() {
+        ResponseCookie cookie = RefreshTokenCookie.clear();
+
+        assertThat(cookie.getName()).isEqualTo("refresh_token");
+        assertThat(cookie.getValue()).isEmpty();
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.isSecure()).isTrue();
+        assertThat(cookie.getSameSite()).isEqualTo("Strict");
+        assertThat(cookie.getPath()).isEqualTo("/api/auth");
+        assertThat(cookie.getMaxAge()).isEqualTo(Duration.ZERO);
+    }
 }

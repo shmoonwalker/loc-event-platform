@@ -12,12 +12,18 @@ public final class RefreshTokenCookie {
     }
 
     public static ResponseCookie create(String rawToken, Duration maxAge) {
-        return ResponseCookie.from(NAME, rawToken)
+        return baseBuilder(rawToken).maxAge(maxAge).build();
+    }
+
+    public static ResponseCookie clear() {
+        return baseBuilder("").maxAge(Duration.ZERO).build();
+    }
+
+    private static ResponseCookie.ResponseCookieBuilder baseBuilder(String value) {
+        return ResponseCookie.from(NAME, value)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Strict")
-                .path(PATH)
-                .maxAge(maxAge)
-                .build();
+                .path(PATH);
     }
 }

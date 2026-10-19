@@ -67,4 +67,15 @@ public class RefreshTokenService {
 
         return new RefreshRotationResult(existing.getUser(), newRawToken);
     }
+
+    @Transactional
+    public void logout(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return;
+        }
+        Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+        refreshTokenRepository
+                .findByTokenHash(SecureTokens.hash(rawToken))
+                .ifPresent(token -> refreshTokenRepository.revokeActiveByFamilyId(token.getFamilyId(), now));
+    }
 }
