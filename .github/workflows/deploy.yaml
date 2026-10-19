@@ -98,6 +98,29 @@ jobs:
         run: |
           ssh "$TARGET" "cd '$RELEASE' && : > deploy.log && { nohup ./deploy.sh > deploy.log 2>&1 & pid=\$!; tail -n +1 -f --pid=\$pid deploy.log; wait \$pid; }"
 
+      # Marks the release on both services in New Relic change tracking. The release is already live,
+      # so a missing key or a New Relic error only warns.
+      - name: Record the deployment in New Relic
+        env:
+          NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
+        run: |
+          [ -n "$NEW_RELIC_API_KEY" ] || { echo "::warning::NEW_RELIC_API_KEY is not configured; no deployment marker"; exit 0; }
+          for service in loc-backend loc-data; do
+            mutation="mutation { changeTrackingCreateEvent(changeTrackingEvent: {
+              categoryAndTypeData: {kind: {category: \"deployment\", type: \"basic\"},
+                categoryFields: {deployment: {version: \"$GITHUB_SHA\", commit: \"$GITHUB_SHA\"}}},
+              entitySearch: {query: \"name = '$service' AND domain = 'EXT' AND type = 'SERVICE'\"}
+            }) { changeTrackingEvent { changeTrackingId } messages } }"
+            response=$(jq -n --arg query "$mutation" '{query: $query}' \
+              | curl -sS --max-time 20 https://api.eu.newrelic.com/graphql \
+                  -H "Content-Type: application/json" -H "API-Key: $NEW_RELIC_API_KEY" --data-binary @-) || response=""
+            if jq -e '.data.changeTrackingCreateEvent.changeTrackingEvent.changeTrackingId' <<< "$response" > /dev/null 2>&1; then
+              echo "Deployment marker recorded for $service"
+            else
+              echo "::warning::No New Relic deployment marker for $service: ${response:-request failed}"
+            fi
+          done
+
       # Cloudflare can challenge requests from GitHub's runners, so this only warns.
       - name: Check the public site
         run: |

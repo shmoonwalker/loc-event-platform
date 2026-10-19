@@ -2,6 +2,9 @@ logging:
   level:
     root: INFO
     nl.loc.data: INFO
+  # trace and span ids put in the MDC by the OpenTelemetry agent, so a log line links to its trace
+  pattern:
+    correlation: "[%X{trace_id:-}-%X{span_id:-}] "
 
 loc:
   object-storage:
