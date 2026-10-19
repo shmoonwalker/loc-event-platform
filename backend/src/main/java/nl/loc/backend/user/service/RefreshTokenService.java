@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Service
@@ -34,5 +35,36 @@ public class RefreshTokenService {
                         jwtProperties.refreshTokenTtl())
         );
         return rawToken;
+    }
+
+    @Transactional
+    public RefreshRotationResult rotate(String rawToken) {
+        Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+        RefreshToken existing = refreshTokenRepository
+                .findByTokenHash(SecureTokens.hash(rawToken))
+                .orElseThrow(InvalidTokenException::new);
+
+        if (existing.getReplacedBy() != null) {
+            refreshTokenRepository.revokeActiveByFamilyId(existing.getFamilyId(), now);
+            throw new InvalidTokenException();
+        }
+
+        if (!existing.isActive(now)) {
+            throw new InvalidTokenException();
+        }
+
+        String newRawToken = SecureTokens.generate();
+        RefreshToken successor = new RefreshToken(
+                existing.getUser(),
+                SecureTokens.hash(newRawToken),
+                existing.getFamilyId(),
+                now,
+                jwtProperties.refreshTokenTtl());
+        successor = refreshTokenRepository.saveAndFlush(successor);
+
+        existing.markReplacedBy(successor.getId());
+        refreshTokenRepository.save(existing);
+
+        return new RefreshRotationResult(existing.getUser(), newRawToken);
     }
 }

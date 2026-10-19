@@ -1,6 +1,8 @@
 package nl.loc.backend.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,6 +32,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -168,6 +171,46 @@ public class AuthController {
         rateLimiter.consume(RateLimitPolicy.LOGIN, httpRequest.getRemoteAddr() + ":" + email);
         rateLimiter.consume(RateLimitPolicy.LOGIN_EMAIL, email);
         LoginResult result = loginService.login(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE,
+                        RefreshTokenCookie.create(result.rawRefreshToken(), result.refreshTokenTtl()).toString())
+                .body(result.response());
+    }
+
+    @PostMapping("/refresh")
+    @Operation(
+            summary = "Refresh session",
+            description = "Reads the refresh_token cookie and returns a new short-lived access token. "
+                    + "Also sets a new refresh_token cookie with the same attributes as login "
+                    + "(HttpOnly, Secure, SameSite=Strict, Path=/api/auth, Max-Age = refresh TTL). "
+                    + "The raw refresh token is not in the JSON body. "
+                    + "Missing, unknown, expired, revoked, and reused cookies all get the same 400.")
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "New access token issued.",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class)),
+                    headers = @Header(
+                            name = "Set-Cookie",
+                            description = "New refresh_token cookie. HttpOnly, Secure, SameSite=Strict, Path=/api/auth. "
+                                    + "Max-Age is the refresh token TTL in seconds.",
+                            schema = @Schema(
+                                    type = "string",
+                                    example = "refresh_token=<token>; Path=/api/auth; Max-Age=1209600; "
+                                            + "Secure; HttpOnly; SameSite=Strict"))),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Missing, invalid, expired, revoked or reused refresh cookie.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ResponseEntity<LoginResponse> refresh(
+            @Parameter(
+                    name = RefreshTokenCookie.NAME,
+                    in = ParameterIn.COOKIE,
+                    description = "Refresh token from login (HttpOnly cookie).",
+                    required = true)
+            @CookieValue(name = RefreshTokenCookie.NAME, required = false) String rawRefreshToken) {
+        LoginResult result = loginService.refresh(rawRefreshToken);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE,
                         RefreshTokenCookie.create(result.rawRefreshToken(), result.refreshTokenTtl()).toString())

@@ -46,10 +46,13 @@ public class RefreshToken {
     }
 
     public boolean isActive(Instant now) {
-        return revokedAt == null && now.isBefore(expiresAt);
+        return revokedAt == null && replacedBy == null && now.isBefore(expiresAt);
     }
     public void revoke(Instant now) {
         revokedAt = now.truncatedTo(ChronoUnit.MICROS);
+    }
+    public void markReplacedBy(UUID successorId) {
+        this.replacedBy = successorId;
     }
 
 

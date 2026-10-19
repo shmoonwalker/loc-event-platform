@@ -43,4 +43,16 @@ public class LoginService {
                 rawRefreshToken,
                 jwtProperties.refreshTokenTtl());
     }
+
+    public LoginResult refresh(String rawRefreshToken) {
+        if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
+            throw new InvalidTokenException();
+        }
+        RefreshRotationResult rotation = refreshTokenService.rotate(rawRefreshToken);
+        UserAccount user = rotation.user();
+        return new LoginResult(
+                new LoginResponse(accessTokenService.issueAccessToken(user), jwtProperties.accessTokenTtl()),
+                rotation.rawRefreshToken(),
+                jwtProperties.refreshTokenTtl());
+    }
 }

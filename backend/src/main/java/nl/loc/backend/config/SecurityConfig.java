@@ -33,7 +33,7 @@ public class SecurityConfig {
                                 "/api/events/*", "/api/organizers/*", "/api/categories", "/api/tags").permitAll()
                         // auth routes are opened one by one; never /api/auth/**
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/verify-email",
-                                "/api/auth/resend-verification", "/api/auth/login").permitAll()
+                                "/api/auth/resend-verification", "/api/auth/login", "/api/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().denyAll())
