@@ -19,7 +19,11 @@ public class LoginService {
     private final JwtProperties jwtProperties;
     private final RefreshTokenService refreshTokenService;
 
-    public LoginService(AuthenticationManager authenticationManager, AccessTokenService accessTokenService, JwtProperties jwtProperties, RefreshTokenService refreshTokenService) {
+    public LoginService(
+            AuthenticationManager authenticationManager,
+            AccessTokenService accessTokenService,
+            JwtProperties jwtProperties,
+            RefreshTokenService refreshTokenService) {
         this.authenticationManager = authenticationManager;
         this.accessTokenService = accessTokenService;
         this.jwtProperties = jwtProperties;
