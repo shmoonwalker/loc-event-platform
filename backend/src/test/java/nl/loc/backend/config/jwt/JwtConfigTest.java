@@ -16,9 +16,9 @@ import org.springframework.security.oauth2.jwt.JwtException;
 
 class JwtConfigTest {
     private static final JwtProperties PROPERTIES = new JwtProperties(
-            "n7bnao9xAfkJrxJHGeJPlgCURpkQNnJDWzcjdEkot3k=", Duration.ofMinutes(15));
+            "n7bnao9xAfkJrxJHGeJPlgCURpkQNnJDWzcjdEkot3k=", Duration.ofMinutes(15), Duration.ofDays(14));
     private static final JwtProperties OTHER_PROPERTIES = new JwtProperties(
-            "8m8qJx6Ow3tKkK3PZ0a4cQ2u7L1vYb9sN5eR0dT6fHg=", Duration.ofMinutes(15));
+            "8m8qJx6Ow3tKkK3PZ0a4cQ2u7L1vYb9sN5eR0dT6fHg=", Duration.ofMinutes(15), Duration.ofDays(14));
 
     private final JwtConfig config = new JwtConfig();
 

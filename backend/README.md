@@ -71,6 +71,7 @@ Redis is only needed for rate limiting. Without it the backend still starts and 
 | `FRONTEND_URL` | `http://localhost:4200` | Base of links in emails |
 | `JWT_SECRET` | none, required | Base64 key of at least 32 bytes that signs access tokens |
 | `JWT_ACCESS_TOKEN_TTL` | `15m` | Lifetime of an access token |
+| `JWT_REFRESH_TOKEN_TTL` | `14d` | Lifetime of a refresh token |
 
 Rate limits are set under `app.rate-limit.policies` in `src/main/resources/application.yaml`.
 
