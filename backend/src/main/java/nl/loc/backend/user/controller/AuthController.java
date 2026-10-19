@@ -1,6 +1,7 @@
 package nl.loc.backend.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -20,10 +21,13 @@ import nl.loc.backend.user.dto.response.UserResponse;
 import nl.loc.backend.user.model.UserAccount;
 import nl.loc.backend.user.service.CurrentUserService;
 import nl.loc.backend.user.service.EmailVerificationService;
+import nl.loc.backend.user.service.LoginResult;
 import nl.loc.backend.user.service.LoginService;
 import nl.loc.backend.user.service.RegistrationService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -123,10 +127,23 @@ public class AuthController {
     @Operation(
             summary = "Log in",
             description = "Checks email and password and returns a short-lived access token. "
+                    + "Also sets a refresh_token cookie: HttpOnly, Secure, SameSite=Strict, Path=/api/auth, "
+                    + "Max-Age equal to the refresh token TTL. The raw refresh token is not in the JSON body. "
                     + "A wrong password and an unknown email get the same 401, "
                     + "so the response never reveals which emails have an account.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Logged in."),
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Logged in.",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class)),
+                    headers = @Header(
+                            name = "Set-Cookie",
+                            description = "refresh_token cookie. HttpOnly, Secure, SameSite=Strict, Path=/api/auth. "
+                                    + "Max-Age is the refresh token TTL in seconds.",
+                            schema = @Schema(
+                                    type = "string",
+                                    example = "refresh_token=<token>; Path=/api/auth; Max-Age=1209600; "
+                                            + "Secure; HttpOnly; SameSite=Strict"))),
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid input or malformed JSON.",
@@ -144,12 +161,17 @@ public class AuthController {
                     description = "Too many login attempts for this email. Retry-After says how many seconds to wait.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                               HttpServletRequest httpRequest) {
         // before BCrypt, so blocked requests cost almost nothing; slow down only, never lock the account
         String email = UserAccount.normalizeEmail(request.email());
         rateLimiter.consume(RateLimitPolicy.LOGIN, httpRequest.getRemoteAddr() + ":" + email);
         rateLimiter.consume(RateLimitPolicy.LOGIN_EMAIL, email);
-        return loginService.login(request);
+        LoginResult result = loginService.login(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE,
+                        RefreshTokenCookie.create(result.rawRefreshToken(), result.refreshTokenTtl()).toString())
+                .body(result.response());
     }
 
     @GetMapping("/me")
