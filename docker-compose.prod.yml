@@ -98,6 +98,11 @@ services:
     environment:
       <<: *otel
       OTEL_SERVICE_NAME: loc-data
+      # The pipeline runs hundreds of thousands of SQL statements per collection run; a span for each
+      # would use up the New Relic free ingest allowance. Connection pool metrics stay on.
+      OTEL_INSTRUMENTATION_JDBC_ENABLED: "false"
+      OTEL_INSTRUMENTATION_HIBERNATE_ENABLED: "false"
+      OTEL_INSTRUMENTATION_SPRING_DATA_ENABLED: "false"
       SPRING_PROFILES_ACTIVE: prod
       DB_HOST: ${DB_HOST:?set DB_HOST}
       DB_PORT: ${DB_PORT:-5432}
