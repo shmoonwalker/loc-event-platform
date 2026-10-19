@@ -182,9 +182,11 @@ public class AuthController {
             summary = "Refresh session",
             description = "Reads the refresh_token cookie and returns a new short-lived access token. "
                     + "Also sets a new refresh_token cookie with the same attributes as login "
-                    + "(HttpOnly, Secure, SameSite=Strict, Path=/api/auth, Max-Age = refresh TTL). "
+                    + "(HttpOnly, Secure, SameSite=Strict, Path=/api/auth). The new token keeps the expiry "
+                    + "of the login it came from, so a session ends one refresh TTL after login. "
                     + "The raw refresh token is not in the JSON body. "
-                    + "Missing, unknown, expired, revoked, and reused cookies all get the same 400.")
+                    + "Missing, unknown, expired, revoked, and reused cookies all get the same 400, "
+                    + "which also clears the cookie. Reusing an already rotated token revokes the whole session.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -193,14 +195,20 @@ public class AuthController {
                     headers = @Header(
                             name = "Set-Cookie",
                             description = "New refresh_token cookie. HttpOnly, Secure, SameSite=Strict, Path=/api/auth. "
-                                    + "Max-Age is the refresh token TTL in seconds.",
+                                    + "Max-Age is the seconds left until the session expires.",
                             schema = @Schema(
                                     type = "string",
                                     example = "refresh_token=<token>; Path=/api/auth; Max-Age=1209600; "
                                             + "Secure; HttpOnly; SameSite=Strict"))),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Missing, invalid, expired, revoked or reused refresh cookie.",
+                    description = "Missing, invalid, expired, revoked or reused refresh cookie. "
+                            + "Set-Cookie clears refresh_token (Max-Age=0).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many refresh or logout requests from this IP. "
+                            + "Retry-After says how many seconds to wait.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public ResponseEntity<LoginResponse> refresh(
@@ -209,7 +217,9 @@ public class AuthController {
                     in = ParameterIn.COOKIE,
                     description = "Refresh token from login (HttpOnly cookie).",
                     required = true)
-            @CookieValue(name = RefreshTokenCookie.NAME, required = false) String rawRefreshToken) {
+            @CookieValue(name = RefreshTokenCookie.NAME, required = false) String rawRefreshToken,
+            HttpServletRequest httpRequest) {
+        rateLimiter.consume(RateLimitPolicy.SESSION, httpRequest.getRemoteAddr());
         LoginResult result = loginService.refresh(rawRefreshToken);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE,
@@ -234,7 +244,12 @@ public class AuthController {
                             schema = @Schema(
                                     type = "string",
                                     example = "refresh_token=; Path=/api/auth; Max-Age=0; "
-                                            + "Secure; HttpOnly; SameSite=Strict")))
+                                            + "Secure; HttpOnly; SameSite=Strict"))),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many refresh or logout requests from this IP. "
+                            + "Retry-After says how many seconds to wait.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public ResponseEntity<Void> logout(
             @Parameter(
@@ -242,7 +257,9 @@ public class AuthController {
                     in = ParameterIn.COOKIE,
                     description = "Refresh token from login or refresh (HttpOnly cookie).",
                     required = false)
-            @CookieValue(name = RefreshTokenCookie.NAME, required = false) String rawRefreshToken) {
+            @CookieValue(name = RefreshTokenCookie.NAME, required = false) String rawRefreshToken,
+            HttpServletRequest httpRequest) {
+        rateLimiter.consume(RateLimitPolicy.SESSION, httpRequest.getRemoteAddr());
         loginService.logout(rawRefreshToken);
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, RefreshTokenCookie.clear().toString())

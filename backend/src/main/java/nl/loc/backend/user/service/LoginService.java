@@ -46,14 +46,14 @@ public class LoginService {
 
     public LoginResult refresh(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
-            throw new InvalidTokenException();
+            throw new InvalidRefreshTokenException();
         }
         RefreshRotationResult rotation = refreshTokenService.rotate(rawRefreshToken);
         UserAccount user = rotation.user();
         return new LoginResult(
                 new LoginResponse(accessTokenService.issueAccessToken(user), jwtProperties.accessTokenTtl()),
                 rotation.rawRefreshToken(),
-                jwtProperties.refreshTokenTtl());
+                rotation.remainingTtl());
     }
 
     public void logout(String rawRefreshToken) {

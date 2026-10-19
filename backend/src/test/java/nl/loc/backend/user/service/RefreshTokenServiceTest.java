@@ -80,11 +80,44 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    void rotateKeepsTheFamilyExpiryInsteadOfExtendingIt() {
+        Instant loggedInAt = NOW.minus(Duration.ofDays(3));
+        RefreshToken existing = new RefreshToken(user, SecureTokens.hash(RAW_TOKEN), FAMILY_ID, loggedInAt, REFRESH_TTL);
+        when(repository.findByTokenHash(aryEq(SecureTokens.hash(RAW_TOKEN)))).thenReturn(Optional.of(existing));
+        when(repository.saveAndFlush(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RefreshRotationResult result = service.rotate(RAW_TOKEN);
+
+        ArgumentCaptor<RefreshToken> flushed = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(repository).saveAndFlush(flushed.capture());
+        assertThat(flushed.getValue().getExpiresAt()).isEqualTo(loggedInAt.plus(REFRESH_TTL));
+        assertThat(result.remainingTtl()).isEqualTo(Duration.ofDays(11));
+    }
+
+    @Test
+    void rotateRejectsUnknownExpiredAndRevokedTokens() {
+        when(repository.findByTokenHash(any())).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.rotate("unknown")).isInstanceOf(InvalidRefreshTokenException.class);
+
+        RefreshToken expired = new RefreshToken(
+                user, SecureTokens.hash(RAW_TOKEN), FAMILY_ID, NOW.minus(REFRESH_TTL), REFRESH_TTL);
+        when(repository.findByTokenHash(aryEq(SecureTokens.hash(RAW_TOKEN)))).thenReturn(Optional.of(expired));
+        assertThatThrownBy(() -> service.rotate(RAW_TOKEN)).isInstanceOf(InvalidRefreshTokenException.class);
+
+        RefreshToken revoked = storedActiveToken();
+        revoked.revoke(NOW);
+        assertThatThrownBy(() -> service.rotate(RAW_TOKEN)).isInstanceOf(InvalidRefreshTokenException.class);
+
+        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).revokeActiveByFamilyId(any(), any());
+    }
+
+    @Test
     void rotateRevokesFamilyWhenPresentedTokenWasAlreadyReplaced() {
         RefreshToken existing = storedActiveToken();
         existing.markReplacedBy(SUCCESSOR_ID);
 
-        assertThatThrownBy(() -> service.rotate(RAW_TOKEN)).isInstanceOf(InvalidTokenException.class);
+        assertThatThrownBy(() -> service.rotate(RAW_TOKEN)).isInstanceOf(InvalidRefreshTokenException.class);
 
         verify(repository).revokeActiveByFamilyId(FAMILY_ID, NOW);
         verify(repository, never()).saveAndFlush(any());

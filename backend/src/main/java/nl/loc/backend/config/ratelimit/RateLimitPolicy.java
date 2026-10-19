@@ -5,5 +5,6 @@ public enum RateLimitPolicy {
     ACCOUNT_MAIL,
     RESEND_VERIFICATION,
     LOGIN,
-    LOGIN_EMAIL
+    LOGIN_EMAIL,
+    SESSION
 }

@@ -2,8 +2,10 @@ package nl.loc.backend.config;
 
 import nl.loc.backend.config.ratelimit.RateLimitExceededException;
 import nl.loc.backend.event.controller.InvalidBrowseQueryException;
+import nl.loc.backend.user.controller.RefreshTokenCookie;
 import nl.loc.backend.user.service.AccountNotFoundException;
 import nl.loc.backend.user.service.EmailNotVerifiedException;
+import nl.loc.backend.user.service.InvalidRefreshTokenException;
 import nl.loc.backend.user.service.InvalidTokenException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -54,6 +56,17 @@ public class GlobalExceptionHandler {
         problem.setTitle("Invalid token");
         problem.setDetail("This link is invalid or has expired");
         return problem;
+    }
+
+    // also clears the cookie, so the browser stops sending a token that will never work again
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Invalid refresh token");
+        problem.setDetail("Your session has expired, please log in again");
+        return ResponseEntity.badRequest()
+                .header(HttpHeaders.SET_COOKIE, RefreshTokenCookie.clear().toString())
+                .body(problem);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -37,35 +38,38 @@ public class RefreshTokenService {
         return rawToken;
     }
 
-    @Transactional
+    // commit the family revoke on reuse; the default rollback on a RuntimeException would undo it
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public RefreshRotationResult rotate(String rawToken) {
         Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         RefreshToken existing = refreshTokenRepository
                 .findByTokenHash(SecureTokens.hash(rawToken))
-                .orElseThrow(InvalidTokenException::new);
+                .orElseThrow(InvalidRefreshTokenException::new);
 
         if (existing.getReplacedBy() != null) {
             refreshTokenRepository.revokeActiveByFamilyId(existing.getFamilyId(), now);
-            throw new InvalidTokenException();
+            throw new InvalidRefreshTokenException();
         }
 
         if (!existing.isActive(now)) {
-            throw new InvalidTokenException();
+            throw new InvalidRefreshTokenException();
         }
 
+        // the successor keeps the family's expiry, so a session ends one TTL after login however often it refreshes
+        Duration remainingTtl = Duration.between(now, existing.getExpiresAt());
         String newRawToken = SecureTokens.generate();
         RefreshToken successor = new RefreshToken(
                 existing.getUser(),
                 SecureTokens.hash(newRawToken),
                 existing.getFamilyId(),
                 now,
-                jwtProperties.refreshTokenTtl());
+                remainingTtl);
         successor = refreshTokenRepository.saveAndFlush(successor);
 
         existing.markReplacedBy(successor.getId());
         refreshTokenRepository.save(existing);
 
-        return new RefreshRotationResult(existing.getUser(), newRawToken);
+        return new RefreshRotationResult(existing.getUser(), newRawToken, remainingTtl);
     }
 
     @Transactional

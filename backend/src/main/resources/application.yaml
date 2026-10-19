@@ -57,6 +57,10 @@ app:
       login-email:
         capacity: 20
         period: 1h
+      # per IP, shared by refresh and logout
+      session:
+        capacity: 30
+        period: 1m
 
 server:
   port: 8080
