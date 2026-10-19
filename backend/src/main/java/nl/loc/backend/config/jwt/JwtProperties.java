@@ -10,7 +10,8 @@ import javax.crypto.spec.SecretKeySpec;
 @ConfigurationProperties("app.jwt")
 public record JwtProperties(
         String secret,
-        Duration accessTokenTtl) {
+        Duration accessTokenTtl,
+        Duration refreshTokenTtl) {
     private static final int MIN_KEY_BYTES = 32;
 
     public JwtProperties {

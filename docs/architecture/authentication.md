@@ -1,6 +1,6 @@
 # Authentication
 
-How users register with Loc, verify their email and log in, how passwords and tokens are stored, how requests are authorized, and how the authentication endpoints are protected against abuse.
+How users register with Loc, verify their email, log in, stay logged in and log out, how passwords and tokens are stored, how requests are authorized, and how the authentication endpoints are protected against abuse.
 
 ---
 
@@ -136,7 +136,7 @@ The verification email links to the frontend page `FRONTEND_URL/verify-email?tok
    - A wrong password, an unknown email and an account without a password all return the same `401` with the title `Invalid credentials`.
    - For an unknown email the provider still runs a BCrypt check against a dummy hash, so a missing account does not answer faster.
 4. Only after the password is proven, an unverified account returns `403` with the title `Email not verified`. Checking this before the password would let anyone find unverified accounts. For the same reason `UserDetails.isEnabled()` always returns `true`: `DaoAuthenticationProvider` checks it before the password.
-5. Otherwise the response is `200` with an access token:
+5. Otherwise the response is `200` with an access token, and a refresh token is set as a cookie (see [Sessions](#sessions)):
 
 ```json
 { "accessToken": "<jwt>", "tokenType": "Bearer", "expiresIn": 900 }
@@ -170,15 +170,77 @@ It never returns password material. When the account no longer exists, the respo
 | `user/dto/request/LoginRequest` | Login request body and its validation rules |
 | `user/dto/response/LoginResponse` | Access token, token type and lifetime in seconds |
 | `user/dto/response/UserResponse` | The current user, without password material |
-| `user/service/LoginService` | Authenticates through the `AuthenticationManager`, checks email verification, issues the token |
+| `user/service/LoginService` | Authenticates through the `AuthenticationManager`, checks email verification, issues the access and refresh tokens |
 | `user/service/AccountUserDetailsService` | Loads an account by normalised email for Spring Security |
 | `user/service/AccountUserDetails` | Adapts `UserAccount` to Spring Security's `UserDetails` |
 | `user/service/AccessTokenService` | Builds and signs the access token |
 | `user/service/CurrentUserService` | Loads the account of the current token |
 | `user/service/EmailNotVerifiedException` | Correct password on an unverified account; becomes `403` |
 | `user/service/AccountNotFoundException` | Token of a deleted account; becomes `401` |
-| `config/jwt/JwtProperties` | Secret and token lifetime; validates the secret at startup |
+| `config/jwt/JwtProperties` | Secret and token lifetimes; validates the secret at startup |
 | `config/jwt/JwtConfig` | JWT encoder and decoder beans |
+
+---
+
+## Sessions
+
+A login starts a session: a **family** of refresh tokens. The short-lived access token is renewed with the refresh token, which is rotated on every use.
+
+### Refresh token cookie
+
+- 32 random bytes from `SecureRandom`, URL-safe Base64 (the same generator as verification tokens). Only the SHA-256 hash is stored.
+- Sent only as a cookie, never in a JSON body: `refresh_token`, `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`.
+  - `HttpOnly`: page scripts cannot read it, so an XSS bug cannot steal it.
+  - `SameSite=Strict`: other sites cannot make the browser send it, so `/refresh` and `/logout` need no CSRF token.
+  - `Path=/api/auth`: the browser sends it only to the auth routes, not with every API call.
+- `Max-Age` is the time left in the session.
+- The session ends `JWT_REFRESH_TOKEN_TTL` (14 days by default) after login, however often it is refreshed: every token in a family has the expiry of the login token. A stolen token therefore cannot keep a session alive forever.
+
+### Refreshing
+
+`POST /api/auth/refresh` with the cookie, no body.
+
+1. The client IP is checked against the `SESSION` rate limit. Over the limit returns `429`.
+2. The token is hashed and looked up, with a row lock so two parallel requests are handled one after the other.
+3. What happens next depends on the token:
+
+| Token | Response | Cookie |
+|---|---|---|
+| Active | `200` with a new access token; the token is marked replaced and a new one in the same family is issued | New refresh token |
+| Missing, unknown, expired or revoked | `400` with the title `Invalid refresh token` | Cleared |
+| Already replaced, more than 10 seconds ago | **Reuse:** every token in the family is revoked, then `400` as above | Cleared |
+| Already replaced, less than 10 seconds ago | `409` with the title `Session already refreshed` | Unchanged |
+
+- **Reuse detection.** A replaced token should never come back. When it does, either the user or an attacker holds a copy, and the server cannot tell which. Revoking the whole family logs both out; the user logs in again. The revoke is committed even though the request fails. Reuse is logged as a warning with the family id.
+- **Parallel refreshes.** Two tabs that refresh at the same moment send the same cookie. The first one rotates it; the second finds it replaced a moment ago. Within the 10-second grace window this is not treated as reuse: the second gets `409`, no new token, and the cookie the first request set stays. The client retries the refresh once, now with the new cookie. If the retry fails as well, the client should call logout, which revokes the family.
+
+### Logging out
+
+`POST /api/auth/logout` with the cookie, no body.
+
+1. The client IP is checked against the `SESSION` rate limit. Over the limit returns `429`.
+2. When the cookie matches a stored token, every token in its family is revoked. Other sessions of the same user stay logged in.
+3. The response is always `204` and clears the cookie, also for a missing, unknown or already revoked token.
+
+An access token issued before logout or before a reuse revoke stays valid until it expires, at most `JWT_ACCESS_TOKEN_TTL`.
+
+### Cleanup
+
+Every night at 03:30 (Amsterdam time) the backend deletes expired refresh tokens. Because a family shares one expiry, an expired token never belongs to a live session, so deleting it cannot hide a reuse.
+
+### Code
+
+| Class | Role |
+|---|---|
+| `user/controller/AuthController` | HTTP endpoints for refresh and logout; applies the `SESSION` rate limit and sets the cookie |
+| `user/controller/RefreshTokenCookie` | Builds and clears the cookie with its attributes |
+| `user/service/LoginService` | Issues a new access token after a rotation |
+| `user/service/RefreshTokenService` | Issues, rotates and revokes refresh tokens; detects reuse; nightly cleanup |
+| `user/service/InvalidRefreshTokenException` | Missing, unknown, expired, revoked or reused token; becomes `400` and clears the cookie |
+| `user/service/RefreshTokenAlreadyRotatedException` | Parallel refresh within the grace window; becomes `409` |
+| `user/repository/RefreshTokenRepository` | Spring Data JPA repository for `refresh_token` |
+| `user/model/RefreshToken` | JPA entity |
+| `config/SchedulingConfig` | Enables `@Scheduled` for the cleanup |
 
 ---
 
@@ -193,7 +255,7 @@ Every request passes Spring Security's filter chain (`config/SecurityConfig`):
 | Routes | Access |
 |---|---|
 | Public discovery `GET` routes, `/api/docs/**` | Everyone |
-| `POST /api/auth/register`, `/verify-email`, `/resend-verification`, `/login` | Everyone |
+| `POST /api/auth/register`, `/verify-email`, `/resend-verification`, `/login`, `/refresh`, `/logout` | Everyone; refresh and logout are authorised by the refresh cookie |
 | `GET /api/auth/me` | Any valid access token |
 | `/api/admin/**` | Role `ADMIN` |
 | Anything else | Denied |
@@ -242,6 +304,19 @@ Administrators are promoted manually in SQL. Registration never accepts a role.
 | `used_at` | Set when the token is used or replaced by a newer one |
 | `created_at` | Set by the database |
 
+### `app.refresh_token`
+
+| Column | Notes |
+|---|---|
+| `id` | UUIDv7 |
+| `user_id` | The account; tokens are deleted with it |
+| `token_hash` | Unique SHA-256 hash, exactly 32 bytes |
+| `family_id` | Shared by every token of one login |
+| `expires_at` | The login time plus the refresh TTL, the same for the whole family |
+| `revoked_at` | Set on logout or when reuse revokes the family |
+| `replaced_by` | Id of the token issued when this one was rotated |
+| `created_at` | Set by the application; for a successor, the moment of rotation |
+
 ---
 
 ## Rate limiting
@@ -264,6 +339,7 @@ Public auth endpoints are rate limited with a token bucket per key.
 | `ACCOUNT_MAIL` | 3 per hour | User id |
 | `LOGIN` | 5 per minute | Client IP and normalised email |
 | `LOGIN_EMAIL` | 20 per hour | Normalised email |
+| `SESSION` | 30 per minute | Client IP; shared by refresh and logout |
 
 The login limits slow guessing down and never lock the account: a lockout would let anyone lock a victim out. `LOGIN_EMAIL` stops guessing spread over many IPs.
 
@@ -292,12 +368,13 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 
 | Status | When |
 |---|---|
-| `200` | Logged in, or the current user |
+| `200` | Logged in, session refreshed, or the current user |
 | `202` | Registration or resend accepted, whatever the account state |
-| `204` | Email verified |
-| `400` | Invalid input, malformed JSON, or an unknown, expired or used verification token |
+| `204` | Email verified, or logged out |
+| `400` | Invalid input, malformed JSON, an unknown, expired or used verification token, or an invalid refresh cookie |
 | `401` | Wrong email or password, or a missing, invalid or expired access token |
 | `403` | Correct password on an unverified account, or an access token without the required role |
+| `409` | The refresh cookie was rotated by another request less than 10 seconds ago |
 | `429` | Rate limit exceeded, with a `Retry-After` header in seconds |
 
 ---
@@ -314,4 +391,5 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 | `FRONTEND_URL` | Base of the links in emails | Defaults to `http://localhost:4200` |
 | `JWT_SECRET` | Signing access tokens | Required, Base64 of at least 32 bytes: `openssl rand -base64 32`. Locally in the shell or IDE; in production in `.env.production` |
 | `JWT_ACCESS_TOKEN_TTL` | Access-token lifetime | Defaults to `15m` |
+| `JWT_REFRESH_TOKEN_TTL` | Session lifetime: how long after login the refresh token stops working | Defaults to `14d` |
 

@@ -12,23 +12,24 @@ import org.springframework.context.annotation.Configuration;
 class JwtPropertiesTest {
     private static final String VALID_SECRET = "n7bnao9xAfkJrxJHGeJPlgCURpkQNnJDWzcjdEkot3k=";
     private static final Duration TTL = Duration.ofMinutes(15);
+    private static final Duration REFRESH_TTL = Duration.ofDays(14);
 
     private final ApplicationContextRunner context = new ApplicationContextRunner()
             .withUserConfiguration(JwtPropertiesConfig.class);
 
     @Test
     void acceptsBase64SecretOf32Bytes() {
-        assertThat(new JwtProperties(VALID_SECRET, TTL).secretKey().getEncoded()).hasSize(32);
+        assertThat(new JwtProperties(VALID_SECRET, TTL, REFRESH_TTL).secretKey().getEncoded()).hasSize(32);
     }
 
     @Test
     void rejectsMissingShortAndNonBase64Secrets() {
-        assertThatThrownBy(() -> new JwtProperties(null, TTL)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new JwtProperties("", TTL)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new JwtProperties(null, TTL, REFRESH_TTL)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new JwtProperties("", TTL, REFRESH_TTL)).isInstanceOf(IllegalArgumentException.class);
         // 31 bytes, one short of 256 bits
-        assertThatThrownBy(() -> new JwtProperties("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==", TTL))
+        assertThatThrownBy(() -> new JwtProperties("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==", TTL, REFRESH_TTL))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new JwtProperties("not base64!", TTL)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new JwtProperties("not base64!", TTL, REFRESH_TTL)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

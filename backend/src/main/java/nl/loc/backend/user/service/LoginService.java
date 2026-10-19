@@ -17,26 +17,50 @@ public class LoginService {
     private final AuthenticationManager authenticationManager;
     private final AccessTokenService accessTokenService;
     private final JwtProperties jwtProperties;
+    private final RefreshTokenService refreshTokenService;
 
-    public LoginService(AuthenticationManager authenticationManager, AccessTokenService accessTokenService, JwtProperties jwtProperties) {
+    public LoginService(
+            AuthenticationManager authenticationManager,
+            AccessTokenService accessTokenService,
+            JwtProperties jwtProperties,
+            RefreshTokenService refreshTokenService) {
         this.authenticationManager = authenticationManager;
         this.accessTokenService = accessTokenService;
         this.jwtProperties = jwtProperties;
+        this.refreshTokenService = refreshTokenService;
     }
 
-    public LoginResponse login(LoginRequest request) {
-        // throws BadCredentialsException for a wrong password and for an unknown email alike
+    public LoginResult login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(request.email(), request.password()));
         UserAccount user = ((AccountUserDetails) authentication.getPrincipal()).account();
 
-        // only after the password is proven, so this can't be used to probe for unverified accounts
         if (!user.isEmailVerified()) {
             log.info("Login refused for unverified account {}", user.getId());
             throw new EmailNotVerifiedException();
         }
 
         log.info("Account {} logged in", user.getId());
-        return new LoginResponse(accessTokenService.issueAccessToken(user), jwtProperties.accessTokenTtl());
+        String rawRefreshToken = refreshTokenService.issueToken(user);
+        return new LoginResult(
+                new LoginResponse(accessTokenService.issueAccessToken(user), jwtProperties.accessTokenTtl()),
+                rawRefreshToken,
+                jwtProperties.refreshTokenTtl());
+    }
+
+    public LoginResult refresh(String rawRefreshToken) {
+        if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
+            throw new InvalidRefreshTokenException();
+        }
+        RefreshRotationResult rotation = refreshTokenService.rotate(rawRefreshToken);
+        UserAccount user = rotation.user();
+        return new LoginResult(
+                new LoginResponse(accessTokenService.issueAccessToken(user), jwtProperties.accessTokenTtl()),
+                rotation.rawRefreshToken(),
+                rotation.remainingTtl());
+    }
+
+    public void logout(String rawRefreshToken) {
+        refreshTokenService.logout(rawRefreshToken);
     }
 }

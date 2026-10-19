@@ -1,0 +1,114 @@
+package nl.loc.backend.user.service;
+
+import lombok.extern.slf4j.Slf4j;
+import nl.loc.backend.config.jwt.JwtProperties;
+import nl.loc.backend.user.model.RefreshToken;
+import nl.loc.backend.user.model.UserAccount;
+import nl.loc.backend.user.repository.RefreshTokenRepository;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
+
+@Service
+@Slf4j
+public class RefreshTokenService {
+
+    // two tabs refreshing with the same cookie at once is not theft; the loser gets 409 and retries
+    static final Duration REUSE_GRACE = Duration.ofSeconds(10);
+
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final JwtProperties jwtProperties;
+    private final Clock clock;
+
+    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, JwtProperties jwtProperties,
+                               Clock clock) {
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.jwtProperties = jwtProperties;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public String issueToken(UserAccount user) {
+        Instant now = Instant.now(clock);
+        String rawToken = SecureTokens.generate();
+        refreshTokenRepository.save(
+                new RefreshToken(user, SecureTokens.hash(rawToken), UUID.randomUUID(), now,
+                        jwtProperties.refreshTokenTtl())
+        );
+        return rawToken;
+    }
+
+    // commit the family revoke on reuse; the default rollback on a RuntimeException would undo it
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
+    public RefreshRotationResult rotate(String rawToken) {
+        Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+        RefreshToken existing = refreshTokenRepository
+                .findByTokenHash(SecureTokens.hash(rawToken))
+                .orElseThrow(InvalidRefreshTokenException::new);
+
+        if (existing.getRevokedAt() != null) {
+            throw new InvalidRefreshTokenException();
+        }
+
+        if (existing.getReplacedBy() != null) {
+            if (rotatedWithinGrace(existing, now)) {
+                throw new RefreshTokenAlreadyRotatedException();
+            }
+            refreshTokenRepository.revokeActiveByFamilyId(existing.getFamilyId(), now);
+            log.warn("Refresh token reuse detected, revoked session family {}", existing.getFamilyId());
+            throw new InvalidRefreshTokenException();
+        }
+
+        if (!existing.isActive(now)) {
+            throw new InvalidRefreshTokenException();
+        }
+
+        // the successor keeps the family's expiry, so a session ends one TTL after login however often it refreshes
+        Duration remainingTtl = Duration.between(now, existing.getExpiresAt());
+        String newRawToken = SecureTokens.generate();
+        RefreshToken successor = new RefreshToken(
+                existing.getUser(),
+                SecureTokens.hash(newRawToken),
+                existing.getFamilyId(),
+                now,
+                remainingTtl);
+        successor = refreshTokenRepository.saveAndFlush(successor);
+
+        existing.markReplacedBy(successor.getId());
+        refreshTokenRepository.save(existing);
+
+        return new RefreshRotationResult(existing.getUser(), newRawToken, remainingTtl);
+    }
+
+    // only the successor's creation time says when the rotation happened
+    private boolean rotatedWithinGrace(RefreshToken replaced, Instant now) {
+        return refreshTokenRepository.findById(replaced.getReplacedBy())
+                .map(successor -> now.isBefore(successor.getCreatedAt().plus(REUSE_GRACE)))
+                .orElse(false);
+    }
+
+    // a family shares one expiry, so an expired row never belongs to a live session
+    @Scheduled(cron = "0 30 3 * * *", zone = "Europe/Amsterdam")
+    @Transactional
+    public void deleteExpired() {
+        int deleted = refreshTokenRepository.deleteExpiredBefore(Instant.now(clock));
+        log.info("Deleted {} expired refresh tokens", deleted);
+    }
+
+    @Transactional
+    public void logout(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return;
+        }
+        Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+        refreshTokenRepository
+                .findByTokenHash(SecureTokens.hash(rawToken))
+                .ifPresent(token -> refreshTokenRepository.revokeActiveByFamilyId(token.getFamilyId(), now));
+    }
+}
