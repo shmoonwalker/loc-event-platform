@@ -62,6 +62,20 @@ server:
   # behind Cloudflare Tunnel and the frontend nginx: take the client IP from X-Forwarded-For, trusting only private proxies
   forward-headers-strategy: native
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # /actuator/health/liveness and /actuator/health/readiness; only these two are permitted in SecurityConfig
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
 springdoc:
   api-docs:
     path: /api/docs/openapi.yaml

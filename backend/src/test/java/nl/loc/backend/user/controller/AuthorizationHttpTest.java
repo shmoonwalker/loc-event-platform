@@ -156,6 +156,20 @@ class AuthorizationHttpTest {
         perform(get("/api/not-opened"), accessTokenService.issueAccessToken(user)).andExpect(status().isForbidden());
     }
 
+    @Test
+    void onlyHealthProbesAreOpenOnActuator() throws Exception {
+        mockMvc.perform(get("/actuator/health/liveness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+        mockMvc.perform(get("/actuator/health/readiness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.components").doesNotExist());
+        // the full health report would show which dependencies are down
+        mockMvc.perform(get("/actuator/health")).andExpect(status().isUnauthorized());
+        perform(get("/actuator/health"), accessTokenService.issueAccessToken(user)).andExpect(status().isForbidden());
+    }
+
     private ResultActions perform(MockHttpServletRequestBuilder request, String token) throws Exception {
         return mockMvc.perform(request.header(HttpHeaders.AUTHORIZATION, "Bearer " + token));
     }
