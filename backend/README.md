@@ -1,6 +1,6 @@
 # Backend
 
-The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration and login.
+The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration, login and sessions.
 
 The backend does not collect or normalize external event data. That is the job of the [data application](../data/README.md).
 
@@ -19,6 +19,7 @@ The frontend communicates only with the backend API.
 | Event discovery | `GET /api/home`, `/api/events`, `/api/events/{id}`, `/api/events/filter-options`, `/api/cities`, `/api/organizers/{id}`, `/api/categories`, `/api/tags` | [Discovery API](docs/discovery.md) |
 | Registration | `POST /api/auth/register`, `/api/auth/verify-email`, `/api/auth/resend-verification` | [Authentication](../docs/architecture/authentication.md) |
 | Login | `POST /api/auth/login` (JWT access token), `GET /api/auth/me` | [Authentication](../docs/architecture/authentication.md) |
+| Sessions | `POST /api/auth/refresh` (rotates the refresh cookie), `/api/auth/logout` | [Authentication](../docs/architecture/authentication.md) |
 
 Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI document at `/api/docs/openapi.yaml`.
 
@@ -71,7 +72,7 @@ Redis is only needed for rate limiting. Without it the backend still starts and 
 | `FRONTEND_URL` | `http://localhost:4200` | Base of links in emails |
 | `JWT_SECRET` | none, required | Base64 key of at least 32 bytes that signs access tokens |
 | `JWT_ACCESS_TOKEN_TTL` | `15m` | Lifetime of an access token |
-| `JWT_REFRESH_TOKEN_TTL` | `14d` | Lifetime of a refresh token |
+| `JWT_REFRESH_TOKEN_TTL` | `14d` | Session lifetime after login |
 
 Rate limits are set under `app.rate-limit.policies` in `src/main/resources/application.yaml`.
 

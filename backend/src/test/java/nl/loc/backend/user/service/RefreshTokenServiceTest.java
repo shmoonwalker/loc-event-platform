@@ -116,12 +116,42 @@ class RefreshTokenServiceTest {
     void rotateRevokesFamilyWhenPresentedTokenWasAlreadyReplaced() {
         RefreshToken existing = storedActiveToken();
         existing.markReplacedBy(SUCCESSOR_ID);
+        storedSuccessorCreatedAt(NOW.minus(RefreshTokenService.REUSE_GRACE));
 
         assertThatThrownBy(() -> service.rotate(RAW_TOKEN)).isInstanceOf(InvalidRefreshTokenException.class);
 
         verify(repository).revokeActiveByFamilyId(FAMILY_ID, NOW);
         verify(repository, never()).saveAndFlush(any());
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void rotateWithinGraceOfTheRotationIsAParallelRefreshNotReuse() {
+        RefreshToken existing = storedActiveToken();
+        existing.markReplacedBy(SUCCESSOR_ID);
+        storedSuccessorCreatedAt(NOW.minusSeconds(2));
+
+        assertThatThrownBy(() -> service.rotate(RAW_TOKEN)).isInstanceOf(RefreshTokenAlreadyRotatedException.class);
+
+        verify(repository, never()).revokeActiveByFamilyId(any(), any());
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void rotateOfARevokedReplacedTokenIsRejectedWithoutGrace() {
+        RefreshToken existing = storedActiveToken();
+        existing.markReplacedBy(SUCCESSOR_ID);
+        existing.revoke(NOW);
+        storedSuccessorCreatedAt(NOW.minusSeconds(2));
+
+        assertThatThrownBy(() -> service.rotate(RAW_TOKEN)).isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void deleteExpiredRemovesRowsThatExpiredBeforeNow() {
+        service.deleteExpired();
+
+        verify(repository).deleteExpiredBefore(NOW);
     }
 
     @Test
@@ -148,6 +178,11 @@ class RefreshTokenServiceTest {
 
         verify(repository, never()).findByTokenHash(any());
         verify(repository, never()).revokeActiveByFamilyId(any(), any());
+    }
+
+    private void storedSuccessorCreatedAt(Instant createdAt) {
+        RefreshToken successor = new RefreshToken(user, SecureTokens.hash("successor"), FAMILY_ID, createdAt, REFRESH_TTL);
+        when(repository.findById(SUCCESSOR_ID)).thenReturn(Optional.of(successor));
     }
 
     private RefreshToken storedActiveToken() {

@@ -7,6 +7,7 @@ import nl.loc.backend.user.service.AccountNotFoundException;
 import nl.loc.backend.user.service.EmailNotVerifiedException;
 import nl.loc.backend.user.service.InvalidRefreshTokenException;
 import nl.loc.backend.user.service.InvalidTokenException;
+import nl.loc.backend.user.service.RefreshTokenAlreadyRotatedException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -67,6 +68,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .header(HttpHeaders.SET_COOKIE, RefreshTokenCookie.clear().toString())
                 .body(problem);
+    }
+
+    // keeps the cookie: the request that won the race has just set the new one
+    @ExceptionHandler(RefreshTokenAlreadyRotatedException.class)
+    public ProblemDetail handleRefreshTokenAlreadyRotated(RefreshTokenAlreadyRotatedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setTitle("Session already refreshed");
+        problem.setDetail("Another request refreshed this session just now; retry the refresh once");
+        return problem;
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

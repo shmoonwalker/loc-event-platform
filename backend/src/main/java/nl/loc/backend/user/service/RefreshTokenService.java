@@ -1,9 +1,11 @@
 package nl.loc.backend.user.service;
 
+import lombok.extern.slf4j.Slf4j;
 import nl.loc.backend.config.jwt.JwtProperties;
 import nl.loc.backend.user.model.RefreshToken;
 import nl.loc.backend.user.model.UserAccount;
 import nl.loc.backend.user.repository.RefreshTokenRepository;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,7 +16,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class RefreshTokenService {
+
+    // two tabs refreshing with the same cookie at once is not theft; the loser gets 409 and retries
+    static final Duration REUSE_GRACE = Duration.ofSeconds(10);
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
@@ -46,8 +52,16 @@ public class RefreshTokenService {
                 .findByTokenHash(SecureTokens.hash(rawToken))
                 .orElseThrow(InvalidRefreshTokenException::new);
 
+        if (existing.getRevokedAt() != null) {
+            throw new InvalidRefreshTokenException();
+        }
+
         if (existing.getReplacedBy() != null) {
+            if (rotatedWithinGrace(existing, now)) {
+                throw new RefreshTokenAlreadyRotatedException();
+            }
             refreshTokenRepository.revokeActiveByFamilyId(existing.getFamilyId(), now);
+            log.warn("Refresh token reuse detected, revoked session family {}", existing.getFamilyId());
             throw new InvalidRefreshTokenException();
         }
 
@@ -70,6 +84,21 @@ public class RefreshTokenService {
         refreshTokenRepository.save(existing);
 
         return new RefreshRotationResult(existing.getUser(), newRawToken, remainingTtl);
+    }
+
+    // only the successor's creation time says when the rotation happened
+    private boolean rotatedWithinGrace(RefreshToken replaced, Instant now) {
+        return refreshTokenRepository.findById(replaced.getReplacedBy())
+                .map(successor -> now.isBefore(successor.getCreatedAt().plus(REUSE_GRACE)))
+                .orElse(false);
+    }
+
+    // a family shares one expiry, so an expired row never belongs to a live session
+    @Scheduled(cron = "0 30 3 * * *", zone = "Europe/Amsterdam")
+    @Transactional
+    public void deleteExpired() {
+        int deleted = refreshTokenRepository.deleteExpiredBefore(Instant.now(clock));
+        log.info("Deleted {} expired refresh tokens", deleted);
     }
 
     @Transactional

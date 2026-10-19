@@ -11,6 +11,7 @@ import java.util.Map;
 import nl.loc.backend.user.model.UserAccount;
 import nl.loc.backend.user.repository.RefreshTokenRepository;
 import nl.loc.backend.user.repository.UserAccountRepository;
+import nl.loc.backend.user.service.RefreshTokenService;
 import nl.loc.backend.user.service.SecureTokens;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -49,6 +51,10 @@ class RefreshHttpTest {
     private RefreshTokenRepository refreshTokenRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @BeforeEach
     void createUser() {
@@ -89,6 +95,7 @@ class RefreshHttpTest {
         Cookie first = login();
         Cookie second = refresh(first).andExpect(status().isOk())
                 .andReturn().getResponse().getCookie(RefreshTokenCookie.NAME);
+        moveRotationOutOfTheGraceWindow();
 
         refresh(first)
                 .andExpect(status().isBadRequest())
@@ -98,6 +105,32 @@ class RefreshHttpTest {
 
         // the revoke must survive the failed request, or the stolen successor keeps working
         refresh(second).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void parallelRefreshFromAnotherTabGetsConflictAndKeepsTheSession() throws Exception {
+        Cookie first = login();
+        Cookie second = refresh(first).andExpect(status().isOk())
+                .andReturn().getResponse().getCookie(RefreshTokenCookie.NAME);
+
+        refresh(first)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Session already refreshed"))
+                .andExpect(result -> assertThat(result.getResponse().getCookie(RefreshTokenCookie.NAME)).isNull());
+
+        refresh(second).andExpect(status().isOk());
+    }
+
+    @Test
+    void cleanupDeletesOnlyExpiredTokens() throws Exception {
+        login();
+        jdbc.update("update app.refresh_token set expires_at = now() - interval '1 minute'");
+        Cookie live = login();
+
+        refreshTokenService.deleteExpired();
+
+        assertThat(refreshTokenRepository.findAll()).singleElement()
+                .satisfies(token -> assertThat(token.getTokenHash()).isEqualTo(SecureTokens.hash(live.getValue())));
     }
 
     @Test
@@ -115,6 +148,10 @@ class RefreshHttpTest {
     @Test
     void refreshWithoutCookieIsRejected() throws Exception {
         mockMvc.perform(post("/api/auth/refresh")).andExpect(status().isBadRequest());
+    }
+
+    private void moveRotationOutOfTheGraceWindow() {
+        jdbc.update("update app.refresh_token set created_at = created_at - interval '1 minute'");
     }
 
     private Cookie login() throws Exception {

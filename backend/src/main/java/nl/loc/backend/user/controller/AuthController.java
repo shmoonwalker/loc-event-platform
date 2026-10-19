@@ -186,7 +186,9 @@ public class AuthController {
                     + "of the login it came from, so a session ends one refresh TTL after login. "
                     + "The raw refresh token is not in the JSON body. "
                     + "Missing, unknown, expired, revoked, and reused cookies all get the same 400, "
-                    + "which also clears the cookie. Reusing an already rotated token revokes the whole session.")
+                    + "which also clears the cookie. Reusing an already rotated token revokes the whole session, "
+                    + "except within 10 seconds of the rotation: then it is a parallel refresh from another tab "
+                    + "and gets 409 without touching the cookie.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -204,6 +206,11 @@ public class AuthController {
                     responseCode = "400",
                     description = "Missing, invalid, expired, revoked or reused refresh cookie. "
                             + "Set-Cookie clears refresh_token (Max-Age=0).",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Another request rotated this token less than 10 seconds ago. "
+                            + "The cookie is left alone; retry the refresh once with the new cookie.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
                     responseCode = "429",
