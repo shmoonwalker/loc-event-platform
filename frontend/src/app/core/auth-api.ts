@@ -47,4 +47,14 @@ export class AuthApi {
   login(body: LoginRequest): Observable<LoginResponse> {
     return this.http.post<LoginResponse>('/api/auth/login', body);
   }
+
+  /** 200 with a new access token and a rotated refresh cookie; 400 when the cookie is missing, invalid, expired or reused; 409 when another tab refreshed less than 10 seconds ago. */
+  refresh(): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>('/api/auth/refresh', null);
+  }
+
+  /** Always 204; the server revokes the session and clears the refresh cookie. */
+  logout(): Observable<void> {
+    return this.http.post<void>('/api/auth/logout', null);
+  }
 }
