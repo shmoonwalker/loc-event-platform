@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationInitStatus } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -43,5 +44,16 @@ describe('app startup', () => {
     await started;
 
     expect(session.loggedIn()).toBe(false);
+  });
+
+  it('sends the restored token with API calls', async () => {
+    const { http, started, refresh } = boot();
+    refresh.flush({ accessToken: 'restored', tokenType: 'Bearer', expiresIn: 900 });
+    await started;
+
+    TestBed.inject(HttpClient).get('/api/auth/me').subscribe();
+
+    const req = http.expectOne('/api/auth/me');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer restored');
   });
 });
