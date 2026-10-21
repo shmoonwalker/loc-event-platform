@@ -6,10 +6,10 @@ import {
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
-import { routes } from './app.routes';
 import { catchError, of } from 'rxjs';
-import { AuthSession } from './core/auth-session';
+import { routes } from './app.routes';
 import { authInterceptor } from './core/auth-interceptor';
+import { AuthSession } from './core/auth-session';
 
 // The application-wide "bean configuration": providers registered here are available everywhere.
 export const appConfig: ApplicationConfig = {

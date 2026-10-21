@@ -30,6 +30,10 @@
       <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
       <span class="max-sm:hidden">{{ theme.theme() === 'dark' ? 'Light' : 'Dark' }}</span>
     </button>
-    <a routerLink="/login" class="btn-dark ml-auto min-h-11">Log in</a>
+    @if (session.loggedIn()) {
+      <button type="button" class="btn-dark ml-auto min-h-11" (click)="logout()">Log out</button>
+    } @else {
+      <a routerLink="/login" class="btn-dark ml-auto min-h-11">Log in</a>
+    }
   </div>
 </header>
