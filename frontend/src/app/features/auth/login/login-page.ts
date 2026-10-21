@@ -1,7 +1,7 @@
-import {HttpErrorResponse} from '@angular/common/http';
-import { Component, inject,signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router,RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthApi } from '../../../core/auth-api';
 import { AuthSession } from '../../../core/auth-session';
 
@@ -9,7 +9,7 @@ import { AuthSession } from '../../../core/auth-session';
 @Component({
   selector: 'app-login-page',
   imports: [RouterLink, ReactiveFormsModule],
-  template: './login-page.html',
+  templateUrl: './login-page.html',
 })
 export class LoginPage {
   private readonly fb = inject(NonNullableFormBuilder);
@@ -17,15 +17,14 @@ export class LoginPage {
   private session = inject(AuthSession);
   private readonly router = inject(Router);
 
+  // Password is only "required": the strength rules belong to sign-up, not to checking an existing password.
+  protected readonly form = this.fb.group({
+    email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
+    password: ['', Validators.required],
+  });
 
-// Password is only "required": the strength rules belong to sign-up, not to checking an existing password.
-protected readonly form = this.fb.group({
-  email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
-  password: ['', Validators.required],
-});
-
-protected readonly showPassword = signal(false);
-protected readonly sending = signal(false);
+  protected readonly showPassword = signal(false);
+  protected readonly sending = signal(false);
 
   /** A message about the whole form (wrong credentials, rate limit, network), shown above the button. */
   protected readonly formError = signal<string | null>(null);
