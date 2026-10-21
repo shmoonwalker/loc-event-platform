@@ -17,14 +17,18 @@ const event = (change: Partial<EventCard>): EventCard => ({
 
 describe('event image fallback', () => {
   it('keeps a real image URL', () => {
-    expect(eventImageUrl(event({ imageUrl: 'https://images.example/jazz.jpg', category: 'sports' }))).toBe(
-      'https://images.example/jazz.jpg',
-    );
+    expect(
+      eventImageUrl(event({ imageUrl: 'https://images.example/jazz.jpg', category: 'sports' })),
+    ).toBe('https://images.example/jazz.jpg');
   });
 
   it('treats blank and missing image URLs as absent', () => {
-    expect(eventImageUrl(event({ imageUrl: '   ', category: 'sports' }))).toBe(CATEGORY_IMAGES.sports);
-    expect(eventImageUrl(event({ imageUrl: undefined, category: 'Arts & Culture' }))).toBe(CATEGORY_IMAGES['arts-culture']);
+    expect(eventImageUrl(event({ imageUrl: '   ', category: 'sports' }))).toBe(
+      CATEGORY_IMAGES.sports,
+    );
+    expect(eventImageUrl(event({ imageUrl: undefined, category: 'Arts & Culture' }))).toBe(
+      CATEGORY_IMAGES['arts-culture'],
+    );
   });
 
   it('maps every category slug and its stored label', () => {

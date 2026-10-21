@@ -1,7 +1,10 @@
 <header class="sticky top-0 z-10 border-b border-line bg-bg">
   <div class="wrap flex flex-wrap items-center gap-3 py-3">
     <a routerLink="/" class="flex items-center gap-2" aria-label="Loc home">
-      <span class="grid size-8 place-items-center rounded-[50%_50%_50%_4px] bg-blush" aria-hidden="true">
+      <span
+        class="grid size-8 place-items-center rounded-[50%_50%_50%_4px] bg-blush"
+        aria-hidden="true"
+      >
         <span class="size-2.5 rounded-full bg-panel"></span>
       </span>
       <span class="font-display text-[26px] font-extrabold tracking-[-0.03em]">loc</span>
@@ -16,7 +19,9 @@
         #citySelect
       >
         @for (city of options(); track city.slug) {
-          <option [value]="city.slug" [selected]="city.slug === homeCity.slug()">{{ city.name }}</option>
+          <option [value]="city.slug" [selected]="city.slug === homeCity.slug()">
+            {{ city.name }}
+          </option>
         }
       </select>
     </label>
@@ -25,11 +30,17 @@
       type="button"
       class="pill-btn"
       (click)="theme.toggle()"
-      [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+      [attr.aria-label]="
+        theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+      "
     >
       <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
       <span class="max-sm:hidden">{{ theme.theme() === 'dark' ? 'Light' : 'Dark' }}</span>
     </button>
-    <a routerLink="/login" class="btn-dark ml-auto min-h-11">Log in</a>
+    @if (session.loggedIn()) {
+      <button type="button" class="btn-dark ml-auto min-h-11" (click)="logout()">Log out</button>
+    } @else {
+      <a routerLink="/login" class="btn-dark ml-auto min-h-11">Log in</a>
+    }
   </div>
 </header>

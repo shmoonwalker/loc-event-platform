@@ -3,19 +3,37 @@
 
 const TZ = 'Europe/Amsterdam';
 
-const dateParts = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
-const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const dateParts = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const timeFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TZ,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
 const dowFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short' });
 const dayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: 'numeric' });
 const monFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, month: 'short' });
 
-const dateFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const dateFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TZ,
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
 
 const toDate = (at: Date | string) => (typeof at === 'string' ? new Date(at) : at);
 
 /** The calendar date in Amsterdam as YYYY-MM-DD (the format the API's dateFrom/dateTo use). */
 export function amsterdamDate(at: Date | string = new Date()): string {
-  const parts = Object.fromEntries(dateParts.formatToParts(toDate(at)).map((p) => [p.type, p.value]));
+  const parts = Object.fromEntries(
+    dateParts.formatToParts(toDate(at)).map((p) => [p.type, p.value]),
+  );
   return `${parts['year']}-${parts['month']}-${parts['day']}`;
 }
 
@@ -44,6 +62,9 @@ export const formatDate = (iso: string): string => dateFmt.format(new Date(iso))
 export function formatWhen(startAt: string, endAt: string): string {
   const start = `${formatDate(startAt)}, ${formatTime(startAt)}`;
   if (startAt === endAt) return start;
-  const end = amsterdamDate(startAt) === amsterdamDate(endAt) ? formatTime(endAt) : `${formatDate(endAt)}, ${formatTime(endAt)}`;
+  const end =
+    amsterdamDate(startAt) === amsterdamDate(endAt)
+      ? formatTime(endAt)
+      : `${formatDate(endAt)}, ${formatTime(endAt)}`;
   return `${start} – ${end}`;
 }

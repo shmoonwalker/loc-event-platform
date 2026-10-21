@@ -29,7 +29,9 @@ export class EventsApi {
 
   /** The organizer plus one page of their upcoming events (the backend's default size, 20). */
   organizer(id: string, page: number): Observable<OrganizerDetail> {
-    return this.http.get<OrganizerDetail>(`/api/organizers/${encodeURIComponent(id)}`, { params: { page } });
+    return this.http.get<OrganizerDetail>(`/api/organizers/${encodeURIComponent(id)}`, {
+      params: { page },
+    });
   }
 
   cities(q = ''): Observable<City[]> {

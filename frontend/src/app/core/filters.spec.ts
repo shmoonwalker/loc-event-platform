@@ -1,8 +1,15 @@
 import { convertToParamMap } from '@angular/router';
-import { EMPTY_FILTERS, Filters, filtersToParams, hasActiveFilters, paramsToFilters } from './filters';
+import {
+  EMPTY_FILTERS,
+  Filters,
+  filtersToParams,
+  hasActiveFilters,
+  paramsToFilters,
+} from './filters';
 
 const TODAY = '2026-10-06';
-const parse = (params: Record<string, string | string[]>) => paramsToFilters(convertToParamMap(params), TODAY);
+const parse = (params: Record<string, string | string[]>) =>
+  paramsToFilters(convertToParamMap(params), TODAY);
 const f = (change: Partial<Filters>): Filters => ({ ...EMPTY_FILTERS, ...change });
 
 describe('filters <-> query params', () => {
@@ -18,8 +25,14 @@ describe('filters <-> query params', () => {
   });
 
   it('turns today/tomorrow into a one-day Amsterdam range', () => {
-    expect(filtersToParams(f({ date: 'today' }), TODAY)).toEqual({ dateFrom: TODAY, dateTo: TODAY });
-    expect(filtersToParams(f({ date: 'tomorrow' }), TODAY)).toEqual({ dateFrom: '2026-10-07', dateTo: '2026-10-07' });
+    expect(filtersToParams(f({ date: 'today' }), TODAY)).toEqual({
+      dateFrom: TODAY,
+      dateTo: TODAY,
+    });
+    expect(filtersToParams(f({ date: 'tomorrow' }), TODAY)).toEqual({
+      dateFrom: '2026-10-07',
+      dateTo: '2026-10-07',
+    });
   });
 
   it('recognises a one-day range as today/tomorrow and anything else as custom', () => {
@@ -38,19 +51,35 @@ describe('filters <-> query params', () => {
   });
 
   it('maps time presets, including the overnight one', () => {
-    expect(filtersToParams(f({ time: 'late' }), TODAY)).toEqual({ timeFrom: '22:00', timeTo: '02:00' });
+    expect(filtersToParams(f({ time: 'late' }), TODAY)).toEqual({
+      timeFrom: '22:00',
+      timeTo: '02:00',
+    });
     expect(parse({ timeFrom: '12:00', timeTo: '18:00' }).time).toBe('afternoon');
-    expect(parse({ timeFrom: '09:30', timeTo: '11:00' })).toMatchObject({ time: 'custom', timeFrom: '09:30', timeTo: '11:00' });
+    expect(parse({ timeFrom: '09:30', timeTo: '11:00' })).toMatchObject({
+      time: 'custom',
+      timeFrom: '09:30',
+      timeTo: '11:00',
+    });
   });
 
   it('repeats category and tag parameters', () => {
-    const params = filtersToParams(f({ categories: ['sports', 'other'], tags: ['free', 'outdoor'] }), TODAY);
+    const params = filtersToParams(
+      f({ categories: ['sports', 'other'], tags: ['free', 'outdoor'] }),
+      TODAY,
+    );
     expect(params).toEqual({ category: ['sports', 'other'], tag: ['free', 'outdoor'] });
-    expect(parse(params)).toMatchObject({ categories: ['sports', 'other'], tags: ['free', 'outdoor'] });
+    expect(parse(params)).toMatchObject({
+      categories: ['sports', 'other'],
+      tags: ['free', 'outdoor'],
+    });
   });
 
   it('drops the city when the URL says online (the backend would answer 400)', () => {
-    expect(parse({ place: 'online', city: 'amsterdam' })).toMatchObject({ place: 'online', city: null });
+    expect(parse({ place: 'online', city: 'amsterdam' })).toMatchObject({
+      place: 'online',
+      city: null,
+    });
   });
 
   it('round-trips a full filter set', () => {

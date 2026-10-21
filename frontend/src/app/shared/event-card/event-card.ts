@@ -24,7 +24,9 @@ export class EventCardComponent {
   /** "20:30 – 23:00", or just "20:30" when the event has no end time. */
   protected readonly time = computed(() => {
     const { startAt, endAt } = this.event();
-    return startAt === endAt ? formatTime(startAt) : `${formatTime(startAt)} – ${formatTime(endAt)}`;
+    return startAt === endAt
+      ? formatTime(startAt)
+      : `${formatTime(startAt)} – ${formatTime(endAt)}`;
   });
 
   protected readonly where = computed(() => {

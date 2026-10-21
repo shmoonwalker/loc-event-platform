@@ -10,7 +10,8 @@ export function pageWindow(current: number, total: number): (number | null)[] {
   const out: (number | null)[] = [];
   wanted.forEach((p, i) => {
     const prev = wanted[i - 1];
-    if (i > 0 && p - prev === 2) out.push(prev + 1); // a one-page gap is shown, not hidden behind "…"
+    if (i > 0 && p - prev === 2)
+      out.push(prev + 1); // a one-page gap is shown, not hidden behind "…"
     else if (i > 0 && p - prev > 2) out.push(null);
     out.push(p);
   });

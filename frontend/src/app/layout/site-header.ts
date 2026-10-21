@@ -1,13 +1,14 @@
 import { Component, computed, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { AuthSession } from '../core/auth-session';
 import { EventsApi } from '../core/events-api';
 import { HomeCity } from '../core/home-city';
 import { valueOf } from '../core/resource';
 import { ThemeService } from '../core/theme';
 import { IconComponent } from '../shared/icon/icon';
 
-/** Brand, "Your city" picker (drives the Near-you rail), the theme switch and the Log in link. */
+/** Brand, "Your city" picker (drives the Near-you rail), the theme switch and the Log in / Log out. */
 @Component({
   selector: 'app-site-header',
   imports: [RouterLink, IconComponent],
@@ -17,6 +18,14 @@ export class SiteHeader {
   private readonly api = inject(EventsApi);
   protected readonly homeCity = inject(HomeCity);
   protected readonly theme = inject(ThemeService);
+  protected readonly session = inject(AuthSession);
+  private readonly router = inject(Router);
+
+  /** Back to the home page once the server has answered, also when it could not be reached (the UI is logged out anyway). */
+  protected logout(): void {
+    const home = () => void this.router.navigateByUrl('/');
+    this.session.logout().subscribe({ complete: home, error: home });
+  }
 
   // rxResource = "run this Observable, expose value/loading/error as signals". No params => runs once.
   private readonly cities = rxResource({ stream: () => this.api.cities() });
@@ -25,8 +34,14 @@ export class SiteHeader {
   protected readonly options = computed(() => {
     const list = valueOf(this.cities) ?? [];
     const current = this.homeCity.slug();
-    return list.some((c) => c.slug === current) ? list : [{ slug: current, name: titleCase(current) }, ...list];
+    return list.some((c) => c.slug === current)
+      ? list
+      : [{ slug: current, name: titleCase(current) }, ...list];
   });
 }
 
-const titleCase = (slug: string) => slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+const titleCase = (slug: string) =>
+  slug
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');

@@ -5,7 +5,9 @@ import { Component } from '@angular/core';
   selector: 'app-event-card-skeleton',
   host: { 'aria-hidden': 'true', class: 'block' },
   template: `
-    <div class="overflow-hidden rounded-[18px] border border-line bg-panel motion-safe:animate-pulse">
+    <div
+      class="overflow-hidden rounded-[18px] border border-line bg-panel motion-safe:animate-pulse"
+    >
       <div class="h-40 bg-line/60"></div>
       <div class="flex flex-col gap-2.5 p-4">
         <div class="h-4 w-4/5 rounded bg-line/60"></div>

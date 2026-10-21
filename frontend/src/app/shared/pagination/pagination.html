@@ -1,5 +1,11 @@
 <nav aria-label="Pagination" class="flex flex-wrap justify-center gap-2">
-  <button type="button" [class]="buttonClass" aria-label="Previous page" [disabled]="page() === 0" (click)="pageChange.emit(page() - 1)">
+  <button
+    type="button"
+    [class]="buttonClass"
+    aria-label="Previous page"
+    [disabled]="page() === 0"
+    (click)="pageChange.emit(page() - 1)"
+  >
     ‹
   </button>
   @for (item of items(); track $index) {

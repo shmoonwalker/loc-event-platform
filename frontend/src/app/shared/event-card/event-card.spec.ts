@@ -34,7 +34,13 @@ describe('EventCardComponent', () => {
   });
 
   it('labels online events and has no venue', () => {
-    const el = render({ ...base, place: 'ONLINE', citySlug: null, cityName: null, venueName: null });
+    const el = render({
+      ...base,
+      place: 'ONLINE',
+      citySlug: null,
+      cityName: null,
+      venueName: null,
+    });
     expect(el.textContent).toContain('Online');
     expect(el.textContent).not.toContain('Bimhuis');
   });
@@ -52,7 +58,9 @@ describe('EventCardComponent', () => {
 
   it('uses the category image when the event has no image URL', () => {
     const el = render(base);
-    expect(el.querySelector('img')?.getAttribute('src')).toBe('/images/categories/music-nightlife.jpg');
+    expect(el.querySelector('img')?.getAttribute('src')).toBe(
+      '/images/categories/music-nightlife.jpg',
+    );
   });
 
   it('treats a blank image URL as missing and uses the category image', () => {
@@ -73,7 +81,10 @@ describe('EventCardComponent', () => {
   it('falls back to the category image when the event image fails to load', async () => {
     TestBed.configureTestingModule({ providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(EventCardComponent);
-    fixture.componentRef.setInput('event', { ...base, imageUrl: 'https://images.example/dead.jpg' });
+    fixture.componentRef.setInput('event', {
+      ...base,
+      imageUrl: 'https://images.example/dead.jpg',
+    });
     fixture.detectChanges();
     const img = (fixture.nativeElement as HTMLElement).querySelector('img')!;
     img.dispatchEvent(new Event('error'));

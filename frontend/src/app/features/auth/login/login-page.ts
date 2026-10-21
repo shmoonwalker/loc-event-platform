@@ -29,6 +29,10 @@ export class LoginPage {
   /** A message about the whole form (wrong credentials, rate limit, network), shown above the button. */
   protected readonly formError = signal<string | null>(null);
 
+  /** Set after a 403: the email that still needs verifying, so the page can offer a new link for it. */
+  protected readonly unverifiedEmail = signal<string | null>(null);
+  protected readonly resendStatus = signal<'idle' | 'sending' | 'sent'>('idle');
+
   protected submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -36,7 +40,10 @@ export class LoginPage {
     }
     this.sending.set(true);
     this.formError.set(null);
-    this.authApi.login(this.form.getRawValue()).subscribe({
+    this.unverifiedEmail.set(null);
+    this.resendStatus.set('idle');
+    const credentials = this.form.getRawValue();
+    this.authApi.login(credentials).subscribe({
       next: (response) => {
         this.session.start(response.accessToken);
         void this.router.navigateByUrl('/');
@@ -45,6 +52,7 @@ export class LoginPage {
         this.sending.set(false);
         this.form.controls.password.reset();
         this.formError.set(loginErrorMessage(err));
+        if (err.status === 403) this.unverifiedEmail.set(credentials.email);
       },
     });
   }
@@ -54,6 +62,23 @@ export class LoginPage {
     const control = this.form.controls[field];
     if (!control.touched || !control.errors) return null;
     return MESSAGES[field][Object.keys(control.errors)[0]] ?? null;
+  }
+
+  /** The API always answers 202, so this never reveals more than the 403 already did. */
+  protected resend(email: string): void {
+    this.resendStatus.set('sending');
+    this.formError.set(null);
+    this.authApi.resendVerification(email).subscribe({
+      next: () => this.resendStatus.set('sent'),
+      error: (err: HttpErrorResponse) => {
+        this.resendStatus.set('idle');
+        this.formError.set(
+          err.status === 429
+            ? `Too many attempts. Try again in ${err.headers.get('Retry-After') ?? '60'} seconds.`
+            : "We couldn't send the link. Check your connection and try again.",
+        );
+      },
+    });
   }
 }
 

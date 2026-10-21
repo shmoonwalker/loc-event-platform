@@ -29,8 +29,14 @@ describe('time (Europe/Amsterdam)', () => {
   });
 
   it('formats an occurrence, with the end date only when it is another day', () => {
-    expect(formatWhen('2026-10-10T18:30:00Z', '2026-10-10T21:00:00Z')).toBe('Sat, 10 Oct 2026, 20:30 – 23:00');
-    expect(formatWhen('2026-10-10T18:30:00Z', '2026-10-10T18:30:00Z')).toBe('Sat, 10 Oct 2026, 20:30');
-    expect(formatWhen('2026-10-10T20:00:00Z', '2026-10-11T00:30:00Z')).toBe('Sat, 10 Oct 2026, 22:00 – Sun, 11 Oct 2026, 02:30');
+    expect(formatWhen('2026-10-10T18:30:00Z', '2026-10-10T21:00:00Z')).toBe(
+      'Sat, 10 Oct 2026, 20:30 – 23:00',
+    );
+    expect(formatWhen('2026-10-10T18:30:00Z', '2026-10-10T18:30:00Z')).toBe(
+      'Sat, 10 Oct 2026, 20:30',
+    );
+    expect(formatWhen('2026-10-10T20:00:00Z', '2026-10-11T00:30:00Z')).toBe(
+      'Sat, 10 Oct 2026, 22:00 – Sun, 11 Oct 2026, 02:30',
+    );
   });
 });

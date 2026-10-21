@@ -4,9 +4,14 @@ import { Component, input, output } from '@angular/core';
 @Component({
   selector: 'app-error-state',
   template: `
-    <div role="alert" class="rounded-[18px] border border-dashed border-line px-6 py-10 text-center">
+    <div
+      role="alert"
+      class="rounded-[18px] border border-dashed border-line px-6 py-10 text-center"
+    >
       <p class="font-semibold">{{ message() }}</p>
-      <button type="button" class="btn-dark mt-4" (click)="action.emit()">{{ actionLabel() }}</button>
+      <button type="button" class="btn-dark mt-4" (click)="action.emit()">
+        {{ actionLabel() }}
+      </button>
     </div>
   `,
 })

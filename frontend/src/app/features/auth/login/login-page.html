@@ -51,6 +51,22 @@
     @if (formError(); as message) {
       <p role="alert" class="text-sm text-danger">{{ message }}</p>
     }
+    @if (unverifiedEmail(); as email) {
+      @if (resendStatus() === 'sent') {
+        <p role="status" class="text-sm font-semibold">
+          We sent a new link to {{ email }}. Check your inbox.
+        </p>
+      } @else {
+        <button
+          type="button"
+          class="link self-start text-sm"
+          [disabled]="resendStatus() === 'sending'"
+          (click)="resend(email)"
+        >
+          {{ resendStatus() === 'sending' ? 'Sending…' : 'Send the link again' }}
+        </button>
+      }
+    }
     <button type="submit" class="btn-primary" [disabled]="sending()">
       {{ sending() ? 'Logging in…' : 'Log in' }}
     </button>
