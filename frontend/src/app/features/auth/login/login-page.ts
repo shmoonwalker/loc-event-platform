@@ -14,7 +14,7 @@ import { AuthSession } from '../../../core/auth-session';
 export class LoginPage {
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly authApi = inject(AuthApi);
-  private session = inject(AuthSession);
+  private readonly session = inject(AuthSession);
   private readonly router = inject(Router);
 
   // Password is only "required": the strength rules belong to sign-up, not to checking an existing password.
