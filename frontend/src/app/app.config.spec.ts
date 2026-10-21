@@ -6,7 +6,9 @@ import { AuthSession } from './core/auth-session';
 
 /** Starts the real app configuration (with a fake backend) and gives back the startup refresh request. */
 function boot() {
-  TestBed.configureTestingModule({ providers: [...appConfig.providers, provideHttpClientTesting()] });
+  TestBed.configureTestingModule({
+    providers: [...appConfig.providers, provideHttpClientTesting()],
+  });
   const http = TestBed.inject(HttpTestingController);
   return {
     http,
