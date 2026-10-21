@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Tailwind v4 is configured in CSS (no tailwind.config.js).
    Utilities like bg-panel / text-muted read CSS variables, so flipping
@@ -23,16 +23,22 @@
   --color-tint-b: var(--tint-b);
   --color-tint-c: var(--tint-c);
   --color-danger: var(--danger);
-  --font-display: "Bricolage Grotesque", sans-serif;
-  --font-sans: "Instrument Sans", system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', sans-serif;
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
   --shadow-card: var(--shadow);
   --animate-drawer: drawer 0.18s ease-out;
 }
 
 @theme {
   @keyframes drawer {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: none; }
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
@@ -59,7 +65,7 @@
   color-scheme: light;
 }
 
-[data-theme="dark"] {
+[data-theme='dark'] {
   --bg: #121620;
   --panel: #1b202d;
   --ink: #eef1f8;
@@ -86,12 +92,16 @@
     scroll-padding-top: 6rem; /* sticky header height, so #anchors are not hidden under it */
   }
   @media (prefers-reduced-motion: no-preference) {
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+    }
   }
   body {
     @apply bg-bg font-sans text-ink antialiased;
   }
-  button { cursor: pointer; }
+  button {
+    cursor: pointer;
+  }
   :focus-visible {
     outline: 2px solid var(--blush);
     outline-offset: 2px;

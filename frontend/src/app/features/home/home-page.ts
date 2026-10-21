@@ -38,6 +38,10 @@ export class HomePage {
 
   /** "Jump to" links only for rails that exist (the backend omits empty rails). */
   protected readonly jumpLinks = computed(() =>
-    this.rails().map((r) => ({ id: `rail-${r.mode}`, label: railText(r.mode, this.cityName()).title, live: r.mode === 'TONIGHT' })),
+    this.rails().map((r) => ({
+      id: `rail-${r.mode}`,
+      label: railText(r.mode, this.cityName()).title,
+      live: r.mode === 'TONIGHT',
+    })),
   );
 }

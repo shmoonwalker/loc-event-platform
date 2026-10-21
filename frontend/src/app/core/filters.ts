@@ -157,7 +157,8 @@ export function paramsToFilters(p: ParamMap, today: string): Filters {
   }
 
   const rawPlace = p.get('place')?.toLowerCase();
-  const place: PlaceFilter | null = rawPlace === 'online' || rawPlace === 'physical' ? rawPlace : null;
+  const place: PlaceFilter | null =
+    rawPlace === 'online' || rawPlace === 'physical' ? rawPlace : null;
   const rawSort = p.get('sort');
   const sort: SortKey | null = rawSort === 'start_time' || rawSort === 'relevance' ? rawSort : null;
 

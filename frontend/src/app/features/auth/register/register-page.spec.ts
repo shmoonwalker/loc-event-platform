@@ -89,13 +89,11 @@ describe('RegisterPage', () => {
     fillValid();
     await submit();
 
-    http
-      .expectOne('/api/auth/register')
-      .flush(null, {
-        status: 429,
-        statusText: 'Too Many Requests',
-        headers: { 'Retry-After': '42' },
-      });
+    http.expectOne('/api/auth/register').flush(null, {
+      status: 429,
+      statusText: 'Too Many Requests',
+      headers: { 'Retry-After': '42' },
+    });
     await harness.fixture.whenStable();
 
     expect(el.querySelector('[role="alert"]')?.textContent).toContain('Try again in 42 seconds');

@@ -1,7 +1,13 @@
-<section class="wrap mt-10 scroll-mt-24 border-t border-line pt-10 pb-6" id="all" aria-labelledby="list-title">
+<section
+  class="wrap mt-10 scroll-mt-24 border-t border-line pt-10 pb-6"
+  id="all"
+  aria-labelledby="list-title"
+>
   <div class="flex flex-wrap items-end justify-between gap-4">
     <div>
-      <h2 class="display text-4xl" id="list-title">{{ filtered() ? 'Events matching your filters' : 'All upcoming events' }}</h2>
+      <h2 class="display text-4xl" id="list-title">
+        {{ filtered() ? 'Events matching your filters' : 'All upcoming events' }}
+      </h2>
       <p class="mt-2 text-muted">
         <!-- polite live region: screen readers hear the new count after each filter change -->
         <span aria-live="polite">
@@ -11,7 +17,9 @@
             Loading events…
           }
         </span>
-        <a class="link" routerLink="." queryParamsHandling="preserve" fragment="top">Change filters</a>
+        <a class="link" routerLink="." queryParamsHandling="preserve" fragment="top"
+          >Change filters</a
+        >
       </p>
     </div>
 
@@ -24,7 +32,11 @@
         #sortSelect
       >
         @for (s of sorts; track s.value) {
-          <option [value]="s.value" [selected]="s.value === sort()" [disabled]="s.value === 'relevance' && !store.filters().q">
+          <option
+            [value]="s.value"
+            [selected]="s.value === sort()"
+            [disabled]="s.value === 'relevance' && !store.filters().q"
+          >
             {{ s.label }}
           </option>
         }
@@ -35,12 +47,22 @@
   <div class="mt-7">
     @if (result.error()) {
       @if (badRequest()) {
-        <app-error-state message="Those filters can't be combined. Clear them and try again." actionLabel="Clear filters" (action)="clearFilters()" />
+        <app-error-state
+          message="Those filters can't be combined. Clear them and try again."
+          actionLabel="Clear filters"
+          (action)="clearFilters()"
+        />
       } @else {
-        <app-error-state message="We couldn't load events. Check your connection and try again." (action)="result.reload()" />
+        <app-error-state
+          message="We couldn't load events. Check your connection and try again."
+          (action)="result.reload()"
+        />
       }
     } @else if (result.isLoading()) {
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6" aria-busy="true">
+      <div
+        class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6"
+        aria-busy="true"
+      >
         @for (_ of skeletons; track $index) {
           <app-event-card-skeleton />
         }
@@ -50,7 +72,9 @@
         <h3 class="mb-1.5 text-xl font-semibold">No events match these filters</h3>
         <p class="text-muted">Remove a filter or pick a wider date range.</p>
         @if (filtered()) {
-          <button type="button" class="btn-dark mt-5" (click)="clearFilters()">Clear filters</button>
+          <button type="button" class="btn-dark mt-5" (click)="clearFilters()">
+            Clear filters
+          </button>
         }
       </div>
     } @else if (result.hasValue()) {
@@ -64,7 +88,11 @@
 
   @if (result.hasValue() && result.value().totalPages > 1) {
     <div class="mt-10">
-      <app-pagination [page]="result.value().page" [totalPages]="result.value().totalPages" (pageChange)="setPage($event)" />
+      <app-pagination
+        [page]="result.value().page"
+        [totalPages]="result.value().totalPages"
+        (pageChange)="setPage($event)"
+      />
     </div>
   }
 </section>

@@ -34,8 +34,14 @@ export class SiteHeader {
   protected readonly options = computed(() => {
     const list = valueOf(this.cities) ?? [];
     const current = this.homeCity.slug();
-    return list.some((c) => c.slug === current) ? list : [{ slug: current, name: titleCase(current) }, ...list];
+    return list.some((c) => c.slug === current)
+      ? list
+      : [{ slug: current, name: titleCase(current) }, ...list];
   });
 }
 
-const titleCase = (slug: string) => slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+const titleCase = (slug: string) =>
+  slug
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');

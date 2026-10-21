@@ -3,7 +3,13 @@ import { Component, computed, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { EventsApi } from '../../../core/events-api';
-import { FILTER_RESET, SORTS, SortKey, filtersToParams, hasActiveFilters } from '../../../core/filters';
+import {
+  FILTER_RESET,
+  SORTS,
+  SortKey,
+  filtersToParams,
+  hasActiveFilters,
+} from '../../../core/filters';
 import { valueOf } from '../../../core/resource';
 import { amsterdamDate } from '../../../core/time';
 import { ErrorState } from '../../../shared/error-state/error-state';
@@ -34,7 +40,9 @@ export class EventList {
   });
 
   protected readonly filtered = computed(() => hasActiveFilters(this.store.filters()));
-  protected readonly sort = computed<SortKey>(() => this.store.filters().sort ?? (this.store.filters().q ? 'relevance' : 'start_time'));
+  protected readonly sort = computed<SortKey>(
+    () => this.store.filters().sort ?? (this.store.filters().q ? 'relevance' : 'start_time'),
+  );
   protected readonly total = computed(() => valueOf(this.result)?.totalElements ?? 0);
 
   /** The backend answers 400 for combinations it rejects (hand-edited URLs). That is a "fix your filters" case. */

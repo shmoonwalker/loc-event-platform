@@ -10,7 +10,9 @@ const KEY = 'loc-theme';
  */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  readonly theme = signal<Theme>(document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light');
+  readonly theme = signal<Theme>(
+    document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light',
+  );
 
   constructor() {
     effect(() => {
