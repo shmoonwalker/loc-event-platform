@@ -9,6 +9,20 @@ export interface RegisterRequest {
   displayName: string;
 }
 
+/** Body of POST /api/auth/login; the same fields as the backend's LoginRequest. */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/** Answer of POST /api/auth/login; the refresh token is not here, it arrives as an HttpOnly cookie. */
+export interface LoginResponse {
+  accessToken: string;
+  tokenType: string;
+  /** Seconds until the access token expires. */
+  expiresIn: number;
+}
+
 /** The only place that knows the backend's auth URLs. */
 @Injectable({ providedIn: 'root' })
 export class AuthApi {
@@ -27,5 +41,10 @@ export class AuthApi {
   /** Always 202, so the answer never reveals whether the email has an account. */
   resendVerification(email: string): Observable<void> {
     return this.http.post<void>('/api/auth/resend-verification', { email });
+  }
+
+  /** 200 with an access token and a refresh cookie; 401 for a wrong email or password (same answer for both); 403 when the email is not verified. */
+  login(body: LoginRequest): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>('/api/auth/login', body);
   }
 }
