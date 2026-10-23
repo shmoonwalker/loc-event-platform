@@ -23,10 +23,23 @@ export interface LoginResponse {
   expiresIn: number;
 }
 
+/** The signed-in account returned by GET /api/auth/me. */
+export interface CurrentUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: 'USER' | 'ADMIN';
+}
+
 /** The only place that knows the backend's auth URLs. */
 @Injectable({ providedIn: 'root' })
 export class AuthApi {
   private readonly http = inject(HttpClient);
+
+  /** Requires the current access token; never returns password material. */
+  me(): Observable<CurrentUser> {
+    return this.http.get<CurrentUser>('/api/auth/me');
+  }
 
   /** Always answers 202 with no body, also for an email that already has an account. */
   register(body: RegisterRequest): Observable<void> {
