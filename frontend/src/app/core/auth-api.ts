@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpContextToken } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
@@ -31,6 +31,9 @@ export interface CurrentUser {
   role: 'USER' | 'ADMIN';
 }
 
+/** Loading the account is part of sign-in/refresh; a 401 here must not start another refresh. */
+export const SKIP_AUTH_REFRESH = new HttpContextToken(() => false);
+
 /** The only place that knows the backend's auth URLs. */
 @Injectable({ providedIn: 'root' })
 export class AuthApi {
@@ -38,7 +41,9 @@ export class AuthApi {
 
   /** Requires the current access token; never returns password material. */
   me(): Observable<CurrentUser> {
-    return this.http.get<CurrentUser>('/api/auth/me');
+    return this.http.get<CurrentUser>('/api/auth/me', {
+      context: new HttpContext().set(SKIP_AUTH_REFRESH, true),
+    });
   }
 
   /** Always answers 202 with no body, also for an email that already has an account. */

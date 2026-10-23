@@ -65,9 +65,14 @@ describe('LoginPage', () => {
       password: 'correct-horse-battery',
     });
     req.flush({ accessToken: 'jwt-123', tokenType: 'Bearer', expiresIn: 900 });
+    expect(TestBed.inject(Router).url).toBe('/login');
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
     await harness.fixture.whenStable();
 
     expect(TestBed.inject(AuthSession).accessToken()).toBe('jwt-123');
+    expect(TestBed.inject(AuthSession).currentUser()?.displayName).toBe('Shadi');
     expect(TestBed.inject(Router).url).toBe('/');
     expect(setItem).not.toHaveBeenCalled();
     setItem.mockRestore();
@@ -160,5 +165,24 @@ describe('LoginPage', () => {
 
       expect(resendButton(el)).toBeUndefined();
     });
+  });
+
+  it('stays signed out when the account cannot be loaded, without offering verification', async () => {
+    const { el, http, harness, fillValid, submit } = await open();
+    fillValid();
+    await submit();
+    http
+      .expectOne('/api/auth/login')
+      .flush({ accessToken: 'token', tokenType: 'Bearer', expiresIn: 900 });
+    http.expectOne('/api/auth/me').flush(null, { status: 403, statusText: 'Forbidden' });
+    await harness.fixture.whenStable();
+
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain(
+      "We couldn't load your account",
+    );
+    expect(el.textContent).not.toContain('Send the link again');
+    expect(TestBed.inject(Router).url).toBe('/login');
+    expect(TestBed.inject(AuthSession).currentUser()).toBeNull();
+    expect(TestBed.inject(AuthSession).loggedIn()).toBe(false);
   });
 });
