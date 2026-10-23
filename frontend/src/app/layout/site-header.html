@@ -37,10 +37,19 @@
       <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
       <span class="max-sm:hidden">{{ theme.theme() === 'dark' ? 'Light' : 'Dark' }}</span>
     </button>
-    @if (session.loggedIn()) {
-      <button type="button" class="btn-dark ml-auto min-h-11" (click)="logout()">Log out</button>
-    } @else {
-      <a routerLink="/login" class="btn-dark ml-auto min-h-11">Log in</a>
-    }
+    <nav aria-label="Account" class="ml-auto flex flex-wrap items-center gap-3">
+      @if (session.currentUser(); as user) {
+        <span class="min-w-0 text-sm">
+          <span class="block max-w-40 truncate font-semibold" [title]="user.displayName">
+            {{ user.displayName }}
+          </span>
+          <span class="text-xs text-muted">{{ session.isAdmin() ? 'Admin' : 'Member' }}</span>
+        </span>
+        <button type="button" class="btn-dark min-h-11" (click)="logout()">Log out</button>
+      } @else {
+        <a routerLink="/register" class="pill-btn min-h-11">Sign up</a>
+        <a routerLink="/login" class="btn-dark min-h-11">Log in</a>
+      }
+    </nav>
   </div>
 </header>
