@@ -5,7 +5,9 @@ import { AuthApi, CurrentUser } from './auth-api';
 
 describe('AuthApi', () => {
   it('loads the current account from the backend', () => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
     const http = TestBed.inject(HttpTestingController);
     const user: CurrentUser = {
       id: 'member-id',
@@ -14,7 +16,9 @@ describe('AuthApi', () => {
       role: 'USER',
     };
     let current: CurrentUser | undefined;
-    TestBed.inject(AuthApi).me().subscribe((value) => (current = value));
+    TestBed.inject(AuthApi)
+      .me()
+      .subscribe((value) => (current = value));
 
     const req = http.expectOne('/api/auth/me');
     expect(req.request.method).toBe('GET');
