@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { switchMap } from 'rxjs';
 import { AuthApi } from '../../../core/auth-api';
 import { AuthSession } from '../../../core/auth-session';
 
@@ -43,18 +44,30 @@ export class LoginPage {
     this.unverifiedEmail.set(null);
     this.resendStatus.set('idle');
     const credentials = this.form.getRawValue();
-    this.authApi.login(credentials).subscribe({
-      next: (response) => {
-        this.session.start(response.accessToken);
-        void this.router.navigateByUrl('/');
-      },
-      error: (err: HttpErrorResponse) => {
-        this.sending.set(false);
-        this.form.controls.password.reset();
-        this.formError.set(loginErrorMessage(err));
-        if (err.status === 403) this.unverifiedEmail.set(credentials.email);
-      },
-    });
+    let authenticated = false;
+    this.authApi
+      .login(credentials)
+      .pipe(
+        switchMap((response) => {
+          authenticated = true;
+          return this.session.start(response.accessToken);
+        }),
+      )
+      .subscribe({
+        next: () => {
+          void this.router.navigateByUrl('/');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.sending.set(false);
+          this.form.controls.password.reset();
+          this.formError.set(
+            authenticated
+              ? "We couldn't load your account. Please try logging in again."
+              : loginErrorMessage(err),
+          );
+          if (!authenticated && err.status === 403) this.unverifiedEmail.set(credentials.email);
+        },
+      });
   }
 
   /** The message to show under a field, or null while it is valid or not visited yet. */

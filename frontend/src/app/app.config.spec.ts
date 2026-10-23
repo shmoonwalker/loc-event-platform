@@ -23,11 +23,15 @@ describe('app startup', () => {
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
   it('restores the session through the refresh cookie after a reload', async () => {
-    const { session, started, refresh } = boot();
+    const { http, session, started, refresh } = boot();
     refresh.flush({ accessToken: 'restored', tokenType: 'Bearer', expiresIn: 900 });
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
     await started;
 
     expect(session.accessToken()).toBe('restored');
+    expect(session.currentUser()?.displayName).toBe('Shadi');
   });
 
   it('starts signed out, without an error, when there is no valid cookie', async () => {
@@ -49,11 +53,24 @@ describe('app startup', () => {
   it('sends the restored token with API calls', async () => {
     const { http, started, refresh } = boot();
     refresh.flush({ accessToken: 'restored', tokenType: 'Bearer', expiresIn: 900 });
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
     await started;
 
     TestBed.inject(HttpClient).get('/api/auth/me').subscribe();
 
     const req = http.expectOne('/api/auth/me');
     expect(req.request.headers.get('Authorization')).toBe('Bearer restored');
+  });
+
+  it('starts signed out when the restored account cannot be loaded', async () => {
+    const { http, session, started, refresh } = boot();
+    refresh.flush({ accessToken: 'restored', tokenType: 'Bearer', expiresIn: 900 });
+    http.expectOne('/api/auth/me').flush(null, { status: 500, statusText: 'Server Error' });
+    await started;
+
+    expect(session.currentUser()).toBeNull();
+    expect(session.loggedIn()).toBe(false);
   });
 });

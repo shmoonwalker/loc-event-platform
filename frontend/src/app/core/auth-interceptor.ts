@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthSession } from './auth-session';
+import { SKIP_AUTH_REFRESH } from './auth-api';
 
 // These work with the refresh cookie or a password, not the access token. Spring answers 401 to an
 // expired Bearer token even on permitAll endpoints, so sending it here would break the refresh itself.
@@ -21,7 +22,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(withToken(req, token)).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status !== 401) return throwError(() => err);
+      if (err.status !== 401 || req.context.get(SKIP_AUTH_REFRESH)) return throwError(() => err);
       return session.refresh().pipe(
         catchError(() => {
           void router.navigateByUrl('/login');

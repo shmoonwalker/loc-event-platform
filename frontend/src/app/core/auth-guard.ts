@@ -8,3 +8,9 @@ import { AuthSession } from './auth-session';
  */
 export const authGuard: CanActivateFn = () =>
   inject(AuthSession).loggedIn() || inject(Router).createUrlTree(['/login']);
+
+/** Admin pages use the loaded account's role; the backend must still authorize every action. */
+export const adminGuard: CanActivateFn = () => {
+  const session = inject(AuthSession);
+  return session.isAdmin() || inject(Router).createUrlTree([session.loggedIn() ? '/' : '/login']);
+};

@@ -8,7 +8,7 @@ import { valueOf } from '../core/resource';
 import { ThemeService } from '../core/theme';
 import { IconComponent } from '../shared/icon/icon';
 
-/** Brand, "Your city" picker (drives the Near-you rail), the theme switch and the Log in / Log out. */
+/** Brand, "Your city" picker (drives the Near-you rail), theme switch and current account. */
 @Component({
   selector: 'app-site-header',
   imports: [RouterLink, IconComponent],

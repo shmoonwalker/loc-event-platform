@@ -61,6 +61,9 @@ describe('authInterceptor', () => {
     const req = http.expectOne('/api/auth/refresh');
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush(NEW_TOKEN);
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
   });
 
   it('renews an expired token and retries the call without showing the login page', () => {
@@ -70,6 +73,9 @@ describe('authInterceptor', () => {
 
     http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
     http.expectOne('/api/auth/refresh').flush(NEW_TOKEN);
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
     const retry = http.expectOne('/api/auth/me');
     expect(retry.request.headers.get('Authorization')).toBe('Bearer new-token');
     retry.flush({ displayName: 'Shadi' });
@@ -86,6 +92,9 @@ describe('authInterceptor', () => {
     http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
     http.expectOne('/api/events').flush(null, { status: 401, statusText: 'Unauthorized' });
     http.expectOne('/api/auth/refresh').flush(NEW_TOKEN);
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
     http.expectOne('/api/auth/me').flush({});
     http.expectOne('/api/events').flush({});
   });
@@ -110,6 +119,9 @@ describe('authInterceptor', () => {
 
     http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
     http.expectOne('/api/auth/refresh').flush(NEW_TOKEN);
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
     http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
 
     expect(status).toBe(401);
@@ -134,5 +146,20 @@ describe('authInterceptor', () => {
     http.expectOne('/api/events').flush(null, { status: 500, statusText: 'Server Error' });
 
     expect(status).toBe(500);
+  });
+
+  it('does not refresh recursively when the account lookup rejects a freshly issued token', () => {
+    const { session, http } = setup(null);
+    let status: number | undefined;
+    session.refresh().subscribe({ error: (err) => (status = err.status) });
+    http.expectOne('/api/auth/refresh').flush(NEW_TOKEN);
+    const me = http.expectOne('/api/auth/me');
+    expect(me.request.headers.get('Authorization')).toBe('Bearer new-token');
+    me.flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    http.expectNone('/api/auth/refresh');
+    expect(status).toBe(401);
+    expect(session.currentUser()).toBeNull();
+    expect(session.loggedIn()).toBe(false);
   });
 });

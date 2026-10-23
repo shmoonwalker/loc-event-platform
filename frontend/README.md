@@ -9,7 +9,7 @@ This Angular application is Loc's user interface. It has these pages:
 | `/organizers/:id` | Organizer profile and their upcoming events |
 | `/register` | Create an account with name, email and password, then "check your email" |
 | `/verify-email` | Opened from the verification email; verifies the account or offers a new link |
-| `/login` | Log in (placeholder until the login form exists) |
+| `/login` | Log in with email and password, or resend verification for an unverified account |
 | `/holding` | Holding page from the earlier version of the site |
 
 Filters live in the URL query string, so every filtered view is a shareable link. The
@@ -23,6 +23,19 @@ the unit tests and `npm run lint` to lint. There is no end-to-end test runner co
 
 Styling uses Tailwind CSS v4. The design tokens (light and dark) are CSS variables in
 `src/styles.css`.
+
+### Current user and roles
+
+`AuthSession.start(accessToken)` loads `/api/auth/me`; sign-in callers subscribe before
+opening the app. `refresh()` uses the same path on startup and after an expired token.
+The header reads `currentUser` for the display name and role, and logout clears both
+the token and account. Neither is persisted in browser storage.
+
+Use `isAdmin()` for admin-only actions and `adminGuard` for admin routes. The backend
+still authorizes every request. Account and admin navigation will be added with their
+pages (#104, #108, #113); the header currently offers logout to members and admins,
+and login/registration to visitors. Google sign-in (#74) is separate work and must use
+this same session path on return.
 
 ### Deployment
 
