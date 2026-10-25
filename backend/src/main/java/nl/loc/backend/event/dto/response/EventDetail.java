@@ -24,9 +24,12 @@ public record EventDetail(
         @Schema(description = "Tag value (slug) and label. Send value to /api/events?tag=.") List<FilterOption> tags,
         List<String> imageUrls,
         List<OrganizerInfo> organizers,
-        @Schema(description = "Upcoming dates, soonest first. Never empty.") List<Occurrence> occurrences,
+        @Schema(description = "Upcoming dates, soonest first. Never empty. For an unavailable saved event: all its dates.")
+        List<Occurrence> occurrences,
         @Schema(description = "Forecast for the next date. Null for online events or when no current forecast exists.") Weather weather,
-        @Schema(description = "True when the signed-in member saved this event. Always false when signed out.") boolean saved
+        @Schema(description = "True when the signed-in member saved this event. Always false when signed out.") boolean saved,
+        @Schema(description = "False when the event was withdrawn or is over. Always true on the public event page.")
+        boolean available
 ) {
     public record Occurrence(Instant startAt, Instant endAt) {
     }

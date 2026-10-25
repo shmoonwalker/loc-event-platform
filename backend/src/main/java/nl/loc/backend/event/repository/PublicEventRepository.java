@@ -34,6 +34,9 @@ public class PublicEventRepository {
     public static final String SAVED = """
             EXISTS (SELECT 1 FROM app.saved_event se
                     WHERE se.user_id = :viewerId AND se.event_id = s.loc_event_id)""";
+    // same rule as the publication.discoverable_events view
+    public static final String AVAILABLE =
+            "(s.discoverable AND (s.payload->>'validUntil')::timestamptz > CURRENT_TIMESTAMP)";
     private static final String DOCUMENT = """
             to_tsvector('simple', concat_ws(' ',
                 s.payload->>'title',

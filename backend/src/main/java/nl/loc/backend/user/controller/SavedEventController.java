@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import nl.loc.backend.event.controller.BrowseCriteriaParser;
+import nl.loc.backend.event.dto.response.EventDetail;
 import nl.loc.backend.user.dto.response.SavedEventPage;
 import nl.loc.backend.user.service.SavedEventService;
 import org.springframework.http.HttpStatus;
@@ -59,6 +60,31 @@ public class SavedEventController {
                                       @RequestParam(required = false) Integer size) {
         return savedEventService.savedEvents(UUID.fromString(jwt.getSubject()),
                 BrowseCriteriaParser.page(page), BrowseCriteriaParser.size(size));
+    }
+
+    @GetMapping("/{eventId}")
+    @Operation(
+            summary = "Saved event",
+            description = "Full event page of an event the member of the access token in the Authorization header saved, "
+                    + "also when it was withdrawn or is over (then available is false). Same shape as GET /api/events/{id}.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "The saved event."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "The event id is not a UUID.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "The member did not save this event, or it does not exist.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public EventDetail savedEvent(@AuthenticationPrincipal Jwt jwt,
+                                  @Parameter(description = "Id of the saved event.") @PathVariable UUID eventId) {
+        return savedEventService.savedEvent(UUID.fromString(jwt.getSubject()), eventId);
     }
 
     @PutMapping("/{eventId}")

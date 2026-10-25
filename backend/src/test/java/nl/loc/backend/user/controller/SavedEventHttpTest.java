@@ -198,6 +198,47 @@ class SavedEventHttpTest {
     }
 
     @Test
+    void memberCanOpenTheirSavedEvent() throws Exception {
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
+
+        perform(get("/api/me/saved-events/{id}", EVENT_ID), token(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(EVENT_ID.toString()))
+                .andExpect(jsonPath("$.title").value("Late night jazz"))
+                .andExpect(jsonPath("$.saved").value(true))
+                .andExpect(jsonPath("$.available").value(true));
+    }
+
+    @Test
+    void memberCanStillOpenASavedEventAfterItWasWithdrawn() throws Exception {
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
+        jdbc.sql("UPDATE publication.event_snapshot SET discoverable = false WHERE loc_event_id = :id")
+                .param("id", EVENT_ID).update();
+
+        mockMvc.perform(get("/api/events/{id}", EVENT_ID)).andExpect(status().isNotFound());
+        perform(get("/api/me/saved-events/{id}", EVENT_ID), token(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.occurrences").isNotEmpty());
+    }
+
+    @Test
+    void savedEventPageIsOnlyForTheMemberWhoSavedIt() throws Exception {
+        UUID hidden = UUID.randomUUID();
+        publish(hidden, false);
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
+
+        perform(get("/api/me/saved-events/{id}", EVENT_ID), token(bob)).andExpect(status().isNotFound());
+        perform(get("/api/me/saved-events/{id}", hidden), token(alice)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/me/saved-events/{id}", EVENT_ID)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void publicEventPageIsAlwaysAvailable() throws Exception {
+        mockMvc.perform(get("/api/events/{id}", EVENT_ID)).andExpect(jsonPath("$.available").value(true));
+    }
+
+    @Test
     void savedListCardsAreAlwaysSaved() throws Exception {
         perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
 
@@ -220,12 +261,16 @@ class SavedEventHttpTest {
     }
 
     private void publish(UUID eventId) {
+        publish(eventId, true);
+    }
+
+    private void publish(UUID eventId, boolean discoverable) {
         jdbc.sql("""
                 INSERT INTO publication.event_snapshot (
                     loc_occurrence_id, loc_event_id, revision, discoverable, state, payload,
                     first_published_at, updated_at
                 ) VALUES (
-                    :occurrenceId, :eventId, 1, true, 'PUBLISHED',
+                    :occurrenceId, :eventId, 1, :discoverable, 'PUBLISHED',
                     CAST('{"title": "Late night jazz", "location": {"type": "ONLINE"},
                            "schedule": {"starts_at": "2998-01-01T20:00:00Z"},
                            "validUntil": "2999-01-01T00:00:00Z"}' AS jsonb), now(), now()
@@ -233,6 +278,7 @@ class SavedEventHttpTest {
                 """)
                 .param("occurrenceId", UUID.randomUUID())
                 .param("eventId", eventId)
+                .param("discoverable", discoverable)
                 .update();
     }
 }

@@ -1,5 +1,6 @@
 package nl.loc.backend.user.repository;
 
+import static nl.loc.backend.event.repository.PublicEventRepository.AVAILABLE;
 import static nl.loc.backend.event.repository.PublicEventRepository.CITY_SLUG;
 import static nl.loc.backend.event.repository.PublicEventRepository.ENDS;
 import static nl.loc.backend.event.repository.PublicEventRepository.STARTS;
@@ -14,10 +15,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class SavedEventRepository {
-
-    // same rule as the publication.discoverable_events view
-    private static final String AVAILABLE =
-            "(s.discoverable AND (s.payload->>'validUntil')::timestamptz > CURRENT_TIMESTAMP)";
 
     private final JdbcClient jdbc;
     private final EventCardRowMapper cardMapper;
