@@ -67,7 +67,7 @@ class PublicEventsHttpTest {
 
     private static final Set<String> PAGE_KEYS = Set.of("page", "size", "totalElements", "totalPages", "items");
     private static final Set<String> CARD_KEYS = Set.of(
-            "id", "title", "startAt", "endAt", "citySlug", "cityName", "venueName", "imageUrl", "place");
+            "id", "title", "startAt", "endAt", "citySlug", "cityName", "venueName", "imageUrl", "place", "saved");
     private static final Set<String> FORBIDDEN_KEYS = Set.of(
             "source", "sourceUrl", "locOccurrenceId", "locEventId", "organizers", "organizer",
             "externalId", "external_id", "revision", "lifecycle", "discoverable", "state",

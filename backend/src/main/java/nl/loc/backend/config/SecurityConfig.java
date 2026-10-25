@@ -38,6 +38,7 @@ public class SecurityConfig {
                                 "/api/auth/resend-verification", "/api/auth/login", "/api/auth/refresh",
                                 "/api/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+                        .requestMatchers("/api/me/**").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)

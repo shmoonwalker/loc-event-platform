@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Event and organizer detail reads over {@code publication.discoverable_events}. */
+/** Event and organizer detail reads over {@code publication.discoverable_events}; saved events also over the snapshots. */
 @Repository
 public class EventDetailRepository {
 
@@ -38,28 +38,59 @@ public class EventDetailRepository {
 
     /** Payload of the next upcoming occurrence is shown; every upcoming date is listed. */
     @Transactional(readOnly = true)
-    public Optional<EventDetail> findEvent(UUID id, Instant now) {
-        List<Row> rows = jdbc.sql("""
-                SELECT s.payload::text AS payload, %s AS start_at, %s AS end_at
+    public Optional<EventDetail> findEvent(UUID id, Instant now, UUID viewerId) {
+        List<Row> rows = rows("""
+                SELECT s.payload::text AS payload, %s AS start_at, %s AS end_at, %s AS saved, true AS available
                 FROM publication.discoverable_events s
                 WHERE s.loc_event_id = :id AND %s IS NOT NULL AND %s > :now
                 ORDER BY start_at, s.loc_occurrence_id
-                """.formatted(STARTS, ENDS, STARTS, ENDS))
-                .param("id", id)
-                .param("now", OffsetDateTime.ofInstant(now, java.time.ZoneOffset.UTC))
-                .query((rs, row) -> new Row(rs.getString("payload"),
-                        rs.getObject("start_at", OffsetDateTime.class).toInstant(),
-                        rs.getObject("end_at", OffsetDateTime.class).toInstant()))
-                .list();
+                """.formatted(STARTS, ENDS, PublicEventRepository.SAVED, STARTS, ENDS), id, now, viewerId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(detail(id, rows.getFirst(), rows, true));
+    }
+
+    /**
+     * A saved event, also when withdrawn or over, and only for the member who saved it.
+     * Shows its upcoming available dates; when there are none, all dates with the latest one's payload.
+     */
+    @Transactional(readOnly = true)
+    public Optional<EventDetail> findSavedEvent(UUID id, Instant now, UUID viewerId) {
+        List<Row> rows = rows("""
+                SELECT s.payload::text AS payload, %1$s AS start_at, %2$s AS end_at, true AS saved,
+                       %3$s AND %2$s > :now AS available
+                FROM publication.event_snapshot s
+                WHERE s.loc_event_id = :id AND %1$s IS NOT NULL AND %4$s
+                ORDER BY start_at, s.loc_occurrence_id
+                """.formatted(STARTS, ENDS, PublicEventRepository.AVAILABLE, PublicEventRepository.SAVED),
+                id, now, viewerId);
         if (rows.isEmpty()) {
             return Optional.empty();
         }
-        JsonNode p = json.readTree(rows.getFirst().payload());
+        List<Row> available = rows.stream().filter(Row::available).toList();
+        return Optional.of(available.isEmpty()
+                ? detail(id, rows.getLast(), rows, false)
+                : detail(id, available.getFirst(), available, true));
+    }
+
+    private List<Row> rows(String sql, UUID id, Instant now, UUID viewerId) {
+        return jdbc.sql(sql)
+                .param("id", id)
+                .param("now", OffsetDateTime.ofInstant(now, java.time.ZoneOffset.UTC))
+                .param("viewerId", viewerId)
+                .query((rs, row) -> new Row(rs.getString("payload"),
+                        rs.getObject("start_at", OffsetDateTime.class).toInstant(),
+                        rs.getObject("end_at", OffsetDateTime.class).toInstant(),
+                        rs.getBoolean("saved"),
+                        rs.getBoolean("available")))
+                .list();
+    }
+
+    private EventDetail detail(UUID id, Row shown, List<Row> dates, boolean available) {
+        JsonNode p = json.readTree(shown.payload());
         JsonNode loc = p.path("location");
         String city = text(loc, "city");
-        List<EventDetail.Occurrence> occurrences = rows.stream()
+        List<EventDetail.Occurrence> occurrences = dates.stream()
                 .map(r -> new EventDetail.Occurrence(r.start(), r.end())).toList();
-        return Optional.of(new EventDetail(
+        return new EventDetail(
                 id, text(p, "title") == null ? "" : text(p, "title"), text(p, "description"),
                 Place.valueOf(text(loc, "type")), text(p, "sourceUrl"),
                 text(loc, "venue_name"), text(loc, "address"), text(loc, "postal_code"),
@@ -67,11 +98,12 @@ public class EventDetailRepository {
                 loc.path("latitude").isNumber() ? loc.path("latitude").asDouble() : null,
                 loc.path("longitude").isNumber() ? loc.path("longitude").asDouble() : null,
                 categories(p.path("categories")), tags(p.path("tags")),
-                strings(p.path("images"), "url"), organizers(p.path("organizers")), occurrences, weather(p.path("weather"))));
+                strings(p.path("images"), "url"), organizers(p.path("organizers")), occurrences, weather(p.path("weather")),
+                shown.saved(), available);
     }
 
     @Transactional(readOnly = true)
-    public Optional<OrganizerDetail> findOrganizer(UUID id, Instant now, int page, int size) {
+    public Optional<OrganizerDetail> findOrganizer(UUID id, Instant now, int page, int size, UUID viewerId) {
         String match = "[{\"locOrganizerId\":\"" + id + "\"}]";
         List<String> payloads = jdbc.sql("""
                 SELECT s.payload::text FROM publication.discoverable_events s
@@ -83,7 +115,7 @@ public class EventDetailRepository {
         }
         OrganizerInfo info = organizers(json.readTree(payloads.getFirst()).path("organizers")).stream()
                 .filter(o -> o.id().equals(id)).findFirst().orElseThrow();
-        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size)));
+        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size, viewerId)));
     }
 
     private static EventDetail.Weather weather(JsonNode w) {
@@ -154,6 +186,6 @@ public class EventDetailRepository {
         return out;
     }
 
-    private record Row(String payload, Instant start, Instant end) {
+    private record Row(String payload, Instant start, Instant end, boolean saved, boolean available) {
     }
 }
