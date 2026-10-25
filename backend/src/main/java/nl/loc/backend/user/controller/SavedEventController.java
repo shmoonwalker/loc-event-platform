@@ -8,15 +8,19 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
+import nl.loc.backend.event.controller.BrowseCriteriaParser;
+import nl.loc.backend.user.dto.response.SavedEventPage;
 import nl.loc.backend.user.service.SavedEventService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,6 +33,32 @@ public class SavedEventController {
 
     public SavedEventController(SavedEventService savedEventService) {
         this.savedEventService = savedEventService;
+    }
+
+    @GetMapping
+    @Operation(
+            summary = "Saved events",
+            description = "One page of the saved events of the member of the access token in the Authorization header, "
+                    + "most recently saved first (page from 0, size 1-20, default 20, same as /api/events). "
+                    + "Withdrawn and past events stay in the list with available false.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "One page of saved events."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "page is negative, or size is not between 1 and 20.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public SavedEventPage savedEvents(@AuthenticationPrincipal Jwt jwt,
+                                      @Parameter(description = "Zero-based page index. Defaults to 0.")
+                                      @RequestParam(required = false) Integer page,
+                                      @Parameter(description = "Page size from 1 to 20. Defaults to 20.")
+                                      @RequestParam(required = false) Integer size) {
+        return savedEventService.savedEvents(UUID.fromString(jwt.getSubject()),
+                BrowseCriteriaParser.page(page), BrowseCriteriaParser.size(size));
     }
 
     @PutMapping("/{eventId}")

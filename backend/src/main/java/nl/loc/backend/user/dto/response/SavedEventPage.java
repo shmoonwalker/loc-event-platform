@@ -9,7 +9,8 @@ public record SavedEventPage(
                 requiredMode = Schema.RequiredMode.REQUIRED)
         int page,
 
-        @Schema(description = "Page size.", example = "20", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "Page size. Defaults to 20 and cannot exceed 20.", example = "20", maximum = "20",
+                requiredMode = Schema.RequiredMode.REQUIRED)
         int size,
 
         @Schema(description = "Total saved events of the member.", requiredMode = Schema.RequiredMode.REQUIRED)
