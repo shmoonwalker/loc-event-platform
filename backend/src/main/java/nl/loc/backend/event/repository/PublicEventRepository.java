@@ -24,11 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class PublicEventRepository {
 
-    private static final String STARTS =
+    public static final String STARTS =
             "(s.payload->'schedule'->>'starts_at')::timestamptz";
-    private static final String ENDS = """
+    public static final String ENDS = """
             COALESCE((s.payload->'schedule'->>'ends_at')::timestamptz, (s.payload->'schedule'->>'starts_at')::timestamptz)""";
-    private static final String CITY_SLUG = """
+    public static final String CITY_SLUG = """
             trim(both '-' from lower(regexp_replace(trim(coalesce(s.payload->'location'->>'city', '')), '[^[:alnum:]]+', '-', 'g')))""";
     private static final String DOCUMENT = """
             to_tsvector('simple', concat_ws(' ',
