@@ -16,6 +16,7 @@ public record EventCard(
         @Schema(description = "City slug for a physical event.", example = "amsterdam") String citySlug,
         @Schema(description = "City display name.", example = "Amsterdam") String cityName,
         @Schema(description = "Venue name for a physical event.") String venueName,
-        @Schema(description = "First image URL, when the snapshot has one.") String imageUrl
+        @Schema(description = "First image URL, when the snapshot has one.") String imageUrl,
+        @Schema(description = "True when the signed-in member saved this event. Always false when signed out.") boolean saved
 ) {
 }

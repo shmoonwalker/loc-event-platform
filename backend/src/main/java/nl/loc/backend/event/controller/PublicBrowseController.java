@@ -25,6 +25,8 @@ import nl.loc.backend.event.service.EventBrowseService;
 import nl.loc.backend.event.service.HomeService;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -73,8 +75,8 @@ public class PublicBrowseController {
                     description = "city is not a slug such as amsterdam.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public HomeView home(@ParameterObject @ModelAttribute HomeQuery query) {
-        return homeService.home(parser.homeCity(query.city()));
+    public HomeView home(@ParameterObject @ModelAttribute HomeQuery query, @AuthenticationPrincipal Jwt jwt) {
+        return homeService.home(parser.homeCity(query.city()), viewerId(jwt));
     }
 
     @GetMapping("/events")
@@ -99,8 +101,8 @@ public class PublicBrowseController {
                     description = "Unknown place, category, tag, when, or sort, or page, size, city, or q is invalid.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
-    public EventPage events(@ParameterObject @ModelAttribute EventsQuery query) {
-        return browse.search(parser.parse(query));
+    public EventPage events(@ParameterObject @ModelAttribute EventsQuery query, @AuthenticationPrincipal Jwt jwt) {
+        return browse.search(parser.parse(query), viewerId(jwt));
     }
 
     @GetMapping("/events/filter-options")
@@ -125,9 +127,10 @@ public class PublicBrowseController {
                     + "404 when unknown or they have no discoverable event.")
     public OrganizerDetail organizer(@PathVariable UUID id,
                                      @RequestParam(required = false) Integer page,
-                                     @RequestParam(required = false) Integer size) {
+                                     @RequestParam(required = false) Integer size,
+                                     @AuthenticationPrincipal Jwt jwt) {
         return details.organizer(id, BrowseCriteriaParser.page(page),
-                BrowseCriteriaParser.size(size));
+                BrowseCriteriaParser.size(size), viewerId(jwt));
     }
 
     @GetMapping("/categories")
@@ -159,5 +162,9 @@ public class PublicBrowseController {
     })
     public List<City> cities(@ParameterObject @ModelAttribute CitiesQuery query) {
         return browse.cities(parser.searchText(query.q()));
+    }
+
+    private static UUID viewerId(Jwt jwt) {
+        return jwt == null ? null : UUID.fromString(jwt.getSubject());
     }
 }

@@ -87,6 +87,7 @@ public class SavedEventRepository {
                    nullif(%3$s, '') AS city_slug,
                    nullif(trim(s.payload->'location'->>'venue_name'), '') AS venue_name,
                    s.payload->'images'->0->>'url' AS image_url,
+                   true AS saved,
                    %4$s AS available
             FROM app.saved_event se
             JOIN LATERAL (

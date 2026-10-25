@@ -3,6 +3,7 @@ package nl.loc.backend.event.service;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import nl.loc.backend.event.model.City;
 import nl.loc.backend.event.dto.response.EventPage;
 import nl.loc.backend.event.model.BrowseCriteria;
@@ -21,11 +22,11 @@ public class EventBrowseService {
         this.clock = clock;
     }
 
-    public EventPage search(BrowseCriteria criteria) {
-        return search(criteria, clock.instant());
+    public EventPage search(BrowseCriteria criteria, UUID viewerId) {
+        return search(criteria, clock.instant(), viewerId);
     }
 
-    EventPage search(BrowseCriteria criteria, Instant now) {
+    EventPage search(BrowseCriteria criteria, Instant now, UUID viewerId) {
         TimeWindow.Range range = criteria.when() == null
                 ? TimeWindow.future(now) : TimeWindow.forPreset(criteria.when(), now);
         if (criteria.dateFrom() != null) {
@@ -33,7 +34,7 @@ public class EventBrowseService {
         }
         EventSort sort = criteria.sort() == EventSort.RELEVANCE && criteria.q() == null
                 ? EventSort.START_TIME : criteria.sort();
-        return repository.search(criteria, range, sort);
+        return repository.search(criteria, range, sort, viewerId);
     }
 
     public List<City> cities(String q) {

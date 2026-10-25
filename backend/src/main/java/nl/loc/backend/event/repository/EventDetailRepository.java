@@ -71,7 +71,7 @@ public class EventDetailRepository {
     }
 
     @Transactional(readOnly = true)
-    public Optional<OrganizerDetail> findOrganizer(UUID id, Instant now, int page, int size) {
+    public Optional<OrganizerDetail> findOrganizer(UUID id, Instant now, int page, int size, UUID viewerId) {
         String match = "[{\"locOrganizerId\":\"" + id + "\"}]";
         List<String> payloads = jdbc.sql("""
                 SELECT s.payload::text FROM publication.discoverable_events s
@@ -83,7 +83,7 @@ public class EventDetailRepository {
         }
         OrganizerInfo info = organizers(json.readTree(payloads.getFirst()).path("organizers")).stream()
                 .filter(o -> o.id().equals(id)).findFirst().orElseThrow();
-        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size)));
+        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size, viewerId)));
     }
 
     private static EventDetail.Weather weather(JsonNode w) {

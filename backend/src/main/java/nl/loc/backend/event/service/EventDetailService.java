@@ -24,8 +24,8 @@ public class EventDetailService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found."));
     }
 
-    public OrganizerDetail organizer(UUID id, int page, int size) {
-        return repository.findOrganizer(id, clock.instant(), page, size)
+    public OrganizerDetail organizer(UUID id, int page, int size, UUID viewerId) {
+        return repository.findOrganizer(id, clock.instant(), page, size, viewerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organizer not found."));
     }
 }

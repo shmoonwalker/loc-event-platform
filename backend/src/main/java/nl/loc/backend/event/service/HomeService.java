@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 import nl.loc.backend.event.model.City;
 import nl.loc.backend.event.dto.response.EventPage;
@@ -31,23 +32,23 @@ public class HomeService {
         this.clock = clock;
     }
 
-    public HomeView home(String slug) {
+    public HomeView home(String slug, UUID viewerId) {
         Instant now = clock.instant();
         City city = repository.findCity(slug).orElseGet(() -> City.fromSlug(slug));
         // Rails are optional highlights: a rail with no matches is left out, never padded or replaced.
         // The full event list is not part of home; the frontend reads it from GET /api/events.
         List<EventRail> rails = Stream.of(
-                        rail(RailMode.TONIGHT, null, When.TONIGHT, Place.PHYSICAL, now),
-                        rail(RailMode.WEEKEND, null, When.WEEKEND, Place.PHYSICAL, now),
-                        rail(RailMode.NEAR_YOU, slug, When.UPCOMING, Place.PHYSICAL, now),
-                        rail(RailMode.ONLINE, null, When.UPCOMING, Place.ONLINE, now))
+                        rail(RailMode.TONIGHT, null, When.TONIGHT, Place.PHYSICAL, now, viewerId),
+                        rail(RailMode.WEEKEND, null, When.WEEKEND, Place.PHYSICAL, now, viewerId),
+                        rail(RailMode.NEAR_YOU, slug, When.UPCOMING, Place.PHYSICAL, now, viewerId),
+                        rail(RailMode.ONLINE, null, When.UPCOMING, Place.ONLINE, now, viewerId))
                 .filter(rail -> rail.total() > 0)
                 .toList();
         return new HomeView(city, rails);
     }
 
-    private EventRail rail(RailMode mode, String city, When when, Place place, Instant now) {
-        EventPage page = browse.search(BrowseCriteria.rail(city, when, place, RAIL_SIZE), now);
+    private EventRail rail(RailMode mode, String city, When when, Place place, Instant now, UUID viewerId) {
+        EventPage page = browse.search(BrowseCriteria.rail(city, when, place, RAIL_SIZE), now, viewerId);
         return new EventRail(mode, page.totalElements(), page.items(), page.totalElements() > page.items().size(),
                 filters(city, when, place));
     }

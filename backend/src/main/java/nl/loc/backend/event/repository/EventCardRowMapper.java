@@ -24,7 +24,8 @@ public class EventCardRowMapper implements RowMapper<EventCard> {
                 rs.getString("city_slug"),
                 rs.getString("city_name"),
                 rs.getString("venue_name"),
-                blankToNull(rs.getString("image_url")));
+                blankToNull(rs.getString("image_url")),
+                rs.getBoolean("saved"));
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {

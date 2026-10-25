@@ -164,6 +164,35 @@ class SavedEventHttpTest {
         mockMvc.perform(get("/api/me/saved-events")).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void publicCardsShowWhetherTheSignedInMemberSavedTheEvent() throws Exception {
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
+
+        perform(get("/api/events"), token(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(EVENT_ID.toString()))
+                .andExpect(jsonPath("$.items[0].saved").value(true));
+        perform(get("/api/events"), token(bob)).andExpect(jsonPath("$.items[0].saved").value(false));
+        mockMvc.perform(get("/api/events")).andExpect(jsonPath("$.items[0].saved").value(false));
+    }
+
+    @Test
+    void homeRailCardsShowWhetherTheSignedInMemberSavedTheEvent() throws Exception {
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
+
+        perform(get("/api/home"), token(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rails[0].items[0].saved").value(true));
+        mockMvc.perform(get("/api/home")).andExpect(jsonPath("$.rails[0].items[0].saved").value(false));
+    }
+
+    @Test
+    void savedListCardsAreAlwaysSaved() throws Exception {
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
+
+        perform(get("/api/me/saved-events"), token(alice)).andExpect(jsonPath("$.items[0].event.saved").value(true));
+    }
+
     private String token(UserAccount user) {
         return accessTokenService.issueAccessToken(user);
     }

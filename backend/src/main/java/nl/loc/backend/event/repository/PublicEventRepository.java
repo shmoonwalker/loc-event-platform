@@ -30,6 +30,10 @@ public class PublicEventRepository {
             COALESCE((s.payload->'schedule'->>'ends_at')::timestamptz, (s.payload->'schedule'->>'starts_at')::timestamptz)""";
     public static final String CITY_SLUG = """
             trim(both '-' from lower(regexp_replace(trim(coalesce(s.payload->'location'->>'city', '')), '[^[:alnum:]]+', '-', 'g')))""";
+    // false when signed out: user_id = NULL never matches
+    public static final String SAVED = """
+            EXISTS (SELECT 1 FROM app.saved_event se
+                    WHERE se.user_id = :viewerId AND se.event_id = s.loc_event_id)""";
     private static final String DOCUMENT = """
             to_tsvector('simple', concat_ws(' ',
                 s.payload->>'title',
@@ -50,9 +54,9 @@ public class PublicEventRepository {
     }
 
     @Transactional(readOnly = true)
-    public EventPage search(BrowseCriteria criteria, TimeWindow.Range range, EventSort sort) {
+    public EventPage search(BrowseCriteria criteria, TimeWindow.Range range, EventSort sort, UUID viewerId) {
         long total = count(criteria, range);
-        List<EventCard> items = total == 0 ? List.of() : cards(criteria, range, sort);
+        List<EventCard> items = total == 0 ? List.of() : cards(criteria, range, sort, viewerId);
         int totalPages = total == 0 ? 0 : (int) Math.ceil(total / (double) criteria.size());
         return new EventPage(criteria.page(), criteria.size(), total, totalPages, items);
     }
@@ -104,7 +108,7 @@ public class PublicEventRepository {
 
     /** One page of an organizer's upcoming events, one card per event, same occurrence selection as the list. */
     @Transactional(readOnly = true)
-    public EventPage organizerEvents(UUID organizerId, Instant now, int page, int size) {
+    public EventPage organizerEvents(UUID organizerId, Instant now, int page, int size, UUID viewerId) {
         String match = "[{\"locOrganizerId\":\"" + organizerId + "\"}]";
         OffsetDateTime at = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
         Long total = jdbc.sql("""
@@ -126,7 +130,8 @@ public class PublicEventRepository {
                            nullif(trim(s.payload->'location'->>'city'), '') AS city_name,
                            nullif(%3$s, '') AS city_slug,
                            nullif(trim(s.payload->'location'->>'venue_name'), '') AS venue_name,
-                           s.payload->'images'->0->>'url' AS image_url
+                           s.payload->'images'->0->>'url' AS image_url,
+                           %4$s AS saved
                     FROM publication.discoverable_events s
                     WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
                       AND %1$s IS NOT NULL AND %2$s > :now
@@ -134,10 +139,11 @@ public class PublicEventRepository {
                 ) e
                 ORDER BY start_at, loc_event_id
                 LIMIT :limit OFFSET :offset
-                """.formatted(STARTS, ENDS, CITY_SLUG);
+                """.formatted(STARTS, ENDS, CITY_SLUG, SAVED);
         List<EventCard> items = jdbc.sql(sql)
                 .param("match", match)
                 .param("now", at)
+                .param("viewerId", viewerId)
                 .param("limit", size)
                 .param("offset", (long) page * size)
                 .query(cardMapper)
@@ -162,7 +168,7 @@ public class PublicEventRepository {
         return "start_at, loc_event_id";
     }
 
-    private List<EventCard> cards(BrowseCriteria criteria, TimeWindow.Range range, EventSort sort) {
+    private List<EventCard> cards(BrowseCriteria criteria, TimeWindow.Range range, EventSort sort, UUID viewerId) {
         String rankColumn = sort == EventSort.RELEVANCE ? ", " + DOCUMENT + " AS document" : "";
         String sql = """
                 WITH next_occurrence AS (
@@ -175,7 +181,8 @@ public class PublicEventRepository {
                            nullif(trim(s.payload->'location'->>'city'), '') AS city_name,
                            nullif(%s, '') AS city_slug,
                            nullif(trim(s.payload->'location'->>'venue_name'), '') AS venue_name,
-                           s.payload->'images'->0->>'url' AS image_url
+                           s.payload->'images'->0->>'url' AS image_url,
+                           %s AS saved
                            %s
                     FROM publication.discoverable_events s
                     WHERE %s
@@ -184,8 +191,9 @@ public class PublicEventRepository {
                 SELECT * FROM next_occurrence
                 ORDER BY %s
                 LIMIT :limit OFFSET :offset
-                """.formatted(STARTS, ENDS, CITY_SLUG, rankColumn, occurrenceFilter(criteria), STARTS, orderBy(sort));
+                """.formatted(STARTS, ENDS, CITY_SLUG, SAVED, rankColumn, occurrenceFilter(criteria), STARTS, orderBy(sort));
         return bind(jdbc.sql(sql), criteria, range)
+                .param("viewerId", viewerId)
                 .param("limit", criteria.size())
                 .param("offset", (long) criteria.page() * criteria.size())
                 .query(cardMapper)
