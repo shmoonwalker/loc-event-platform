@@ -38,18 +38,20 @@ public class EventDetailRepository {
 
     /** Payload of the next upcoming occurrence is shown; every upcoming date is listed. */
     @Transactional(readOnly = true)
-    public Optional<EventDetail> findEvent(UUID id, Instant now) {
+    public Optional<EventDetail> findEvent(UUID id, Instant now, UUID viewerId) {
         List<Row> rows = jdbc.sql("""
-                SELECT s.payload::text AS payload, %s AS start_at, %s AS end_at
+                SELECT s.payload::text AS payload, %s AS start_at, %s AS end_at, %s AS saved
                 FROM publication.discoverable_events s
                 WHERE s.loc_event_id = :id AND %s IS NOT NULL AND %s > :now
                 ORDER BY start_at, s.loc_occurrence_id
-                """.formatted(STARTS, ENDS, STARTS, ENDS))
+                """.formatted(STARTS, ENDS, PublicEventRepository.SAVED, STARTS, ENDS))
                 .param("id", id)
                 .param("now", OffsetDateTime.ofInstant(now, java.time.ZoneOffset.UTC))
+                .param("viewerId", viewerId)
                 .query((rs, row) -> new Row(rs.getString("payload"),
                         rs.getObject("start_at", OffsetDateTime.class).toInstant(),
-                        rs.getObject("end_at", OffsetDateTime.class).toInstant()))
+                        rs.getObject("end_at", OffsetDateTime.class).toInstant(),
+                        rs.getBoolean("saved")))
                 .list();
         if (rows.isEmpty()) {
             return Optional.empty();
@@ -67,7 +69,8 @@ public class EventDetailRepository {
                 loc.path("latitude").isNumber() ? loc.path("latitude").asDouble() : null,
                 loc.path("longitude").isNumber() ? loc.path("longitude").asDouble() : null,
                 categories(p.path("categories")), tags(p.path("tags")),
-                strings(p.path("images"), "url"), organizers(p.path("organizers")), occurrences, weather(p.path("weather"))));
+                strings(p.path("images"), "url"), organizers(p.path("organizers")), occurrences, weather(p.path("weather")),
+                rows.getFirst().saved()));
     }
 
     @Transactional(readOnly = true)
@@ -154,6 +157,6 @@ public class EventDetailRepository {
         return out;
     }
 
-    private record Row(String payload, Instant start, Instant end) {
+    private record Row(String payload, Instant start, Instant end, boolean saved) {
     }
 }

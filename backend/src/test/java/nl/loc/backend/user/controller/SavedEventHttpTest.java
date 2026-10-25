@@ -187,6 +187,17 @@ class SavedEventHttpTest {
     }
 
     @Test
+    void eventDetailShowsWhetherTheSignedInMemberSavedTheEvent() throws Exception {
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
+
+        perform(get("/api/events/{id}", EVENT_ID), token(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.saved").value(true));
+        perform(get("/api/events/{id}", EVENT_ID), token(bob)).andExpect(jsonPath("$.saved").value(false));
+        mockMvc.perform(get("/api/events/{id}", EVENT_ID)).andExpect(jsonPath("$.saved").value(false));
+    }
+
+    @Test
     void savedListCardsAreAlwaysSaved() throws Exception {
         perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
 

@@ -19,8 +19,8 @@ public class EventDetailService {
         this.clock = clock;
     }
 
-    public EventDetail event(UUID id) {
-        return repository.findEvent(id, clock.instant())
+    public EventDetail event(UUID id, UUID viewerId) {
+        return repository.findEvent(id, clock.instant(), viewerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found."));
     }
 

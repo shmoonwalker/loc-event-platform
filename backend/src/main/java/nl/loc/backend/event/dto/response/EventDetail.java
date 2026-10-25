@@ -25,7 +25,8 @@ public record EventDetail(
         List<String> imageUrls,
         List<OrganizerInfo> organizers,
         @Schema(description = "Upcoming dates, soonest first. Never empty.") List<Occurrence> occurrences,
-        @Schema(description = "Forecast for the next date. Null for online events or when no current forecast exists.") Weather weather
+        @Schema(description = "Forecast for the next date. Null for online events or when no current forecast exists.") Weather weather,
+        @Schema(description = "True when the signed-in member saved this event. Always false when signed out.") boolean saved
 ) {
     public record Occurrence(Instant startAt, Instant endAt) {
     }

@@ -116,8 +116,8 @@ public class PublicBrowseController {
     @Operation(summary = "Event detail",
             description = "Full public event page with organizers, categories, tags, images, and every upcoming date. "
                     + "404 when the event is unknown, withdrawn, or over.")
-    public EventDetail event(@PathVariable UUID id) {
-        return details.event(id);
+    public EventDetail event(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return details.event(id, viewerId(jwt));
     }
 
     @GetMapping("/organizers/{id}")
