@@ -1,4 +1,4 @@
-package nl.loc.backend.event.repository;
+package nl.loc.backend.user.repository;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
