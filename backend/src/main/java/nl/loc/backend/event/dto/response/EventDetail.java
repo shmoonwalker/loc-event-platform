@@ -28,6 +28,7 @@ public record EventDetail(
         List<Occurrence> occurrences,
         @Schema(description = "Forecast for the next date. Null for online events or when no current forecast exists.") Weather weather,
         @Schema(description = "True when the signed-in member saved this event. Always false when signed out.") boolean saved,
+        @Schema(description = "How many members saved this event.") long saveCount,
         @Schema(description = "False when the event was withdrawn or is over. Always true on the public event page.")
         boolean available
 ) {

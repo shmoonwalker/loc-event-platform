@@ -90,6 +90,8 @@ public class EventDetailRepository {
         String city = text(loc, "city");
         List<EventDetail.Occurrence> occurrences = dates.stream()
                 .map(r -> new EventDetail.Occurrence(r.start(), r.end())).toList();
+        long saveCount = jdbc.sql("SELECT count(*) FROM app.saved_event WHERE event_id = :id")
+                .param("id", id).query(Long.class).single();
         return new EventDetail(
                 id, text(p, "title") == null ? "" : text(p, "title"), text(p, "description"),
                 Place.valueOf(text(loc, "type")), text(p, "sourceUrl"),
@@ -99,7 +101,7 @@ public class EventDetailRepository {
                 loc.path("longitude").isNumber() ? loc.path("longitude").asDouble() : null,
                 categories(p.path("categories")), tags(p.path("tags")),
                 strings(p.path("images"), "url"), organizers(p.path("organizers")), occurrences, weather(p.path("weather")),
-                shown.saved(), available);
+                shown.saved(), saveCount, available);
     }
 
     @Transactional(readOnly = true)
