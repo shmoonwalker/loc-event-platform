@@ -198,6 +198,22 @@ class SavedEventHttpTest {
     }
 
     @Test
+    void eventDetailShowsHowManyMembersSavedTheEvent() throws Exception {
+        mockMvc.perform(get("/api/events/{id}", EVENT_ID)).andExpect(jsonPath("$.saveCount").value(0));
+
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(bob)).andExpect(status().isNoContent());
+        perform(put("/api/me/saved-events/{id}", EVENT_ID), token(bob)).andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/events/{id}", EVENT_ID)).andExpect(jsonPath("$.saveCount").value(2));
+        perform(get("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(jsonPath("$.saveCount").value(2));
+
+        perform(delete("/api/me/saved-events/{id}", EVENT_ID), token(bob)).andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/events/{id}", EVENT_ID)).andExpect(jsonPath("$.saveCount").value(1));
+    }
+
+    @Test
     void memberCanOpenTheirSavedEvent() throws Exception {
         perform(put("/api/me/saved-events/{id}", EVENT_ID), token(alice)).andExpect(status().isNoContent());
 

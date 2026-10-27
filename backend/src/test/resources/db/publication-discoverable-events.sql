@@ -17,3 +17,10 @@ CREATE VIEW publication.discoverable_events AS
     FROM publication.event_snapshot
     WHERE discoverable
       AND (payload->>'validUntil')::timestamptz > CURRENT_TIMESTAMP;
+
+CREATE TABLE publication.organizer_identity (
+    loc_organizer_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    UNIQUE (source, external_id)
+);
