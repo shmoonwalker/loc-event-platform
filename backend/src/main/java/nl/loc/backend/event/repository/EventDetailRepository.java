@@ -115,7 +115,12 @@ public class EventDetailRepository {
         }
         OrganizerInfo info = organizers(json.readTree(payloads.getFirst()).path("organizers")).stream()
                 .filter(o -> o.id().equals(id)).findFirst().orElseThrow();
-        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size, viewerId)));
+        // signed out: no follows to look up
+        boolean followed = viewerId != null && jdbc.sql("""
+                SELECT EXISTS (SELECT 1 FROM app.followed_organizer
+                               WHERE user_id = :viewerId AND organizer_id = :id)
+                """).param("viewerId", viewerId).param("id", id).query(Boolean.class).single();
+        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size, viewerId), followed));
     }
 
     private static EventDetail.Weather weather(JsonNode w) {
