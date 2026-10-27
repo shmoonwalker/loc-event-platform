@@ -90,6 +90,8 @@ public class EventDetailRepository {
         String city = text(loc, "city");
         List<EventDetail.Occurrence> occurrences = dates.stream()
                 .map(r -> new EventDetail.Occurrence(r.start(), r.end())).toList();
+        long saveCount = jdbc.sql("SELECT count(*) FROM app.saved_event WHERE event_id = :id")
+                .param("id", id).query(Long.class).single();
         return new EventDetail(
                 id, text(p, "title") == null ? "" : text(p, "title"), text(p, "description"),
                 Place.valueOf(text(loc, "type")), text(p, "sourceUrl"),
@@ -99,7 +101,7 @@ public class EventDetailRepository {
                 loc.path("longitude").isNumber() ? loc.path("longitude").asDouble() : null,
                 categories(p.path("categories")), tags(p.path("tags")),
                 strings(p.path("images"), "url"), organizers(p.path("organizers")), occurrences, weather(p.path("weather")),
-                shown.saved(), available);
+                shown.saved(), saveCount, available);
     }
 
     @Transactional(readOnly = true)
@@ -115,7 +117,12 @@ public class EventDetailRepository {
         }
         OrganizerInfo info = organizers(json.readTree(payloads.getFirst()).path("organizers")).stream()
                 .filter(o -> o.id().equals(id)).findFirst().orElseThrow();
-        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size, viewerId)));
+        // signed out: no follows to look up
+        boolean followed = viewerId != null && jdbc.sql("""
+                SELECT EXISTS (SELECT 1 FROM app.followed_organizer
+                               WHERE user_id = :viewerId AND organizer_id = :id)
+                """).param("viewerId", viewerId).param("id", id).query(Boolean.class).single();
+        return Optional.of(new OrganizerDetail(info, events.organizerEvents(id, now, page, size, viewerId), followed));
     }
 
     private static EventDetail.Weather weather(JsonNode w) {
