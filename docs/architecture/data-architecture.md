@@ -757,6 +757,7 @@ Backend owns
 ├── users
 ├── authentication/session data
 ├── saved events
+├── followed organizers
 ├── comments
 ├── notification state (design pending)
 └── other product/user behaviour

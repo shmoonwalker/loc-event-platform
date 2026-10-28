@@ -1,6 +1,10 @@
 # Discovery API
 
-Public, read-only endpoints for finding events. Anonymous `GET` only.
+Public, read-only endpoints for finding events. Every route is an anonymous `GET`.
+A signed-in member may send `Authorization: Bearer <accessToken>`; then `saved` on cards
+and event pages, and `followed` on organizer pages, are filled in for that member.
+Without a token they are `false`. An invalid or expired token gets `401`, so drop it
+instead of sending it.
 Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 
 | Endpoint | Purpose |
@@ -9,8 +13,8 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 | `GET /api/home?city=amsterdam` | Homepage highlight rails. Only rails with events are returned. |
 | `GET /api/events/filter-options` | Values and labels for the filter controls. |
 | `GET /api/cities?q=amster` | Up to ten city suggestions for the city picker. |
-| `GET /api/events/{id}` | Event page: description, address, coordinates, categories, tags, images, organizers, every upcoming date, forecast (`weather`, null when none). `404` when unknown or over. |
-| `GET /api/organizers/{id}` | Organizer profile (`name`, `description`, `site`) plus a page of upcoming event cards in `events` (same `page`/`size` and shape as `/api/events`). Organizer ids come from `EventDetail.organizers[].id`. `404` when none. |
+| `GET /api/events/{id}` | Event page: description, address, coordinates, categories, tags, images, organizers, every upcoming date, forecast (`weather`, null when none), `saved`, `saveCount` (how many members saved it) and `available` (always `true` here). `404` when unknown, withdrawn or over. |
+| `GET /api/organizers/{id}` | Organizer profile in `organizer` (`id`, `name`, `description`, `site`), a page of upcoming event cards in `events` (same `page`/`size` and shape as `/api/events`) and `followed`. Organizer ids come from `EventDetail.organizers[].id`. `404` when none. |
 | `GET /api/categories`, `GET /api/tags` | `{ value, label }` lists, same as in filter-options. |
 
 Online vs in person is the `place` filter (`physical` / `online`) on `/api/events`; every card and detail carries `place`.
@@ -103,7 +107,8 @@ Rails and the list return the same card, so the frontend needs one card componen
   "citySlug": "amsterdam",
   "cityName": "Amsterdam",
   "venueName": "Paradiso",
-  "imageUrl": null
+  "imageUrl": null,
+  "saved": false
 }
 ```
 
@@ -124,8 +129,9 @@ Show `name`, send `slug`. With no `q`, Amsterdam comes first.
 ```text
 event/
   controller/  PublicBrowseController (HTTP), BrowseCriteriaParser (validation → BrowseCriteria)
-  service/     EventBrowseService (time windows, sort), HomeService (rails), FilterOptionsService
-  repository/  PublicEventRepository (SQL via JdbcClient), EventCardRowMapper
+  service/     EventBrowseService (time windows, sort), HomeService (rails), FilterOptionsService,
+               EventDetailService (event and organizer pages)
+  repository/  PublicEventRepository (SQL via JdbcClient), EventDetailRepository, EventCardRowMapper
   model/       BrowseCriteria, TimeWindow (Amsterdam calendar), When, Place, EventSort, RailMode,
                City, EventCategory, EventTag
   dto/         request query records, response records

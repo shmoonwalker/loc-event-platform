@@ -10,7 +10,7 @@ Loc consists of three applications:
 
 | Application | Technology | Responsibility |
 |---|---|---|
-| [Backend](backend/README.md) | Java 25, Spring Boot | Product API: event discovery, user accounts, authentication |
+| [Backend](backend/README.md) | Java 25, Spring Boot | Product API: event discovery, user accounts, authentication, saved events, followed organizers |
 | [Data](data/README.md) | Java 25, Spring Boot | Collects external events, normalizes and enriches them, publishes qualified events |
 | [Frontend](frontend/README.md) | Angular, Tailwind CSS | User interface; talks only to the backend API |
 
@@ -53,7 +53,7 @@ Requirements: Docker, Java 25 and Node.js.
 - [System architecture](docs/architecture/system-architecture.md)
 - [Data architecture](docs/architecture/data-architecture.md)
 - [Authentication](docs/architecture/authentication.md)
-- [Backend guide](backend/README.md) and [Discovery API](backend/docs/discovery.md)
+- [Backend guide](backend/README.md), [Discovery API](backend/docs/discovery.md) and [Member API](backend/docs/member.md)
 - [Data guide](data/README.md)
 - [Frontend guide](frontend/README.md)
 - [Production deployment](deploy/README.md)
