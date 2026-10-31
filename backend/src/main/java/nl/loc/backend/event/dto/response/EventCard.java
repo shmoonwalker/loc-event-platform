@@ -8,7 +8,7 @@ import java.util.UUID;
 /** Homepage and results card. Organizer name is intentionally absent; it belongs on the event detail. */
 @Schema(description = "Event card for the homepage and the events collection. Organizer name is not included.")
 public record EventCard(
-        @Schema(description = "Published event id.") UUID id,
+        @Schema(description = "Show id. One card per show; the card shows its earliest matching performance.") UUID id,
         @Schema(description = "Event title.", example = "Late night jazz") String title,
         @Schema(description = "Occurrence start, UTC.") Instant startAt,
         @Schema(description = "Occurrence end, UTC. Equals the start when the snapshot has no end.") Instant endAt,

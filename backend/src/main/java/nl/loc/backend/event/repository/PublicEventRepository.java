@@ -30,10 +30,15 @@ public class PublicEventRepository {
             COALESCE((s.payload->'schedule'->>'ends_at')::timestamptz, (s.payload->'schedule'->>'starts_at')::timestamptz)""";
     public static final String CITY_SLUG = """
             trim(both '-' from lower(regexp_replace(trim(coalesce(s.payload->'location'->>'city', '')), '[^[:alnum:]]+', '-', 'g')))""";
-    // false when signed out: user_id = NULL never matches
+    // false when signed out: user_id = NULL never matches; saving any performance saves the show
     public static final String SAVED = """
             EXISTS (SELECT 1 FROM app.saved_event se
-                    WHERE se.user_id = :viewerId AND se.event_id = s.loc_event_id)""";
+                    JOIN publication.event_snapshot g ON g.loc_event_id = se.event_id
+                    WHERE se.user_id = :viewerId AND g.loc_group_id = s.loc_group_id)""";
+    // the show of :id, which is a show id or an old loc_event_id from links made before shows existed
+    public static final String SHOW_OF = """
+            (SELECT g.loc_group_id FROM publication.event_snapshot g
+             WHERE g.loc_group_id = :id OR g.loc_event_id = :id LIMIT 1)""";
     // same rule as the publication.discoverable_events view
     public static final String AVAILABLE =
             "(s.discoverable AND (s.payload->>'validUntil')::timestamptz > CURRENT_TIMESTAMP)";
@@ -92,7 +97,7 @@ public class PublicEventRepository {
                 FROM (
                     SELECT trim(s.payload->'location'->>'city') AS city_name,
                            %s AS city_slug,
-                           count(DISTINCT s.loc_event_id) AS event_count
+                           count(DISTINCT s.loc_group_id) AS event_count
                     FROM publication.discoverable_events s
                     WHERE %s
                       AND coalesce(trim(s.payload->'location'->>'city'), '') <> ''
@@ -109,13 +114,13 @@ public class PublicEventRepository {
                 .list();
     }
 
-    /** One page of an organizer's upcoming events, one card per event, same occurrence selection as the list. */
+    /** One page of an organizer's upcoming shows, one card per show, same occurrence selection as the list. */
     @Transactional(readOnly = true)
     public EventPage organizerEvents(UUID organizerId, Instant now, int page, int size, UUID viewerId) {
         String match = "[{\"locOrganizerId\":\"" + organizerId + "\"}]";
         OffsetDateTime at = OffsetDateTime.ofInstant(now, ZoneOffset.UTC);
         Long total = jdbc.sql("""
-                SELECT count(DISTINCT s.loc_event_id) FROM publication.discoverable_events s
+                SELECT count(DISTINCT s.loc_group_id) FROM publication.discoverable_events s
                 WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
                   AND %1$s IS NOT NULL AND %2$s > :now
                 """.formatted(STARTS, ENDS)).param("match", match).param("now", at).query(Long.class).single();
@@ -124,8 +129,8 @@ public class PublicEventRepository {
         }
         String sql = """
                 SELECT * FROM (
-                    SELECT DISTINCT ON (s.loc_event_id)
-                           s.loc_event_id,
+                    SELECT DISTINCT ON (s.loc_group_id)
+                           s.loc_group_id,
                            s.payload->>'title' AS title,
                            s.payload->'location'->>'type' AS place,
                            %1$s AS start_at,
@@ -138,9 +143,9 @@ public class PublicEventRepository {
                     FROM publication.discoverable_events s
                     WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
                       AND %1$s IS NOT NULL AND %2$s > :now
-                    ORDER BY s.loc_event_id, %1$s, s.loc_occurrence_id
+                    ORDER BY s.loc_group_id, %1$s, s.loc_occurrence_id
                 ) e
-                ORDER BY start_at, loc_event_id
+                ORDER BY start_at, loc_group_id
                 LIMIT :limit OFFSET :offset
                 """.formatted(STARTS, ENDS, CITY_SLUG, SAVED);
         List<EventCard> items = jdbc.sql(sql)
@@ -156,7 +161,7 @@ public class PublicEventRepository {
 
     private long count(BrowseCriteria criteria, TimeWindow.Range range) {
         String sql = """
-                SELECT count(DISTINCT s.loc_event_id)
+                SELECT count(DISTINCT s.loc_group_id)
                 FROM publication.discoverable_events s
                 WHERE %s
                 """.formatted(occurrenceFilter(criteria));
@@ -166,17 +171,17 @@ public class PublicEventRepository {
 
     private static String orderBy(EventSort sort) {
         if (sort == EventSort.RELEVANCE) {
-            return "ts_rank(document, websearch_to_tsquery('simple', :q)) DESC, start_at, loc_event_id";
+            return "ts_rank(document, websearch_to_tsquery('simple', :q)) DESC, start_at, loc_group_id";
         }
-        return "start_at, loc_event_id";
+        return "start_at, loc_group_id";
     }
 
     private List<EventCard> cards(BrowseCriteria criteria, TimeWindow.Range range, EventSort sort, UUID viewerId) {
         String rankColumn = sort == EventSort.RELEVANCE ? ", " + DOCUMENT + " AS document" : "";
         String sql = """
                 WITH next_occurrence AS (
-                    SELECT DISTINCT ON (s.loc_event_id)
-                           s.loc_event_id,
+                    SELECT DISTINCT ON (s.loc_group_id)
+                           s.loc_group_id,
                            s.payload->>'title' AS title,
                            s.payload->'location'->>'type' AS place,
                            %s AS start_at,
@@ -189,7 +194,7 @@ public class PublicEventRepository {
                            %s
                     FROM publication.discoverable_events s
                     WHERE %s
-                    ORDER BY s.loc_event_id, %s, s.loc_occurrence_id
+                    ORDER BY s.loc_group_id, %s, s.loc_occurrence_id
                 )
                 SELECT * FROM next_occurrence
                 ORDER BY %s

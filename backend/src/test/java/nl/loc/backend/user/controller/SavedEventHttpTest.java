@@ -283,10 +283,10 @@ class SavedEventHttpTest {
     private void publish(UUID eventId, boolean discoverable) {
         jdbc.sql("""
                 INSERT INTO publication.event_snapshot (
-                    loc_occurrence_id, loc_event_id, revision, discoverable, state, payload,
+                    loc_occurrence_id, loc_event_id, loc_group_id, revision, discoverable, state, payload,
                     first_published_at, updated_at
                 ) VALUES (
-                    :occurrenceId, :eventId, 1, :discoverable, 'PUBLISHED',
+                    :occurrenceId, :eventId, :eventId, 1, :discoverable, 'PUBLISHED',
                     CAST('{"title": "Late night jazz", "location": {"type": "ONLINE"},
                            "schedule": {"starts_at": "2998-01-01T20:00:00Z"},
                            "validUntil": "2999-01-01T00:00:00Z"}' AS jsonb), now(), now()

@@ -130,7 +130,7 @@ The backend does **not** publish ingestion-owned catalog data.
 
 The frontend owns the user interface and communicates only with the backend API.
 
-Discovery UX treats `loc_event_id` as the list unit (one card per logical event) and `loc_occurrence_id` as the schedule unit on event detail. The backend discovery API performs grouping; the frontend does not read `publication` directly.
+Discovery UX treats `loc_group_id` as the list unit (one card per show) and `loc_occurrence_id` as the schedule unit on event detail. The backend discovery API performs grouping; the frontend does not read `publication` directly.
 
 ### Shared Contracts
 
@@ -140,7 +140,7 @@ The data and backend applications share only the contracts required to interact 
 - identifiers and shared domain concepts
 - optional asynchronous event or signal definitions
 
-Published snapshots remain occurrence-granular in `publication`; the backend may expose an event-granular discovery list DTO derived from those snapshots. Identifier semantics: `loc_event_id` is the logical event (list unit); `loc_occurrence_id` is one dated instance (schedule unit). See the [backend guide](../../backend/README.md) for discovery grouping rules.
+Published snapshots remain occurrence-granular in `publication`; the backend may expose an event-granular discovery list DTO derived from those snapshots. Identifier semantics: `loc_group_id` is the show (list unit and public event id); `loc_event_id` is one source event and stays stable; `loc_occurrence_id` is one dated instance (schedule unit). See the [backend guide](../../backend/README.md) for discovery grouping rules.
 
 There is no shared Java library between the applications. One is only introduced if real duplication or contract-management needs justify it.
 

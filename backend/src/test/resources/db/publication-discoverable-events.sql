@@ -4,6 +4,7 @@ CREATE SCHEMA publication;
 CREATE TABLE publication.event_snapshot (
     loc_occurrence_id UUID PRIMARY KEY,
     loc_event_id UUID NOT NULL,
+    loc_group_id UUID NOT NULL,
     revision BIGINT NOT NULL CHECK (revision > 0),
     discoverable BOOLEAN NOT NULL,
     state TEXT NOT NULL,

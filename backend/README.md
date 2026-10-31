@@ -134,7 +134,7 @@ Published data keeps snapshots of occurrences after they end or are withdrawn, s
 ## Discovery behaviour
 
 - Anonymous users can browse and search without an account. A signed-in member may send their access token on discovery routes; cards and event pages then say whether the member saved the event, and organizer pages whether the member follows the organizer.
-- Lists are grouped by `loc_event_id`: one card per logical event, showing the earliest occurrence that matches the filters. Pagination and totals count events, not occurrences.
+- Lists are grouped by `loc_group_id`: one card per show, showing the earliest occurrence that matches the filters. Pagination and totals count shows, not occurrences. The show id is the public event id; an older `loc_event_id` still opens its show.
 - Occurrence-level filters (dates, "this weekend") are applied to occurrences first; an event is shown when at least one occurrence matches.
 - An event detail page shows the shared event information once and lists its upcoming occurrences, with per-date weather when the data application attached a forecast.
 - Organizer identity comes from the data application (`locOrganizerId`, name, optional description and site). The backend never infers an organizer site from other fields.
