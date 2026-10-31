@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface CatalogEventTimeSlotRepository extends JpaRepository<CatalogEventTimeSlot, Long> {
     List<CatalogEventTimeSlot> findByEventOrderBySlotIndex(CatalogEvent event);
+    List<CatalogEventTimeSlot> findByEventSourceAndRetiredFalse(String source);
 }

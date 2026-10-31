@@ -1,8 +1,11 @@
 package nl.loc.data.catalog;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import lombok.RequiredArgsConstructor;
@@ -26,15 +29,28 @@ public class CatalogPresenceService {
     public void reconcile(String source) {
         sourceLock.acquire(source);
         List<Observation> observations = observations(source);
-        for (CatalogEvent event : eventRepository.findBySource(source)) {
-            applyLatest(event, observations);
+        List<CatalogEvent> events = eventRepository.findBySource(source);
+        // Load scope facts once: a query per event made Hibernate auto-flush every loaded event each time.
+        Map<Long, String> countries = new HashMap<>();
+        locationRepository.findByEventSource(source)
+                .forEach(location -> countries.put(location.getId(), location.getCountryCode()));
+        Map<Long, List<Instant>> starts = new HashMap<>();
+        slotRepository.findByEventSourceAndRetiredFalse(source).forEach(slot -> starts
+                .computeIfAbsent(slot.getEvent().getId(), id -> new ArrayList<>()).add(slot.getStartsAt()));
+        for (CatalogEvent event : events) {
+            Scope scope = new Scope(countries.get(event.getId()), starts.getOrDefault(event.getId(), List.of()));
+            applyLatest(event, observations, scope);
         }
     }
 
     /** Also covers historical files first published after a newer collection completed. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void refresh(CatalogEvent event) {
-        applyLatest(event, observations(event.getSource()));
+        String country = locationRepository.findById(event.getId())
+                .map(CatalogEventLocation::getCountryCode).orElse(null);
+        List<Instant> starts = slotRepository.findByEventOrderBySlotIndex(event).stream()
+                .filter(slot -> !slot.isRetired()).map(CatalogEventTimeSlot::getStartsAt).toList();
+        applyLatest(event, observations(event.getSource()), new Scope(country, starts));
     }
 
     private List<Observation> observations(String source) {
@@ -44,7 +60,7 @@ public class CatalogPresenceService {
                 .toList();
     }
 
-    private void applyLatest(CatalogEvent event, List<Observation> observations) {
+    private void applyLatest(CatalogEvent event, List<Observation> observations, Scope scope) {
         // Remember the latest positive observation even when a later run marked it absent.
         observations.stream()
                 .filter(observation -> observation.seenIds().contains(event.getExternalId()))
@@ -65,14 +81,14 @@ public class CatalogPresenceService {
                 event.markSeen(checkedAt, checkedAt);
                 return;
             }
-            if (covers(run, event)) {
+            if (covers(run, scope)) {
                 event.markAbsent(checkedAt);
                 return;
             }
         }
     }
 
-    private boolean covers(CollectionRun run, CatalogEvent event) {
+    private boolean covers(CollectionRun run, Scope scope) {
         if (run.isFullSource()) {
             return true;
         }
@@ -80,20 +96,19 @@ public class CatalogPresenceService {
             // Legacy runs lack a recorded scope and must not deactivate rows.
             return false;
         }
-        boolean sameCountry = locationRepository.findById(event.getId())
-                .map(location -> run.getCountryCode().equalsIgnoreCase(location.getCountryCode()))
-                .orElse(false);
-        if (!sameCountry) {
+        if (!run.getCountryCode().equalsIgnoreCase(scope.countryCode())) {
             return false;
         }
-        List<CatalogEventTimeSlot> slots = slotRepository.findByEventOrderBySlotIndex(event).stream()
-                .filter(slot -> !slot.isRetired()).toList();
         // Unknown dates and slots outside the searched interval are deliberately left alone.
-        return !slots.isEmpty() && slots.stream().allMatch(slot -> slot.getStartsAt() != null
-                && !slot.getStartsAt().isBefore(run.getScopeStartsAt())
-                && slot.getStartsAt().isBefore(run.getScopeEndsAt()));
+        return !scope.starts().isEmpty() && scope.starts().stream().allMatch(start -> start != null
+                && !start.isBefore(run.getScopeStartsAt())
+                && start.isBefore(run.getScopeEndsAt()));
     }
 
     private record Observation(CollectionRun run, Set<String> seenIds) {
+    }
+
+    /** The event facts a scoped run is compared against: country and active slot starts. */
+    private record Scope(String countryCode, List<Instant> starts) {
     }
 }
