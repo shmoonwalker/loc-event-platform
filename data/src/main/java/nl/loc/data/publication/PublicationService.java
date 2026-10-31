@@ -35,6 +35,24 @@ public class PublicationService {
     private final CatalogSourceLock sourceLock;
     private final ObjectMapper json = new ObjectMapper();
 
+
+    private String groupKey(JsonNode input) {
+        JsonNode event = input.path("event");
+        String source = PublicationPolicy.text(event, "source");
+        String externalId = PublicationPolicy.text(event, "external_id");
+        String venueId = input.path("external_venue_id").asText(null);
+
+        if ("rvo".equals(source) || venueId == null || venueId.isBlank()) {
+            return json.valueToTree(List.of("EVENT", source, externalId)).toString();
+        }
+
+        String title = PublicationPolicy.text(event, "title");
+        String normalizedTitle = title == null ? "" :
+                title.strip().toLowerCase(Locale.ROOT).replaceAll("(?U)\\s+", " ");
+
+        return json.valueToTree(List.of("SHOW", source, venueId.strip(), normalizedTitle)).toString();
+    }
+
     /**
      * One publication answer for enrichment. {@code retryAt == null} means an occurrence is
      * eligible now, so an API call is allowed. Otherwise wait until {@code retryAt}.
@@ -107,6 +125,7 @@ public class PublicationService {
                 source, externalId);
         UUID publicEvent = jdbc.queryForObject("SELECT loc_event_id FROM publication.event_identity WHERE source=? AND external_id=?",
                 UUID.class, source, externalId);
+        UUID locGroupId = groupId(groupKey(input));
         String revision = hash(input.toString() + policy.version());
         List<Boolean> unchanged = jdbc.query("""
                 SELECT input_revision = ? AND next_evaluation_at > ? FROM publication.decision WHERE subject_id = ?
@@ -132,7 +151,7 @@ public class PublicationService {
                 next = next == null || result.nextCheck().isBefore(next) ? result.nextCheck() : next;
             }
             saveDecision(occurrence, publicEvent, "OCCURRENCE", result, now, revision);
-            publish(input, slot, publicEvent, occurrence, result, now);
+            publish(input, slot, publicEvent, occurrence, locGroupId, result, now);
         }
         // A catalogue rebuild can omit an occurrence that already had a public snapshot.
         // Explicitly retire/withdraw it; omission alone must never leave it discoverable.
@@ -149,7 +168,7 @@ public class PublicationService {
             jdbc.update("UPDATE publication.occurrence_identity SET retired=TRUE WHERE loc_occurrence_id=?", occurrence);
             PublicationPolicy.Decision removed = policy.evaluate(input, retired, now);
             saveDecision(occurrence, publicEvent, "OCCURRENCE", removed, now, revision);
-            publish(input, retired, publicEvent, occurrence, removed, now);
+            publish(input, retired, publicEvent, occurrence,locGroupId, removed, now);
         }
         if (next == null) {
             PublicationPolicy.Decision missing = policy.evaluate(input, null, now);
@@ -163,10 +182,23 @@ public class PublicationService {
                 anyEligible ? "PUBLISHED" : "UNAVAILABLE"), now, revision);
     }
 
+    private UUID groupId(String groupKey) {
+        jdbc.update("""
+            INSERT INTO publication.event_group(group_key)
+            VALUES (?)
+            ON CONFLICT (group_key) DO NOTHING
+            """, groupKey);
+
+        return jdbc.queryForObject(
+                "SELECT loc_group_id FROM publication.event_group WHERE group_key = ?",
+                UUID.class, groupKey);
+    }
+
     private JsonNode load(long id) {
         List<String> rows = jdbc.query("""
                 SELECT jsonb_build_object(
                     'event', to_jsonb(e),
+                    'external_venue_id', l.external_venue_id,
                     'location', CASE WHEN o.source_location_fingerprint = md5(COALESCE((to_jsonb(l)-'event_id')::text,'null'))
                                      THEN to_jsonb(o) ELSE to_jsonb(l) END,
                     'location_override_stale', o.source IS NOT NULL AND
@@ -229,7 +261,7 @@ public class PublicationService {
     }
 
     private void publish(JsonNode input, JsonNode slot, UUID eventId, UUID occurrence,
-                         PublicationPolicy.Decision result, Instant now) {
+                         UUID locGroupId, PublicationPolicy.Decision result, Instant now) {
         List<Stored> existing = jdbc.query("""
                 SELECT revision, payload::text, discoverable, state FROM publication.event_snapshot WHERE loc_occurrence_id=?
                 """, (rs, row) -> new Stored(rs.getLong(1), read(rs.getString(2)), rs.getBoolean(3), rs.getString(4)), occurrence);
@@ -250,16 +282,25 @@ public class PublicationService {
             payload.put("sourceUrl", PublicationPolicy.publicUrl(currentUrl) ? currentUrl : null);
             if (result.reasons().contains("VERIFIED_DUPLICATE")) payload.set("duplicateOf", input.path("review").path("duplicate_of"));
         }
+        payload.put("locGroupId", locGroupId.toString());
         if (!existing.isEmpty() && existing.getFirst().payload().equals(payload)
                 && existing.getFirst().discoverable() == result.eligible()
                 && existing.getFirst().state().equals(result.state())) return;
         long revision = existing.isEmpty() ? 1 : existing.getFirst().revision() + 1;
         jdbc.update("""
-                INSERT INTO publication.event_snapshot(loc_occurrence_id,loc_event_id,revision,discoverable,state,
-                    payload,first_published_at,updated_at) VALUES (?,?,?,?,?,CAST(? AS jsonb),?,?)
-                ON CONFLICT(loc_occurrence_id) DO UPDATE SET revision=EXCLUDED.revision,
-                    discoverable=EXCLUDED.discoverable,state=EXCLUDED.state,payload=EXCLUDED.payload,updated_at=EXCLUDED.updated_at
-                """, occurrence, eventId, revision, result.eligible(), result.state(), payload.toString(), utc(now), utc(now));
+        INSERT INTO publication.event_snapshot(
+            loc_occurrence_id, loc_event_id, loc_group_id, revision, discoverable, state,
+            payload, first_published_at, updated_at
+        ) VALUES (?,?,?,?,?,?,CAST(? AS jsonb),?,?)
+        ON CONFLICT(loc_occurrence_id) DO UPDATE SET
+            loc_group_id=EXCLUDED.loc_group_id,
+            revision=EXCLUDED.revision,
+            discoverable=EXCLUDED.discoverable,
+            state=EXCLUDED.state,
+            payload=EXCLUDED.payload,
+            updated_at=EXCLUDED.updated_at
+        """, occurrence, eventId, locGroupId, revision, result.eligible(), result.state(),
+                payload.toString(), utc(now), utc(now));
         ObjectNode envelope = json.createObjectNode().put("schemaVersion", 1).put("locEventId", eventId.toString())
                 .put("locOccurrenceId", occurrence.toString()).put("revision", revision)
                 .put("operation", result.eligible() ? "UPSERT" : "WITHDRAW").put("updatedAt", now.toString());
