@@ -186,6 +186,25 @@
       }
     </aside>
   </article>
+
+  <section class="wrap pt-6 pb-10" aria-labelledby="similar-title">
+    <h2 class="text-2xl font-semibold" id="similar-title">More like this</h2>
+    <p
+      class="mt-4 rounded-[18px] border border-dashed border-line bg-panel p-10 text-center text-muted"
+    >
+      Coming soon
+    </p>
+  </section>
+  @if (session.loggedIn()) {
+    <section class="wrap pb-16" aria-labelledby="for-you-title">
+      <h2 class="text-2xl font-semibold" id="for-you-title">More for you</h2>
+      <p
+        class="mt-4 rounded-[18px] border border-dashed border-line bg-panel p-10 text-center text-muted"
+      >
+        Coming soon
+      </p>
+    </section>
+  }
 } @else {
   <div
     class="wrap grid gap-x-12 gap-y-10 pt-10 pb-6 lg:grid-cols-[minmax(0,1fr)_340px]"

@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { AuthSession } from '../../core/auth-session';
 import { EventDetail } from '../../core/models';
 import { EventPage } from './event-page';
 
@@ -180,6 +181,17 @@ describe('EventPage', () => {
     );
     expect(el.querySelector('a[href="https://example.nl/jazz"]')).toBeNull();
     expect(el.textContent).toContain('11°C, Clear sky');
+  });
+
+  it('shows "More like this" to everyone and "More for you" only when logged in', async () => {
+    const el = await open((req) => req.flush(event));
+    expect(el.querySelector('#similar-title')?.textContent).toContain('More like this');
+    expect(el.querySelector('#for-you-title')).toBeNull();
+
+    TestBed.inject(AuthSession).start('token');
+    await settle();
+    expect(el.querySelector('#for-you-title')?.textContent).toContain('More for you');
+    expect(el.textContent).toContain('Coming soon');
   });
 
   it('ends the description with one "Tickets & more info" link to the listing', async () => {

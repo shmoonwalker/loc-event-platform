@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, input, linkedSignal } from '@angul
 import { rxResource } from '@angular/core/rxjs-interop';
 import { DomSanitizer, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
+import { AuthSession } from '../../core/auth-session';
 import { categoryImage } from '../../core/event-image';
 import { EventsApi, QueryParams } from '../../core/events-api';
 import { externalUrl } from '../../core/external-url';
@@ -23,6 +24,7 @@ export class EventPage {
   private readonly api = inject(EventsApi);
   private readonly title = inject(Title);
   private readonly sanitizer = inject(DomSanitizer);
+  protected readonly session = inject(AuthSession);
 
   /** The :id route parameter. Changing it (a link to another event) refetches. */
   readonly id = input.required<string>();
@@ -79,6 +81,7 @@ export class EventPage {
       .filter(Boolean)
       .join(', ');
   });
+
   /** The event's coordinates; null for online events and events without them. */
   private readonly coordinates = computed(() => {
     const e = this.event();
