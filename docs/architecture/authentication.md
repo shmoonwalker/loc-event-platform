@@ -256,7 +256,7 @@ Every request passes Spring Security's filter chain (`config/SecurityConfig`):
 |---|---|
 | Public discovery `GET` routes, `/api/docs/**` | Everyone |
 | `POST /api/auth/register`, `/verify-email`, `/resend-verification`, `/login`, `/refresh`, `/logout` | Everyone; refresh and logout are authorised by the refresh cookie |
-| `GET /api/auth/me` | Any valid access token |
+| `GET /api/auth/me`, `/api/me/**` | Any valid access token |
 | `/api/admin/**` | Role `ADMIN` |
 | Anything else | Denied |
 

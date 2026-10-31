@@ -1,6 +1,6 @@
 # Backend
 
-The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration, login and sessions.
+The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration, login and sessions, saved events and followed organizers.
 
 The backend does not collect or normalize external event data. That is the job of the [data application](../data/README.md).
 
@@ -20,6 +20,8 @@ The frontend communicates only with the backend API.
 | Registration | `POST /api/auth/register`, `/api/auth/verify-email`, `/api/auth/resend-verification` | [Authentication](../docs/architecture/authentication.md) |
 | Login | `POST /api/auth/login` (JWT access token), `GET /api/auth/me` | [Authentication](../docs/architecture/authentication.md) |
 | Sessions | `POST /api/auth/refresh` (rotates the refresh cookie), `/api/auth/logout` | [Authentication](../docs/architecture/authentication.md) |
+| Saved events | `GET /api/me/saved-events`, `GET`/`PUT`/`DELETE /api/me/saved-events/{eventId}` | [Member API](docs/member.md) |
+| Followed organizers | `GET /api/me/followed-organizers`, `/api/me/followed-organizers/events`, `PUT`/`DELETE /api/me/followed-organizers/{organizerId}` | [Member API](docs/member.md) |
 
 Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI document at `/api/docs/openapi.yaml`.
 
@@ -88,7 +90,7 @@ nl.loc.backend
 │   ├── jwt/       access-token signing key and JWT encoder/decoder
 │   └── ratelimit/ Redis-backed rate limiter
 ├── event/         public discovery: events, organizers, cities, categories, tags
-└── user/          user accounts, registration, login and account emails
+└── user/          user accounts, registration, login, account emails, saved events, followed organizers
 ```
 
 Within a feature:
@@ -131,7 +133,7 @@ Published data keeps snapshots of occurrences after they end or are withdrawn, s
 
 ## Discovery behaviour
 
-- Anonymous users can browse and search without an account.
+- Anonymous users can browse and search without an account. A signed-in member may send their access token on discovery routes; cards and event pages then say whether the member saved the event, and organizer pages whether the member follows the organizer.
 - Lists are grouped by `loc_event_id`: one card per logical event, showing the earliest occurrence that matches the filters. Pagination and totals count events, not occurrences.
 - Occurrence-level filters (dates, "this weekend") are applied to occurrences first; an event is shown when at least one occurrence matches.
 - An event detail page shows the shared event information once and lists its upcoming occurrences, with per-date weather when the data application attached a forecast.

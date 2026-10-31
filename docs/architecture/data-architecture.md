@@ -627,6 +627,8 @@ The backend reads `publication`, not intermediate `catalog` rows.
 
 Publication stores one snapshot per occurrence (`loc_occurrence_id`). Grouping multiple occurrences into one discovery list card is not a data-application responsibility; the backend derives event-level list views from occurrence snapshots that share the same `loc_event_id`. Organizer pages similarly read `locOrganizerId` from those occurrence snapshots.
 
+Publication also gives every snapshot a `loc_group_id` (`locGroupId` in the payload) for performances of the same show. `publication.event_group_key` defines the key: Ticketmaster events with the same venue ID and the same title (ignoring case and spacing) share a group. RVO events, and events without a venue ID or title, get one group per `loc_event_id`. `publication.event_group` maps each key to a stable `loc_group_id`. A title change in the source moves the event to the group of its new title.
+
 The backend does not need to understand:
 
 ```text
@@ -757,6 +759,7 @@ Backend owns
 ├── users
 ├── authentication/session data
 ├── saved events
+├── followed organizers
 ├── comments
 ├── notification state (design pending)
 └── other product/user behaviour
