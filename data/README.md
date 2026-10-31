@@ -58,6 +58,11 @@ rules afterwards and writes `publication.event_snapshot` and
 `publication.change_log`. `publication.discoverable_events` is a view over
 currently discoverable snapshots. Only that final step is called publication.
 
+Each snapshot also has a `loc_group_id` (`locGroupId` in the payload) that links
+performances of the same show. Ticketmaster events at the same venue with the same
+title (ignoring case and spacing) share one group. Every other event, including all
+RVO events and events without a venue or title, is its own group.
+
 List grouping by logical event is defined in the backend product API, not in publication. See [Backend guide](../backend/README.md).
 
 Published occurrences include organizer records, not a bare list of names. Each

@@ -35,22 +35,15 @@ public class PublicationService {
     private final CatalogSourceLock sourceLock;
     private final ObjectMapper json = new ObjectMapper();
 
-
     private String groupKey(JsonNode input) {
         JsonNode event = input.path("event");
-        String source = PublicationPolicy.text(event, "source");
-        String externalId = PublicationPolicy.text(event, "external_id");
-        String venueId = input.path("external_venue_id").asText(null);
-
-        if ("rvo".equals(source) || venueId == null || venueId.isBlank()) {
-            return json.valueToTree(List.of("EVENT", source, externalId)).toString();
-        }
-
-        String title = PublicationPolicy.text(event, "title");
-        String normalizedTitle = title == null ? "" :
-                title.strip().toLowerCase(Locale.ROOT).replaceAll("(?U)\\s+", " ");
-
-        return json.valueToTree(List.of("SHOW", source, venueId.strip(), normalizedTitle)).toString();
+        return jdbc.queryForObject(
+                "SELECT publication.event_group_key(?, ?, ?, ?)",
+                String.class,
+                PublicationPolicy.text(event, "source"),
+                PublicationPolicy.text(event, "external_id"),
+                input.path("external_venue_id").asText(null),
+                PublicationPolicy.text(event, "title"));
     }
 
     /**
@@ -168,7 +161,7 @@ public class PublicationService {
             jdbc.update("UPDATE publication.occurrence_identity SET retired=TRUE WHERE loc_occurrence_id=?", occurrence);
             PublicationPolicy.Decision removed = policy.evaluate(input, retired, now);
             saveDecision(occurrence, publicEvent, "OCCURRENCE", removed, now, revision);
-            publish(input, retired, publicEvent, occurrence,locGroupId, removed, now);
+            publish(input, retired, publicEvent, occurrence, locGroupId, removed, now);
         }
         if (next == null) {
             PublicationPolicy.Decision missing = policy.evaluate(input, null, now);
@@ -184,11 +177,9 @@ public class PublicationService {
 
     private UUID groupId(String groupKey) {
         jdbc.update("""
-            INSERT INTO publication.event_group(group_key)
-            VALUES (?)
-            ON CONFLICT (group_key) DO NOTHING
-            """, groupKey);
-
+                INSERT INTO publication.event_group(group_key) VALUES (?)
+                ON CONFLICT (group_key) DO NOTHING
+                """, groupKey);
         return jdbc.queryForObject(
                 "SELECT loc_group_id FROM publication.event_group WHERE group_key = ?",
                 UUID.class, groupKey);
@@ -288,18 +279,11 @@ public class PublicationService {
                 && existing.getFirst().state().equals(result.state())) return;
         long revision = existing.isEmpty() ? 1 : existing.getFirst().revision() + 1;
         jdbc.update("""
-        INSERT INTO publication.event_snapshot(
-            loc_occurrence_id, loc_event_id, loc_group_id, revision, discoverable, state,
-            payload, first_published_at, updated_at
-        ) VALUES (?,?,?,?,?,?,CAST(? AS jsonb),?,?)
-        ON CONFLICT(loc_occurrence_id) DO UPDATE SET
-            loc_group_id=EXCLUDED.loc_group_id,
-            revision=EXCLUDED.revision,
-            discoverable=EXCLUDED.discoverable,
-            state=EXCLUDED.state,
-            payload=EXCLUDED.payload,
-            updated_at=EXCLUDED.updated_at
-        """, occurrence, eventId, locGroupId, revision, result.eligible(), result.state(),
+                INSERT INTO publication.event_snapshot(loc_occurrence_id,loc_event_id,loc_group_id,revision,discoverable,
+                    state,payload,first_published_at,updated_at) VALUES (?,?,?,?,?,?,CAST(? AS jsonb),?,?)
+                ON CONFLICT(loc_occurrence_id) DO UPDATE SET loc_group_id=EXCLUDED.loc_group_id,revision=EXCLUDED.revision,
+                    discoverable=EXCLUDED.discoverable,state=EXCLUDED.state,payload=EXCLUDED.payload,updated_at=EXCLUDED.updated_at
+                """, occurrence, eventId, locGroupId, revision, result.eligible(), result.state(),
                 payload.toString(), utc(now), utc(now));
         ObjectNode envelope = json.createObjectNode().put("schemaVersion", 1).put("locEventId", eventId.toString())
                 .put("locOccurrenceId", occurrence.toString()).put("revision", revision)
