@@ -22,6 +22,16 @@ const GROUPS: [codes: number[], label: string, icon: IconName][] = [
   [[95, 96, 99], 'Thunderstorm', 'storm'],
 ];
 
+/** How far ahead forecasts reach; the data module's WeatherSchedule.FORECAST_WINDOW. */
+const FORECAST_DAYS = 14;
+
+/** What the weather card says instead of a forecast for a date starting at startAt. */
+export function weatherMessage(startAt: string, now = new Date()): string {
+  return new Date(startAt).getTime() - now.getTime() > FORECAST_DAYS * 86_400_000
+    ? "It's too early for a forecast. Check back a few days before the event."
+    : "Weather isn't available right now. Check back later.";
+}
+
 /** The forecast as display strings, or null when there is nothing worth showing. */
 export function weatherView(w: Weather | null): WeatherView | null {
   if (!w) return null;

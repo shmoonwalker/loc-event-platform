@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { AuthSession } from '../../core/auth-session';
 import { EventDetail } from '../../core/models';
 import { EventPage } from './event-page';
 
@@ -26,8 +27,24 @@ const event: EventDetail = {
   imageUrls: [],
   organizers: [{ id: 'o1', name: 'Bimhuis', description: null, site: null }],
   occurrences: [
-    { startAt: '2026-10-10T18:30:00Z', endAt: '2026-10-10T21:00:00Z' },
-    { startAt: '2026-10-17T18:30:00Z', endAt: '2026-10-17T18:30:00Z' },
+    {
+      startAt: '2026-10-10T18:30:00Z',
+      endAt: '2026-10-10T21:00:00Z',
+      sourceUrl: 'https://example.nl/jazz',
+    },
+    {
+      startAt: '2026-10-17T18:30:00Z',
+      endAt: '2026-10-17T18:30:00Z',
+      sourceUrl: 'https://example.nl/jazz-17',
+      weather: {
+        forecastFetchedAt: '2026-10-06T06:00:00Z',
+        forecastHour: '2026-10-17T18:00:00Z',
+        temperatureCelsius: 11,
+        precipitationProbabilityPercent: null,
+        windSpeedKmh: null,
+        weatherCode: 0,
+      },
+    },
   ],
   weather: {
     forecastFetchedAt: '2026-10-06T06:00:00Z',
@@ -38,6 +55,15 @@ const event: EventDetail = {
     weatherCode: 63,
   },
 };
+
+const oneDate = { ...event, occurrences: [event.occurrences[0]] };
+
+/** Re-render after a change made outside the template (an event, a sign-in). */
+const settle = () => TestBed.inject(ApplicationRef).whenStable();
+
+/** True when a comes before b in the page. */
+const before = (a: Element | null, b: Element | null) =>
+  !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 async function open(
   respond: (req: ReturnType<HttpTestingController['expectOne']>) => void,
@@ -57,7 +83,7 @@ async function open(
 }
 
 describe('EventPage', () => {
-  it('shows the event in Amsterdam time, with location, weather, organizers and more dates', async () => {
+  it('shows the event in Amsterdam time, with location, weather, organizers and all dates', async () => {
     const el = await open((req) => req.flush(event));
     expect(el.querySelector('h1')?.textContent).toContain('Late-night jazz session');
     expect(el.textContent).toContain('Sat, 10 Oct 2026, 20:30 – 23:00');
@@ -87,17 +113,113 @@ describe('EventPage', () => {
       req.flush({ ...event, imageUrls: ['https://images.example/dead.jpg'] }),
     );
     el.querySelector('img')!.dispatchEvent(new Event('error'));
-    await TestBed.inject(ApplicationRef).whenStable();
+    await settle();
     expect(el.querySelector('img')?.getAttribute('src')).toBe(
       '/images/categories/music-nightlife.jpg',
     );
     expect(el.querySelector('img')?.getAttribute('alt')).toBe('');
   });
 
-  it('links categories and tags to the filtered home list', async () => {
+  it('links categories above the title and tags under the description', async () => {
     const el = await open((req) => req.flush(event));
-    expect(el.querySelector('a[href="/?category=music-nightlife#all"]')).toBeTruthy();
-    expect(el.querySelector('a[href="/?tag=live-music#all"]')).toBeTruthy();
+    const category = el.querySelector('a[href="/?category=music-nightlife#all"]');
+    const tag = el.querySelector('a[href="/?tag=live-music#all"]');
+    expect(before(category, el.querySelector('h1'))).toBe(true);
+    expect(before(el.querySelector('.whitespace-pre-line'), tag)).toBe(true);
+  });
+
+  it('shows the full address under the date, with no separate "Where" section', async () => {
+    const el = await open((req) => req.flush(event));
+    expect(el.textContent).toContain('Bimhuis, Piet Heinkade 3, 1019 BR Amsterdam');
+    expect(el.textContent).not.toContain('Where');
+  });
+
+  it('shows a map at the coordinates after the weather card, with a maps link under it', async () => {
+    const el = await open((req) => req.flush(event));
+    const map = el.querySelector('iframe');
+    expect(map?.getAttribute('src')).toContain('openstreetmap.org/export/embed.html');
+    expect(map?.getAttribute('src')).toContain('marker=52.3765,4.9126');
+    expect(before(el.querySelector('#weather-title'), map)).toBe(true);
+    expect(before(map, el.querySelector('a[href*="google.com/maps"]'))).toBe(true);
+  });
+
+  it('shows no map when the event has no coordinates', async () => {
+    const el = await open((req) => req.flush({ ...event, latitude: null, longitude: null }));
+    expect(el.querySelector('iframe')).toBeNull();
+    expect(el.querySelector('#map-title')).toBeNull();
+  });
+
+  it('says why there is no forecast: too early, or not available', async () => {
+    const far = { startAt: '2099-01-01T18:00:00Z', endAt: '2099-01-01T18:00:00Z', sourceUrl: null };
+    const el = await open((req) => req.flush({ ...oneDate, occurrences: [far], weather: null }));
+    expect(el.textContent).toContain("It's too early for a forecast.");
+    TestBed.resetTestingModule();
+    const near = await open((req) => req.flush({ ...oneDate, weather: null }));
+    expect(near.textContent).toContain("Weather isn't available right now.");
+  });
+
+  it('shows one date as a plain line, without the date picker', async () => {
+    const el = await open((req) => req.flush(oneDate));
+    expect(el.textContent).toContain('Sat, 10 Oct 2026, 20:30 – 23:00');
+    expect(el.querySelector('select')).toBeNull();
+    expect(el.textContent).not.toContain('dates');
+  });
+
+  it('lets you pick a date, which updates the ticket link and the weather', async () => {
+    const el = await open((req) => req.flush(event));
+    expect(el.textContent).toContain('2 dates');
+    expect(el.querySelector('label')?.textContent).toContain('Choose a date');
+    expect(el.textContent).toContain('15°C, Rain'); // the first date: the top-level forecast
+
+    const select = el.querySelector('select')!;
+    select.value = '1';
+    select.dispatchEvent(new Event('change'));
+    await settle();
+
+    expect(el.querySelector('a[href="https://example.nl/jazz-17"]')?.textContent).toContain(
+      'Tickets & more info',
+    );
+    expect(el.querySelector('a[href="https://example.nl/jazz"]')).toBeNull();
+    expect(el.textContent).toContain('11°C, Clear sky');
+  });
+
+  it('shows "More like this" to everyone and "More for you" only when logged in', async () => {
+    const el = await open((req) => req.flush(event));
+    expect(el.querySelector('#similar-title')?.textContent).toContain('More like this');
+    expect(el.querySelector('#for-you-title')).toBeNull();
+
+    TestBed.inject(AuthSession).start('token');
+    await settle();
+    expect(el.querySelector('#for-you-title')?.textContent).toContain('More for you');
+    expect(el.textContent).toContain('Coming soon');
+  });
+
+  it('ends the description with one "Tickets & more info" link to the listing', async () => {
+    const el = await open((req) => req.flush(event));
+    const links = [...el.querySelectorAll('a[href="https://example.nl/jazz"]')];
+    expect(links.length).toBe(1);
+    expect(links[0].textContent).toContain('Tickets & more info');
+    expect(el.textContent).not.toContain('View the original listing');
+  });
+
+  it('shows the fallback line when there is no description', async () => {
+    const el = await open((req) => req.flush({ ...event, description: null }));
+    expect(el.textContent).toContain('For more info, visit the event listing');
+    expect(el.querySelector('a[href="https://example.nl/jazz"]')).toBeTruthy();
+    expect(el.textContent).not.toContain('Tickets & more info');
+  });
+
+  it('leaves out both links when the event has no usable source link', async () => {
+    const unsafe = 'javascript:alert(1)';
+    const occurrences = event.occurrences.map((o) => ({ ...o, sourceUrl: unsafe }));
+    const el = await open((req) => req.flush({ ...event, sourceUrl: unsafe, occurrences }));
+    expect(el.textContent).not.toContain('Tickets & more info');
+    TestBed.resetTestingModule();
+    const none = event.occurrences.map((o) => ({ ...o, sourceUrl: null }));
+    const bare = await open((req) =>
+      req.flush({ ...event, description: null, sourceUrl: null, occurrences: none }),
+    );
+    expect(bare.textContent).not.toContain('For more info');
   });
 
   it('shows "Online" and no location or weather block for online events', async () => {
@@ -114,8 +236,8 @@ describe('EventPage', () => {
     };
     const el = await open((req) => req.flush(online));
     expect(el.textContent).toContain('Online');
-    expect(el.querySelector('#where-title')).toBeNull();
     expect(el.querySelector('#weather-title')).toBeNull();
+    expect(el.querySelector('iframe')).toBeNull();
   });
 
   it('shows a not-found state on 404, not the generic error', async () => {

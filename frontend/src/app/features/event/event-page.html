@@ -25,31 +25,16 @@
         />
       </div>
 
-      <h1 class="display mt-8 text-[clamp(32px,5vw,56px)] wrap-break-word" id="event-title">
-        {{ e.title }}
-      </h1>
-      <p class="mt-4 text-lg font-semibold">{{ when() }}</p>
-      <p class="mt-1.5 flex items-start gap-2 text-muted">
-        <app-icon [name]="online() ? 'screen' : 'pin'" class="mt-0.75" />
-        {{ placeLine() }}
-      </p>
-
-      @if (e.description) {
-        <!-- plain text from the source: keep its line breaks -->
-        <p
-          class="mt-8 max-w-[70ch] text-[17px] leading-relaxed wrap-break-word whitespace-pre-line"
+      @if (e.categories.length) {
+        <ul
+          role="list"
+          class="mt-8 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold tracking-wide uppercase"
+          aria-label="Categories"
         >
-          {{ e.description }}
-        </p>
-      }
-
-      @if (e.categories.length || e.tags.length) {
-        <h2 class="sr-only">Categories and tags</h2>
-        <ul role="list" class="mt-8 flex flex-wrap gap-2">
           @for (c of e.categories; track c.value) {
             <li>
               <a
-                class="chip chip-sm bg-blush-soft hover:border-blush"
+                class="text-blush-ink hover:underline"
                 routerLink="/"
                 [queryParams]="filterParams({ categories: [c.value] })"
                 fragment="all"
@@ -58,6 +43,72 @@
               </a>
             </li>
           }
+        </ul>
+      }
+
+      <h1
+        class="display text-[clamp(32px,5vw,56px)] wrap-break-word"
+        [class]="e.categories.length ? 'mt-2' : 'mt-8'"
+        id="event-title"
+      >
+        {{ e.title }}
+      </h1>
+      @if (dates().length > 1) {
+        <div class="mt-4 flex flex-wrap items-end gap-3">
+          <label class="flex max-w-full min-w-0 flex-col gap-1 text-sm text-muted">
+            Choose a date
+            <select
+              class="field-input max-w-full text-lg font-semibold"
+              (change)="picked.set(+dateSelect.value)"
+              #dateSelect
+            >
+              @for (d of dates(); track $index) {
+                <option [value]="$index" [selected]="$index === picked()">{{ d }}</option>
+              }
+            </select>
+          </label>
+          <span
+            class="mb-2 rounded-full bg-sky px-3 py-1 text-sm font-semibold whitespace-nowrap text-sky-ink"
+          >
+            {{ dates().length }} dates
+          </span>
+        </div>
+      } @else {
+        <p class="mt-4 text-lg font-semibold">{{ when() }}</p>
+      }
+      <p class="mt-1.5 flex items-start gap-2 text-muted">
+        <app-icon [name]="online() ? 'screen' : 'pin'" class="mt-0.75" />
+        {{ placeLine() }}
+      </p>
+
+      @if (e.description) {
+        <div class="mt-8 max-w-[70ch]">
+          <!-- plain text from the source: keep its line breaks -->
+          <p class="text-[17px] leading-relaxed wrap-break-word whitespace-pre-line">
+            {{ e.description }}
+          </p>
+          @if (sourceUrl(); as url) {
+            <a
+              class="link mt-4 inline-block"
+              [href]="url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Tickets &amp; more info<span class="sr-only"> (opens in a new tab)</span>
+            </a>
+          }
+        </div>
+      } @else if (sourceUrl(); as url) {
+        <p class="mt-8 text-[17px] text-muted">
+          For more info,
+          <a class="link" [href]="url" target="_blank" rel="noopener noreferrer"
+            >visit the event listing<span class="sr-only"> (opens in a new tab)</span></a
+          >
+        </p>
+      }
+
+      @if (e.tags.length) {
+        <ul role="list" class="mt-8 flex flex-wrap gap-2" aria-label="Tags">
           @for (t of e.tags; track t.value) {
             <li>
               <a
@@ -75,14 +126,36 @@
     </div>
 
     <aside class="flex min-w-0 flex-col gap-8 wrap-break-word">
-      @if (addressLines().length) {
-        <section aria-labelledby="where-title">
-          <h2 class="text-xl font-semibold" id="where-title">Where</h2>
-          <address class="mt-2 not-italic">
-            @for (line of addressLines(); track $index) {
-              <span class="block">{{ line }}</span>
+      @if (!online()) {
+        <section aria-labelledby="weather-title">
+          <h2 class="text-xl font-semibold" id="weather-title">Weather</h2>
+          <div class="mt-2 flex items-center gap-3 rounded-[14px] border border-line bg-panel p-4">
+            @if (forecast(); as w) {
+              <app-icon [name]="w.icon" [size]="32" />
+              <div>
+                <p class="font-semibold">{{ w.summary }}</p>
+                @if (w.details) {
+                  <p class="text-sm text-muted">{{ w.details }}</p>
+                }
+                <p class="text-sm text-muted">Forecast for {{ w.hour }}</p>
+              </div>
+            } @else {
+              <app-icon name="cloud" [size]="32" class="text-muted" />
+              <p class="text-muted">{{ weatherNote() }}</p>
             }
-          </address>
+          </div>
+        </section>
+      }
+
+      @if (mapEmbed(); as src) {
+        <section aria-labelledby="map-title">
+          <h2 class="text-xl font-semibold" id="map-title">Map</h2>
+          <iframe
+            class="mt-2 block aspect-4/3 w-full rounded-[14px] border border-line bg-panel"
+            [src]="src"
+            [title]="'Map of ' + placeLine()"
+            loading="lazy"
+          ></iframe>
           @if (mapUrl(); as url) {
             <a
               class="link mt-2 inline-block"
@@ -93,22 +166,6 @@
               Open in maps<span class="sr-only"> (opens in a new tab)</span>
             </a>
           }
-        </section>
-      }
-
-      @if (weather(); as w) {
-        <section aria-labelledby="weather-title">
-          <h2 class="text-xl font-semibold" id="weather-title">Weather</h2>
-          <div class="mt-2 flex items-center gap-3 rounded-[14px] border border-line bg-panel p-4">
-            <app-icon [name]="w.icon" [size]="32" />
-            <div>
-              <p class="font-semibold">{{ w.summary }}</p>
-              @if (w.details) {
-                <p class="text-sm text-muted">{{ w.details }}</p>
-              }
-              <p class="text-sm text-muted">Forecast for {{ w.hour }}</p>
-            </div>
-          </div>
         </section>
       }
 
@@ -127,25 +184,27 @@
           </ul>
         </section>
       }
-
-      @if (moreDates().length) {
-        <section aria-labelledby="dates-title">
-          <h2 class="text-xl font-semibold" id="dates-title">More dates</h2>
-          <ul role="list" class="mt-2 flex flex-col gap-1.5">
-            @for (d of moreDates(); track $index) {
-              <li>{{ d }}</li>
-            }
-          </ul>
-        </section>
-      }
-
-      @if (sourceUrl(); as url) {
-        <a class="link" [href]="url" target="_blank" rel="noopener noreferrer">
-          View the original listing<span class="sr-only"> (opens in a new tab)</span>
-        </a>
-      }
     </aside>
   </article>
+
+  <section class="wrap pt-6 pb-10" aria-labelledby="similar-title">
+    <h2 class="text-2xl font-semibold" id="similar-title">More like this</h2>
+    <p
+      class="mt-4 rounded-[18px] border border-dashed border-line bg-panel p-10 text-center text-muted"
+    >
+      Coming soon
+    </p>
+  </section>
+  @if (session.loggedIn()) {
+    <section class="wrap pb-16" aria-labelledby="for-you-title">
+      <h2 class="text-2xl font-semibold" id="for-you-title">More for you</h2>
+      <p
+        class="mt-4 rounded-[18px] border border-dashed border-line bg-panel p-10 text-center text-muted"
+      >
+        Coming soon
+      </p>
+    </section>
+  }
 } @else {
   <div
     class="wrap grid gap-x-12 gap-y-10 pt-10 pb-6 lg:grid-cols-[minmax(0,1fr)_340px]"

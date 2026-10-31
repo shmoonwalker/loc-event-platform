@@ -99,6 +99,25 @@
   body {
     @apply bg-bg font-sans text-ink antialiased;
   }
+  /* A still glow in two corners, under all content; the tokens follow the theme. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        520px 320px at 12% 8%,
+        color-mix(in srgb, var(--sky) 80%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        480px 340px at 90% 90%,
+        color-mix(in srgb, var(--blush) 18%, transparent),
+        transparent 72%
+      );
+  }
   button {
     cursor: pointer;
   }
@@ -112,8 +131,8 @@
 @utility wrap {
   margin-inline: auto;
   width: 100%;
-  max-width: 1280px;
-  padding-inline: calc(var(--spacing) * 6);
+  max-width: 1600px;
+  padding-inline: clamp(1rem, 4vw, 3rem);
 }
 
 @utility display {
