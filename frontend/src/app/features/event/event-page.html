@@ -53,7 +53,29 @@
       >
         {{ e.title }}
       </h1>
-      <p class="mt-4 text-lg font-semibold">{{ when() }}</p>
+      @if (dates().length > 1) {
+        <div class="mt-4 flex flex-wrap items-end gap-3">
+          <label class="flex max-w-full min-w-0 flex-col gap-1 text-sm text-muted">
+            Choose a date
+            <select
+              class="field-input max-w-full text-lg font-semibold"
+              (change)="picked.set(+dateSelect.value)"
+              #dateSelect
+            >
+              @for (d of dates(); track $index) {
+                <option [value]="$index" [selected]="$index === picked()">{{ d }}</option>
+              }
+            </select>
+          </label>
+          <span
+            class="mb-2 rounded-full bg-sky px-3 py-1 text-sm font-semibold whitespace-nowrap text-sky-ink"
+          >
+            {{ dates().length }} dates
+          </span>
+        </div>
+      } @else {
+        <p class="mt-4 text-lg font-semibold">{{ when() }}</p>
+      }
       <p class="mt-1.5 flex items-start gap-2 text-muted">
         <app-icon [name]="online() ? 'screen' : 'pin'" class="mt-0.75" />
         {{ placeLine() }}
@@ -158,17 +180,6 @@
                   <p class="mt-1 line-clamp-3 text-sm text-muted">{{ o.description }}</p>
                 }
               </li>
-            }
-          </ul>
-        </section>
-      }
-
-      @if (moreDates().length) {
-        <section aria-labelledby="dates-title">
-          <h2 class="text-xl font-semibold" id="dates-title">More dates</h2>
-          <ul role="list" class="mt-2 flex flex-col gap-1.5">
-            @for (d of moreDates(); track $index) {
-              <li>{{ d }}</li>
             }
           </ul>
         </section>

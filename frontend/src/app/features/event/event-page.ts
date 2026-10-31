@@ -46,6 +46,30 @@ export class EventPage {
       alt: own ? (e?.title ?? '') : '',
     };
   });
+  /** Index of the picked date in occurrences; back to the first date when another event opens. */
+  protected readonly picked = linkedSignal({ source: this.event, computation: () => 0 });
+  protected readonly occurrence = computed(() => this.event()?.occurrences[this.picked()]);
+  protected readonly dates = computed(
+    () => this.event()?.occurrences.map((o) => formatWhen(o.startAt, o.endAt)) ?? [],
+  );
+  protected readonly when = computed(() => this.dates()[this.picked()] ?? '');
+  /** The picked date's ticket link, else the event's own listing. */
+  protected readonly sourceUrl = computed(() =>
+    externalUrl(this.occurrence()?.sourceUrl ?? this.event()?.sourceUrl ?? null),
+  );
+
+  /** The picked date's forecast. Older API versions send only the first date's, at the top level. */
+  protected readonly forecast = computed(() => {
+    const e = this.event();
+    const o = this.occurrence();
+    if (!e || !o || this.online()) return null;
+    return weatherView(o.weather ?? (this.picked() === 0 ? e.weather : null));
+  });
+  protected readonly weatherNote = computed(() => {
+    const o = this.occurrence();
+    return o ? weatherMessage(o.startAt) : '';
+  });
+
   /** Venue, street, postal code and city on one line, or "Online". */
   protected readonly placeLine = computed(() => {
     const e = this.event();
@@ -55,25 +79,6 @@ export class EventPage {
       .filter(Boolean)
       .join(', ');
   });
-  protected readonly when = computed(() => {
-    const first = this.event()?.occurrences[0];
-    return first ? formatWhen(first.startAt, first.endAt) : '';
-  });
-  protected readonly moreDates = computed(
-    () =>
-      this.event()
-        ?.occurrences.slice(1)
-        .map((o) => formatWhen(o.startAt, o.endAt)) ?? [],
-  );
-  protected readonly forecast = computed(() =>
-    this.online() ? null : weatherView(this.event()?.weather ?? null),
-  );
-  protected readonly weatherNote = computed(() => {
-    const o = this.event()?.occurrences[0];
-    return o ? weatherMessage(o.startAt) : '';
-  });
-  protected readonly sourceUrl = computed(() => externalUrl(this.event()?.sourceUrl ?? null));
-
   /** The event's coordinates; null for online events and events without them. */
   private readonly coordinates = computed(() => {
     const e = this.event();

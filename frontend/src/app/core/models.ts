@@ -58,9 +58,11 @@ export interface OrganizerInfo {
 export interface Occurrence {
   startAt: string; // ISO instant, UTC
   endAt: string; // equals startAt when the event has no end
+  sourceUrl: string | null; // ticket link for this date
+  weather?: Weather | null; // this date's forecast; missing from older API versions
 }
 
-/** Forecast for the event's first date. weatherCode is a WMO code. */
+/** A forecast for one date. weatherCode is a WMO code. */
 export interface Weather {
   forecastFetchedAt: string;
   forecastHour: string;
@@ -89,7 +91,7 @@ export interface EventDetail {
   imageUrls: string[]; // the first is the main image
   organizers: OrganizerInfo[];
   occurrences: Occurrence[]; // soonest first, never empty
-  weather: Weather | null;
+  weather: Weather | null; // the first date's forecast
 }
 
 export interface OrganizerDetail {
