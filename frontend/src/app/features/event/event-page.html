@@ -25,7 +25,32 @@
         />
       </div>
 
-      <h1 class="display mt-8 text-[clamp(32px,5vw,56px)] wrap-break-word" id="event-title">
+      @if (e.categories.length) {
+        <ul
+          role="list"
+          class="mt-8 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold tracking-wide uppercase"
+          aria-label="Categories"
+        >
+          @for (c of e.categories; track c.value) {
+            <li>
+              <a
+                class="text-blush-ink hover:underline"
+                routerLink="/"
+                [queryParams]="filterParams({ categories: [c.value] })"
+                fragment="all"
+              >
+                {{ c.label }}
+              </a>
+            </li>
+          }
+        </ul>
+      }
+
+      <h1
+        class="display text-[clamp(32px,5vw,56px)] wrap-break-word"
+        [class]="e.categories.length ? 'mt-2' : 'mt-8'"
+        id="event-title"
+      >
         {{ e.title }}
       </h1>
       <p class="mt-4 text-lg font-semibold">{{ when() }}</p>
@@ -60,21 +85,8 @@
         </p>
       }
 
-      @if (e.categories.length || e.tags.length) {
-        <h2 class="sr-only">Categories and tags</h2>
-        <ul role="list" class="mt-8 flex flex-wrap gap-2">
-          @for (c of e.categories; track c.value) {
-            <li>
-              <a
-                class="chip chip-sm bg-blush-soft hover:border-blush"
-                routerLink="/"
-                [queryParams]="filterParams({ categories: [c.value] })"
-                fragment="all"
-              >
-                {{ c.label }}
-              </a>
-            </li>
-          }
+      @if (e.tags.length) {
+        <ul role="list" class="mt-8 flex flex-wrap gap-2" aria-label="Tags">
           @for (t of e.tags; track t.value) {
             <li>
               <a

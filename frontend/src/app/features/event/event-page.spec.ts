@@ -100,10 +100,12 @@ describe('EventPage', () => {
     expect(el.querySelector('img')?.getAttribute('alt')).toBe('');
   });
 
-  it('links categories and tags to the filtered home list', async () => {
+  it('links categories above the title and tags under the description', async () => {
     const el = await open((req) => req.flush(event));
-    expect(el.querySelector('a[href="/?category=music-nightlife#all"]')).toBeTruthy();
-    expect(el.querySelector('a[href="/?tag=live-music#all"]')).toBeTruthy();
+    const category = el.querySelector('a[href="/?category=music-nightlife#all"]');
+    const tag = el.querySelector('a[href="/?tag=live-music#all"]');
+    expect(before(category, el.querySelector('h1'))).toBe(true);
+    expect(before(el.querySelector('.whitespace-pre-line'), tag)).toBe(true);
   });
 
   it('ends the description with one "Tickets & more info" link to the listing', async () => {
