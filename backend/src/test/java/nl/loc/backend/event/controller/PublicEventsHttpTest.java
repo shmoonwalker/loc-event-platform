@@ -296,6 +296,41 @@ class PublicEventsHttpTest {
     }
 
     @Test
+    void eachDateOnTheEventPageCarriesItsOwnForecast() throws Exception {
+        Instant validUntil = Instant.parse("9999-01-01T00:00:00Z");
+        Instant saturday = Instant.parse("2030-06-08T15:00:00Z");
+        Instant farAhead = NOW.plus(Duration.ofDays(30));
+        insert(MUSIC_ID, "Late night jazz", saturday, "Music & Nightlife", "jazz", "PHYSICAL",
+                "Amsterdam", "Paradiso", null, true, validUntil);
+        insert(MUSIC_ID, "Late night jazz", farAhead, "Music & Nightlife", "jazz", "PHYSICAL",
+                "Amsterdam", "Paradiso", null, true, validUntil);
+        jdbc.sql("""
+                UPDATE publication.event_snapshot
+                SET payload = jsonb_set(payload, '{weather,temperature_celsius}', '21.0')
+                WHERE loc_group_id = :id AND payload->'schedule'->>'starts_at' = :start
+                """).param("id", MUSIC_ID).param("start", saturday.toString()).update();
+        // more than 14 days ahead: the data module publishes no forecast
+        jdbc.sql("""
+                UPDATE publication.event_snapshot SET payload = payload - 'weather'
+                WHERE loc_group_id = :id AND payload->'schedule'->>'starts_at' = :start
+                """).param("id", MUSIC_ID).param("start", farAhead.toString()).update();
+
+        mockMvc.perform(get("/api/events/" + MUSIC_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.occurrences", hasSize(3)))
+                .andExpect(jsonPath("$.occurrences[0].startAt").value(music.start().toString()))
+                .andExpect(jsonPath("$.occurrences[0].weather.temperatureCelsius").value(18.5))
+                .andExpect(jsonPath("$.occurrences[0].weather.weatherCode").value(3))
+                .andExpect(jsonPath("$.occurrences[1].startAt").value(saturday.toString()))
+                .andExpect(jsonPath("$.occurrences[1].weather.temperatureCelsius").value(21.0))
+                .andExpect(jsonPath("$.occurrences[1].weather.precipitationProbabilityPercent").value(30))
+                .andExpect(jsonPath("$.occurrences[2].startAt").value(farAhead.toString()))
+                .andExpect(jsonPath("$.occurrences[2].weather").value(nullValue()))
+                .andExpect(jsonPath("$.weather.temperatureCelsius").value(18.5))
+                .andExpect(jsonPath("$.weather.forecastHour").value("2030-06-08T18:00:00Z"));
+    }
+
+    @Test
     void unknownOrEndedEventAndOrganizerReturn404() throws Exception {
         mockMvc.perform(get("/api/events/" + EXPIRED_ID)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/events/" + WITHDRAWN_ID)).andExpect(status().isNotFound());

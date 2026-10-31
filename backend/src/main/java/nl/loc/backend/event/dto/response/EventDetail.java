@@ -36,7 +36,9 @@ public record EventDetail(
     public record Occurrence(
             Instant startAt,
             Instant endAt,
-            @Schema(description = "Ticket link for this date, when the source has a public one.") String sourceUrl) {
+            @Schema(description = "Ticket link for this date, when the source has a public one.") String sourceUrl,
+            @Schema(description = "Forecast for this date. Null for online events or when no current forecast exists.")
+            Weather weather) {
     }
 
     @Schema(description = "weatherCode is the WMO code from the forecast provider.")
