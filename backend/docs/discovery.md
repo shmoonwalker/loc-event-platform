@@ -13,7 +13,7 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 | `GET /api/home?city=amsterdam` | Homepage highlight rails. Only rails with events are returned. |
 | `GET /api/events/filter-options` | Values and labels for the filter controls. |
 | `GET /api/cities?q=amster` | Up to ten city suggestions for the city picker. |
-| `GET /api/events/{id}` | Event page: description, address, coordinates, categories, tags, images, organizers, every upcoming date, forecast (`weather`, null when none), `saved`, `saveCount` (how many members saved it) and `available` (always `true` here). `404` when unknown, withdrawn or over. |
+| `GET /api/events/{id}` | Event page for one show: description, address, coordinates, categories, tags, images, organizers, every upcoming date with its own `sourceUrl` (ticket link), forecast (`weather`, null when none), `saved`, `saveCount` (how many members saved it) and `available` (always `true` here). `id` is a show id; an older event id (`loc_event_id`) also opens its show. `404` when unknown, withdrawn or over. |
 | `GET /api/organizers/{id}` | Organizer profile in `organizer` (`id`, `name`, `description`, `site`), a page of upcoming event cards in `events` (same `page`/`size` and shape as `/api/events`) and `followed`. Organizer ids come from `EventDetail.organizers[].id`. `404` when none. |
 | `GET /api/categories`, `GET /api/tags` | `{ value, label }` lists, same as in filter-options. |
 
@@ -88,8 +88,9 @@ With no parameters: every upcoming event, soonest first, page 0, 20 per page.
 - Ended events are never returned. A filter that matches nothing returns `200` with
   an empty list; it never falls back to other events. Show an empty state.
 - Invalid input returns `400` with a `ProblemDetail` body.
-- One card per event. If an event has several dates, the earliest date that matches
-  the filters is shown.
+- One card per show. Performances of the same show (same venue and title, grouped by
+  the data application as `loc_group_id`) share one card, and `id` is the show id.
+  The earliest date that matches the filters is shown. Totals and paging count shows.
 - All calendar rules use Europe/Amsterdam time, including daylight saving.
   A date filter matches the event's own local start date.
 
@@ -139,8 +140,8 @@ event/
 
 - Data comes from the `publication.discoverable_events` view (published, not expired
   snapshots written by the data application). The backend never writes to it.
-- The repository counts distinct events, skips the card query when the count is 0,
-  and uses `DISTINCT ON (loc_event_id)` to pick one occurrence per event.
+- The repository counts distinct shows, skips the card query when the count is 0,
+  and uses `DISTINCT ON (loc_group_id)` to pick one occurrence per show.
   User input is always bound as parameters, never concatenated into SQL.
 - A rail is just `/api/events` criteria with page size 6. The homepage makes up to
   nine SQL reads (city, plus count and cards per non-empty rail). No cache.

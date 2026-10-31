@@ -759,10 +759,10 @@ class PublicEventsHttpTest {
         String payload = payload(eventId, occurrenceId, title, start, end, category, tag, place, city, venue, imageUrl, validUntil);
         jdbc.sql("""
                 INSERT INTO publication.event_snapshot (
-                    loc_occurrence_id, loc_event_id, revision, discoverable, state, payload,
+                    loc_occurrence_id, loc_event_id, loc_group_id, revision, discoverable, state, payload,
                     first_published_at, updated_at
                 ) VALUES (
-                    :occurrenceId, :eventId, 1, :discoverable, 'PUBLISHED', CAST(:payload AS jsonb),
+                    :occurrenceId, :eventId, :eventId, 1, :discoverable, 'PUBLISHED', CAST(:payload AS jsonb),
                     :publishedAt, :updatedAt
                 )
                 """)

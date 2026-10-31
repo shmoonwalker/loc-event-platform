@@ -99,7 +99,7 @@ public class FollowedOrganizerRepository {
 
     public long countFollowedEvents(UUID userId, Instant now) {
         return jdbc.sql("""
-            SELECT count(DISTINCT s.loc_event_id)
+            SELECT count(DISTINCT s.loc_group_id)
             FROM publication.discoverable_events s
             WHERE %s
             """.formatted(FOLLOWED_UPCOMING))
@@ -109,12 +109,12 @@ public class FollowedOrganizerRepository {
                 .single();
     }
 
-    /** Soonest first, one card per event even when several followed organizers run it. */
+    /** Soonest first, one card per show even when several followed organizers run it. */
     public List<EventCard> followedEvents(UUID userId, Instant now, int page, int size) {
         String sql = """
             SELECT * FROM (
-                SELECT DISTINCT ON (s.loc_event_id)
-                       s.loc_event_id,
+                SELECT DISTINCT ON (s.loc_group_id)
+                       s.loc_group_id,
                        s.payload->>'title' AS title,
                        s.payload->'location'->>'type' AS place,
                        %1$s AS start_at,
@@ -126,9 +126,9 @@ public class FollowedOrganizerRepository {
                        %4$s AS saved
                 FROM publication.discoverable_events s
                 WHERE %5$s
-                ORDER BY s.loc_event_id, %1$s, s.loc_occurrence_id
+                ORDER BY s.loc_group_id, %1$s, s.loc_occurrence_id
             ) e
-            ORDER BY start_at, loc_event_id
+            ORDER BY start_at, loc_group_id
             LIMIT :limit OFFSET :offset
             """.formatted(STARTS, ENDS, CITY_SLUG, SAVED, FOLLOWED_UPCOMING);
         return jdbc.sql(sql)

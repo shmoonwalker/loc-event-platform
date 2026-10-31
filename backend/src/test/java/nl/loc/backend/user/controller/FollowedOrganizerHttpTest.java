@@ -272,10 +272,10 @@ class FollowedOrganizerHttpTest {
                 .collect(Collectors.joining(", ", "[", "]"));
         jdbc.sql("""
                 INSERT INTO publication.event_snapshot (
-                    loc_occurrence_id, loc_event_id, revision, discoverable, state, payload,
+                    loc_occurrence_id, loc_event_id, loc_group_id, revision, discoverable, state, payload,
                     first_published_at, updated_at
                 ) VALUES (
-                    :occurrenceId, :eventId, 1, :discoverable, 'PUBLISHED',
+                    :occurrenceId, :eventId, :eventId, 1, :discoverable, 'PUBLISHED',
                     jsonb_build_object(
                         'title', 'Late night jazz',
                         'location', jsonb_build_object('type', 'ONLINE'),

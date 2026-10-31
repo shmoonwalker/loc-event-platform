@@ -22,6 +22,9 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
 
 ## Saved events
 
+- A member saves a show, not a single date. The id can be a show id or an older event
+  id. Saving a show that is already saved through another performance changes nothing;
+  unsaving removes every saved performance of the show.
 - Saving and unsaving are idempotent: saving a saved event, or unsaving one that is not
   saved, changes nothing and still answers `204`.
 - Only an event in `publication.discoverable_events` (published and not over) can be
@@ -43,7 +46,7 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
 }
 ```
 
-`EventDetail.saveCount` on the public event page counts the members that saved the event.
+`EventDetail.saveCount` on the public event page counts the members that saved the show.
 
 ## Followed organizers
 
@@ -53,7 +56,7 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
 - `GET /api/me/followed-organizers` returns `{ id, name, description, site }` per
   organizer, taken from the most recently updated published event of that organizer.
 - `GET /api/me/followed-organizers/events` returns the same page and card shape as
-  `/api/events`, one card per event. Withdrawn and ended events are left out.
+  `/api/events`, one card per show. Withdrawn and ended events are left out.
 - `GET /api/organizers/{id}` returns `followed` for the signed-in member.
 
 ## Implementation
@@ -68,6 +71,9 @@ user/
 - Both tables live in the backend-owned `app` schema and store the published id
   (`event_id` is a `loc_event_id`, `organizer_id` a `locOrganizerId`) without a foreign
   key into `publication`. Rows are deleted with the account.
+- A saved row keeps the `loc_event_id`, which never changes. The show (`loc_group_id`)
+  is looked up when reading, because a show id changes when the source changes the
+  title. The saved list shows one row per show with the earliest `saved_at`.
 - `app.saved_event`: primary key `(user_id, event_id)`, `saved_at`; indexed on
   `(user_id, saved_at DESC)` for the list and on `event_id` for `saveCount`.
 - `app.followed_organizer`: primary key `(user_id, organizer_id)`, `followed_at`;

@@ -16,7 +16,7 @@ public class EventCardRowMapper implements RowMapper<EventCard> {
     public EventCard mapRow(ResultSet rs, int row) throws SQLException {
         String title = rs.getString("title");
         return new EventCard(
-                rs.getObject("loc_event_id", UUID.class),
+                rs.getObject("loc_group_id", UUID.class),
                 title == null ? "" : title,
                 instant(rs, "start_at"),
                 instant(rs, "end_at"),

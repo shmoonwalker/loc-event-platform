@@ -55,6 +55,7 @@ class SavedEventRepositoryTest {
 
     @Test
     void savingTwiceKeepsOneRow() {
+        publish(EVENT_ID, true, "2999-01-01T00:00:00Z");
         repository.saveEvent(alice, EVENT_ID);
         repository.saveEvent(alice, EVENT_ID);
 
@@ -63,6 +64,7 @@ class SavedEventRepositoryTest {
 
     @Test
     void deleteRemovesOnlyThatMembersSave() {
+        publish(EVENT_ID, true, "2999-01-01T00:00:00Z");
         repository.saveEvent(alice, EVENT_ID);
         repository.saveEvent(bob, EVENT_ID);
 
@@ -81,6 +83,7 @@ class SavedEventRepositoryTest {
 
     @Test
     void deletingTheAccountRemovesItsSaves() {
+        publish(EVENT_ID, true, "2999-01-01T00:00:00Z");
         repository.saveEvent(alice, EVENT_ID);
 
         userRepository.deleteById(alice);
@@ -110,8 +113,8 @@ class SavedEventRepositoryTest {
         publish(EVENT_ID, true, "2999-01-01T00:00:00Z");
         publish(hidden, false, "2999-01-01T00:00:00Z");
         repository.saveEvent(alice, EVENT_ID);
-        repository.saveEvent(alice, hidden);
-        repository.saveEvent(alice, withoutSnapshot);
+        savedEarlier(alice, hidden);
+        savedEarlier(alice, withoutSnapshot);
         repository.saveEvent(bob, EVENT_ID);
 
         assertThat(repository.countSaved(alice)).isEqualTo(2);
@@ -147,8 +150,8 @@ class SavedEventRepositoryTest {
         publish(hidden, false, "2999-01-01T00:00:00Z");
         publish(expired, true, "2000-01-01T00:00:00Z");
         repository.saveEvent(alice, EVENT_ID);
-        repository.saveEvent(alice, hidden);
-        repository.saveEvent(alice, expired);
+        savedEarlier(alice, hidden);
+        savedEarlier(alice, expired);
 
         assertThat(repository.findSaved(alice, 0, 20))
                 .extracting(saved -> saved.event().id(), SavedEventResponse::available)
@@ -167,13 +170,21 @@ class SavedEventRepositoryTest {
         publish(ended, true, "2000-01-01T00:00:00Z", "1999-01-01T00:00:00Z");
         publish(ended, true, "2000-01-01T00:00:00Z", "1999-09-01T00:00:00Z");
         repository.saveEvent(alice, EVENT_ID);
-        repository.saveEvent(alice, ended);
+        savedEarlier(alice, ended);
 
         assertThat(repository.findSaved(alice, 0, 20))
                 .extracting(saved -> saved.event().id(), saved -> saved.event().startAt())
                 .containsExactlyInAnyOrder(
                         tuple(EVENT_ID, Instant.parse("2998-01-01T00:00:00Z")),
                         tuple(ended, Instant.parse("1999-09-01T00:00:00Z")));
+    }
+
+    // saved while it was still discoverable; saveEvent only saves discoverable shows
+    private void savedEarlier(UUID userId, UUID eventId) {
+        jdbc.sql("INSERT INTO app.saved_event (user_id, event_id) VALUES (:userId, :eventId)")
+                .param("userId", userId)
+                .param("eventId", eventId)
+                .update();
     }
 
     private void savedAt(UUID userId, UUID eventId, String savedAt) {
@@ -199,10 +210,10 @@ class SavedEventRepositoryTest {
     private void publish(UUID eventId, boolean discoverable, String validUntil, String startsAt) {
         jdbc.sql("""
                 INSERT INTO publication.event_snapshot (
-                    loc_occurrence_id, loc_event_id, revision, discoverable, state, payload,
+                    loc_occurrence_id, loc_event_id, loc_group_id, revision, discoverable, state, payload,
                     first_published_at, updated_at
                 ) VALUES (
-                    :occurrenceId, :eventId, 1, :discoverable, 'PUBLISHED', CAST(:payload AS jsonb), now(), now()
+                    :occurrenceId, :eventId, :eventId, 1, :discoverable, 'PUBLISHED', CAST(:payload AS jsonb), now(), now()
                 )
                 """)
                 .param("occurrenceId", UUID.randomUUID())
