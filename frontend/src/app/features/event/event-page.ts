@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, input, linkedSignal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { Title } from '@angular/platform-browser';
+import { DomSanitizer, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { categoryImage } from '../../core/event-image';
 import { EventsApi, QueryParams } from '../../core/events-api';
@@ -22,6 +22,7 @@ import { weatherMessage, weatherView } from './weather';
 export class EventPage {
   private readonly api = inject(EventsApi);
   private readonly title = inject(Title);
+  private readonly sanitizer = inject(DomSanitizer);
 
   /** The :id route parameter. Changing it (a link to another event) refetches. */
   readonly id = input.required<string>();
@@ -45,9 +46,14 @@ export class EventPage {
       alt: own ? (e?.title ?? '') : '',
     };
   });
+  /** Venue, street, postal code and city on one line, or "Online". */
   protected readonly placeLine = computed(() => {
     const e = this.event();
-    return this.online() ? 'Online' : [e?.venueName, e?.cityName].filter(Boolean).join(', ');
+    if (!e) return '';
+    if (this.online()) return 'Online';
+    return [e.venueName, e.address, [e.postalCode, e.cityName].filter(Boolean).join(' ')]
+      .filter(Boolean)
+      .join(', ');
   });
   protected readonly when = computed(() => {
     const first = this.event()?.occurrences[0];
@@ -68,25 +74,30 @@ export class EventPage {
   });
   protected readonly sourceUrl = computed(() => externalUrl(this.event()?.sourceUrl ?? null));
 
-  /** Venue, street and city, as lines. Empty for online events. */
-  protected readonly addressLines = computed(() => {
+  /** The event's coordinates; null for online events and events without them. */
+  private readonly coordinates = computed(() => {
     const e = this.event();
-    if (!e || this.online()) return [];
-    return [e.venueName, e.address, [e.postalCode, e.cityName].filter(Boolean).join(' ')].filter(
-      (line): line is string => !!line,
-    );
+    return e && !this.online() && e.latitude !== null && e.longitude !== null
+      ? { lat: e.latitude, lon: e.longitude }
+      : null;
   });
 
-  /** A plain maps link instead of an embedded map: no extra dependency. Coordinates win, they are exact. */
+  /** OpenStreetMap's embed page around the venue, with a marker on it. */
+  protected readonly mapEmbed = computed(() => {
+    const c = this.coordinates();
+    if (!c) return null;
+    const bbox = [c.lon - 0.006, c.lat - 0.003, c.lon + 0.006, c.lat + 0.003]
+      .map((n) => n.toFixed(5))
+      .join(',');
+    // Safe to trust: a fixed host, and the query holds only numbers.
+    return this.sanitizer.bypassSecurityTrustResourceUrl(
+      `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${c.lat},${c.lon}`,
+    );
+  });
   protected readonly mapUrl = computed(() => {
-    const e = this.event();
-    if (!e || this.online()) return null;
-    const query =
-      e.latitude !== null && e.longitude !== null
-        ? `${e.latitude},${e.longitude}`
-        : this.addressLines().join(', ');
-    return query
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+    const c = this.coordinates();
+    return c
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${c.lat},${c.lon}`)}`
       : null;
   });
 

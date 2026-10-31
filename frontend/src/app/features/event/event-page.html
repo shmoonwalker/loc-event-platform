@@ -92,27 +92,6 @@
     </div>
 
     <aside class="flex min-w-0 flex-col gap-8 wrap-break-word">
-      @if (addressLines().length) {
-        <section aria-labelledby="where-title">
-          <h2 class="text-xl font-semibold" id="where-title">Where</h2>
-          <address class="mt-2 not-italic">
-            @for (line of addressLines(); track $index) {
-              <span class="block">{{ line }}</span>
-            }
-          </address>
-          @if (mapUrl(); as url) {
-            <a
-              class="link mt-2 inline-block"
-              [href]="url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open in maps<span class="sr-only"> (opens in a new tab)</span>
-            </a>
-          }
-        </section>
-      }
-
       @if (!online()) {
         <section aria-labelledby="weather-title">
           <h2 class="text-xl font-semibold" id="weather-title">Weather</h2>
@@ -131,6 +110,28 @@
               <p class="text-muted">{{ weatherNote() }}</p>
             }
           </div>
+        </section>
+      }
+
+      @if (mapEmbed(); as src) {
+        <section aria-labelledby="map-title">
+          <h2 class="text-xl font-semibold" id="map-title">Map</h2>
+          <iframe
+            class="mt-2 block aspect-4/3 w-full rounded-[14px] border border-line bg-panel"
+            [src]="src"
+            [title]="'Map of ' + placeLine()"
+            loading="lazy"
+          ></iframe>
+          @if (mapUrl(); as url) {
+            <a
+              class="link mt-2 inline-block"
+              [href]="url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in maps<span class="sr-only"> (opens in a new tab)</span>
+            </a>
+          }
         </section>
       }
 

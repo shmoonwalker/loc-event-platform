@@ -41,6 +41,10 @@ const event: EventDetail = {
 
 const oneDate = { ...event, occurrences: [event.occurrences[0]] };
 
+/** True when a comes before b in the page. */
+const before = (a: Element | null, b: Element | null) =>
+  !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
 async function open(
   respond: (req: ReturnType<HttpTestingController['expectOne']>) => void,
 ): Promise<HTMLElement> {
@@ -125,6 +129,27 @@ describe('EventPage', () => {
     expect(bare.textContent).not.toContain('For more info');
   });
 
+  it('shows the full address under the date, with no separate "Where" section', async () => {
+    const el = await open((req) => req.flush(event));
+    expect(el.textContent).toContain('Bimhuis, Piet Heinkade 3, 1019 BR Amsterdam');
+    expect(el.textContent).not.toContain('Where');
+  });
+
+  it('shows a map at the coordinates after the weather card, with a maps link under it', async () => {
+    const el = await open((req) => req.flush(event));
+    const map = el.querySelector('iframe');
+    expect(map?.getAttribute('src')).toContain('openstreetmap.org/export/embed.html');
+    expect(map?.getAttribute('src')).toContain('marker=52.3765,4.9126');
+    expect(before(el.querySelector('#weather-title'), map)).toBe(true);
+    expect(before(map, el.querySelector('a[href*="google.com/maps"]'))).toBe(true);
+  });
+
+  it('shows no map when the event has no coordinates', async () => {
+    const el = await open((req) => req.flush({ ...event, latitude: null, longitude: null }));
+    expect(el.querySelector('iframe')).toBeNull();
+    expect(el.querySelector('#map-title')).toBeNull();
+  });
+
   it('says why there is no forecast: too early, or not available', async () => {
     const far = { startAt: '2099-01-01T18:00:00Z', endAt: '2099-01-01T18:00:00Z', sourceUrl: null };
     const el = await open((req) => req.flush({ ...oneDate, occurrences: [far], weather: null }));
@@ -148,8 +173,8 @@ describe('EventPage', () => {
     };
     const el = await open((req) => req.flush(online));
     expect(el.textContent).toContain('Online');
-    expect(el.querySelector('#where-title')).toBeNull();
     expect(el.querySelector('#weather-title')).toBeNull();
+    expect(el.querySelector('iframe')).toBeNull();
   });
 
   it('shows a not-found state on 404, not the generic error', async () => {
