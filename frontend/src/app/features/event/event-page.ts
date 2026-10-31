@@ -11,7 +11,7 @@ import { amsterdamDate, formatWhen } from '../../core/time';
 import { ErrorState } from '../../shared/error-state/error-state';
 import { IconComponent } from '../../shared/icon/icon';
 import { NotFoundState } from '../../shared/not-found-state/not-found-state';
-import { weatherView } from './weather';
+import { weatherMessage, weatherView } from './weather';
 
 /** One event: everything the API knows about it. 404 (unknown or already over) gets a calm not-found state. */
 @Component({
@@ -59,7 +59,13 @@ export class EventPage {
         ?.occurrences.slice(1)
         .map((o) => formatWhen(o.startAt, o.endAt)) ?? [],
   );
-  protected readonly weather = computed(() => weatherView(this.event()?.weather ?? null));
+  protected readonly forecast = computed(() =>
+    this.online() ? null : weatherView(this.event()?.weather ?? null),
+  );
+  protected readonly weatherNote = computed(() => {
+    const o = this.event()?.occurrences[0];
+    return o ? weatherMessage(o.startAt) : '';
+  });
   protected readonly sourceUrl = computed(() => externalUrl(this.event()?.sourceUrl ?? null));
 
   /** Venue, street and city, as lines. Empty for online events. */

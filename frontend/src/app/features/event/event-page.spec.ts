@@ -39,6 +39,8 @@ const event: EventDetail = {
   },
 };
 
+const oneDate = { ...event, occurrences: [event.occurrences[0]] };
+
 async function open(
   respond: (req: ReturnType<HttpTestingController['expectOne']>) => void,
 ): Promise<HTMLElement> {
@@ -121,6 +123,15 @@ describe('EventPage', () => {
     TestBed.resetTestingModule();
     const bare = await open((req) => req.flush({ ...event, description: null, sourceUrl: null }));
     expect(bare.textContent).not.toContain('For more info');
+  });
+
+  it('says why there is no forecast: too early, or not available', async () => {
+    const far = { startAt: '2099-01-01T18:00:00Z', endAt: '2099-01-01T18:00:00Z', sourceUrl: null };
+    const el = await open((req) => req.flush({ ...oneDate, occurrences: [far], weather: null }));
+    expect(el.textContent).toContain("It's too early for a forecast.");
+    TestBed.resetTestingModule();
+    const near = await open((req) => req.flush({ ...oneDate, weather: null }));
+    expect(near.textContent).toContain("Weather isn't available right now.");
   });
 
   it('shows "Online" and no location or weather block for online events', async () => {

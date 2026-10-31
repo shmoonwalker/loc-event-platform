@@ -1,5 +1,5 @@
 import { Weather } from '../../core/models';
-import { weatherView } from './weather';
+import { weatherMessage, weatherView } from './weather';
 
 const w: Weather = {
   forecastFetchedAt: '2026-10-06T06:00:00Z',
@@ -44,5 +44,18 @@ describe('weatherView', () => {
       weatherCode: null,
     };
     expect(weatherView(empty)).toBeNull();
+  });
+});
+
+describe('weatherMessage', () => {
+  const now = new Date('2026-10-01T12:00:00Z');
+
+  it('says it is too early for a date more than 14 days away', () => {
+    expect(weatherMessage('2026-10-15T12:00:01Z', now)).toContain('too early');
+  });
+
+  it('says the forecast is unavailable for a date within 14 days', () => {
+    expect(weatherMessage('2026-10-15T12:00:00Z', now)).toContain("isn't available");
+    expect(weatherMessage('2026-10-02T12:00:00Z', now)).toContain("isn't available");
   });
 });

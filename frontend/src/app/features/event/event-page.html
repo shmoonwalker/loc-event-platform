@@ -113,18 +113,23 @@
         </section>
       }
 
-      @if (weather(); as w) {
+      @if (!online()) {
         <section aria-labelledby="weather-title">
           <h2 class="text-xl font-semibold" id="weather-title">Weather</h2>
           <div class="mt-2 flex items-center gap-3 rounded-[14px] border border-line bg-panel p-4">
-            <app-icon [name]="w.icon" [size]="32" />
-            <div>
-              <p class="font-semibold">{{ w.summary }}</p>
-              @if (w.details) {
-                <p class="text-sm text-muted">{{ w.details }}</p>
-              }
-              <p class="text-sm text-muted">Forecast for {{ w.hour }}</p>
-            </div>
+            @if (forecast(); as w) {
+              <app-icon [name]="w.icon" [size]="32" />
+              <div>
+                <p class="font-semibold">{{ w.summary }}</p>
+                @if (w.details) {
+                  <p class="text-sm text-muted">{{ w.details }}</p>
+                }
+                <p class="text-sm text-muted">Forecast for {{ w.hour }}</p>
+              </div>
+            } @else {
+              <app-icon name="cloud" [size]="32" class="text-muted" />
+              <p class="text-muted">{{ weatherNote() }}</p>
+            }
           </div>
         </section>
       }
