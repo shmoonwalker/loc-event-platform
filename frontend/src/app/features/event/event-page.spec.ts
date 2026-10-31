@@ -100,6 +100,29 @@ describe('EventPage', () => {
     expect(el.querySelector('a[href="/?tag=live-music#all"]')).toBeTruthy();
   });
 
+  it('ends the description with one "Tickets & more info" link to the listing', async () => {
+    const el = await open((req) => req.flush(event));
+    const links = [...el.querySelectorAll('a[href="https://example.nl/jazz"]')];
+    expect(links.length).toBe(1);
+    expect(links[0].textContent).toContain('Tickets & more info');
+    expect(el.textContent).not.toContain('View the original listing');
+  });
+
+  it('shows the fallback line when there is no description', async () => {
+    const el = await open((req) => req.flush({ ...event, description: null }));
+    expect(el.textContent).toContain('For more info, visit the event listing');
+    expect(el.querySelector('a[href="https://example.nl/jazz"]')).toBeTruthy();
+    expect(el.textContent).not.toContain('Tickets & more info');
+  });
+
+  it('leaves out both links when the event has no usable source link', async () => {
+    const el = await open((req) => req.flush({ ...event, sourceUrl: 'javascript:alert(1)' }));
+    expect(el.textContent).not.toContain('Tickets & more info');
+    TestBed.resetTestingModule();
+    const bare = await open((req) => req.flush({ ...event, description: null, sourceUrl: null }));
+    expect(bare.textContent).not.toContain('For more info');
+  });
+
   it('shows "Online" and no location or weather block for online events', async () => {
     const online = {
       ...event,

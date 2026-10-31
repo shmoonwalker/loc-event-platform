@@ -35,11 +35,28 @@
       </p>
 
       @if (e.description) {
-        <!-- plain text from the source: keep its line breaks -->
-        <p
-          class="mt-8 max-w-[70ch] text-[17px] leading-relaxed wrap-break-word whitespace-pre-line"
-        >
-          {{ e.description }}
+        <div class="mt-8 max-w-[70ch]">
+          <!-- plain text from the source: keep its line breaks -->
+          <p class="text-[17px] leading-relaxed wrap-break-word whitespace-pre-line">
+            {{ e.description }}
+          </p>
+          @if (sourceUrl(); as url) {
+            <a
+              class="link mt-4 inline-block"
+              [href]="url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Tickets &amp; more info<span class="sr-only"> (opens in a new tab)</span>
+            </a>
+          }
+        </div>
+      } @else if (sourceUrl(); as url) {
+        <p class="mt-8 text-[17px] text-muted">
+          For more info,
+          <a class="link" [href]="url" target="_blank" rel="noopener noreferrer"
+            >visit the event listing<span class="sr-only"> (opens in a new tab)</span></a
+          >
         </p>
       }
 
@@ -137,12 +154,6 @@
             }
           </ul>
         </section>
-      }
-
-      @if (sourceUrl(); as url) {
-        <a class="link" [href]="url" target="_blank" rel="noopener noreferrer">
-          View the original listing<span class="sr-only"> (opens in a new tab)</span>
-        </a>
       }
     </aside>
   </article>
