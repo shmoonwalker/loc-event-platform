@@ -92,9 +92,12 @@ public class EventDetailRepository {
         JsonNode p = json.readTree(shown.payload());
         JsonNode loc = p.path("location");
         String city = text(loc, "city");
-        // performances of one show can have different ticket links
+        // performances of one show can have different ticket links and forecasts
         List<EventDetail.Occurrence> occurrences = dates.stream()
-                .map(r -> new EventDetail.Occurrence(r.start(), r.end(), text(json.readTree(r.payload()), "sourceUrl")))
+                .map(r -> {
+                    JsonNode d = json.readTree(r.payload());
+                    return new EventDetail.Occurrence(r.start(), r.end(), text(d, "sourceUrl"), weather(d.path("weather")));
+                })
                 .toList();
         long saveCount = jdbc.sql("""
                 SELECT count(DISTINCT se.user_id) FROM app.saved_event se
