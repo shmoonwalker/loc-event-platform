@@ -14,11 +14,14 @@ export interface EventCard {
   cityName: string | null;
   venueName: string | null;
   imageUrl: string | null;
+
   /**
    * Category slug or label, when the payload includes one.
    * Omitted or blank means the image fallback uses the generic default.
    */
   category?: string | null;
+  saved: boolean; // always false when signed out
+
 }
 
 export interface City {
@@ -92,6 +95,9 @@ export interface EventDetail {
   organizers: OrganizerInfo[];
   occurrences: Occurrence[]; // soonest first, never empty
   weather: Weather | null; // the first date's forecast
+  saved: boolean;
+  saveCount: number;
+  available: boolean; // false: withdrawn or over (only reachable through your saved events)
 }
 
 export interface OrganizerDetail {
@@ -115,4 +121,19 @@ export interface FilterOptions {
   defaultPageSize: number;
   maxPageSize: number;
   maxQueryLength: number;
+}
+
+/** One row of GET /api/me/saved-events. */
+export interface SavedEvent {
+  event: EventCard;
+  savedAt: string; // ISO instant, UTC
+  available: boolean;
+}
+
+export interface SavedEventPage {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  items: SavedEvent[];
 }
