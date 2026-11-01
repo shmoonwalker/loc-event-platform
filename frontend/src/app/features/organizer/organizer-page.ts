@@ -7,6 +7,7 @@ import { externalUrl } from '../../core/external-url';
 import { OrganizerInfo } from '../../core/models';
 import { errorStatus, valueOf } from '../../core/resource';
 import { ErrorState } from '../../shared/error-state/error-state';
+import { FollowButton } from '../../shared/follow-button/follow-button';
 import { EventCardComponent } from '../../shared/event-card/event-card';
 import { EventCardSkeleton } from '../../shared/event-card-skeleton/event-card-skeleton';
 import { Pagination } from '../../shared/pagination/pagination';
@@ -15,7 +16,14 @@ import { NotFoundState } from '../../shared/not-found-state/not-found-state';
 /** An organizer and their upcoming events. The page number lives in the URL (?page=), like the home list. */
 @Component({
   selector: 'app-organizer-page',
-  imports: [ErrorState, EventCardComponent, EventCardSkeleton, Pagination, NotFoundState],
+  imports: [
+    ErrorState,
+    EventCardComponent,
+    EventCardSkeleton,
+    FollowButton,
+    Pagination,
+    NotFoundState,
+  ],
   templateUrl: './organizer-page.html',
 })
 export class OrganizerPage {
@@ -49,6 +57,11 @@ export class OrganizerPage {
       computation: (next, prev) => next ?? (prev?.value?.id === this.id() ? prev.value : undefined),
     },
   );
+  /** Whether the member follows this organizer; like organizer(), kept while the next page loads. */
+  protected readonly followed = linkedSignal<boolean | undefined, boolean>({
+    source: () => valueOf(this.detail)?.followed,
+    computation: (next, prev) => next ?? prev?.value ?? false,
+  });
   protected readonly site = computed(() => externalUrl(this.organizer()?.site ?? null));
 
   constructor() {
