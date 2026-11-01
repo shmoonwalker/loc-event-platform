@@ -1,0 +1,28 @@
+<section class="wrap pt-14 pb-10" aria-labelledby="me-title">
+  <h1 class="display text-[clamp(36px,5vw,60px)]" id="me-title">My Loc</h1>
+  @if (session.currentUser(); as user) {
+    <p class="mt-2 text-muted">Hi {{ user.displayName }}, here is what you keep track of.</p>
+  }
+
+  <nav aria-label="My Loc sections" class="mt-8 flex gap-2 border-b border-line">
+    @for (t of tabs; track t.id) {
+      <a
+        [routerLink]="[]"
+        [queryParams]="{ tab: t.id === 'saved' ? null : t.id }"
+        [attr.aria-current]="current() === t.id ? 'page' : null"
+        class="-mb-px inline-flex min-h-11 items-center border-b-2 border-transparent px-4 font-semibold text-muted hover:text-ink aria-[current=page]:border-blush aria-[current=page]:text-ink"
+      >
+        {{ t.label }}
+      </a>
+    }
+  </nav>
+
+  <div class="mt-6">
+    <h2 class="sr-only">{{ current() === 'saved' ? 'Saved events' : 'Organizers you follow' }}</h2>
+    @if (current() === 'saved') {
+      <app-saved-events [page]="pageIndex()" (pageChange)="setPage($event)" />
+    } @else {
+      <app-followed-organizers />
+    }
+  </div>
+</section>

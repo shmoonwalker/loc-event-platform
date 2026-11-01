@@ -55,7 +55,7 @@ describe('SiteHeader', () => {
 
     expect(loginLink()).toBeDefined();
     expect(logoutButton()).toBeUndefined();
-    expect(el.querySelector('a[href="/saved"]')).toBeNull();
+    expect(el.querySelector('a[href="/me"]')).toBeNull();
   });
 
   it('shows Log out instead of Log in while signed in', async () => {
@@ -67,7 +67,7 @@ describe('SiteHeader', () => {
 
     expect(logoutButton()).toBeDefined();
     expect(loginLink()).toBeUndefined();
-    expect(el.querySelector('a[href="/saved"]')?.textContent).toContain('Saved');
+    expect(el.querySelector('a[href="/me"]')?.textContent).toContain('My Loc');
   });
 
   it('logout ends the session on the server and in the UI, then opens the home page', async () => {

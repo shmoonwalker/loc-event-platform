@@ -33,11 +33,13 @@ export const routes: Routes = [
           import('./features/organizer/organizer-page').then((m) => m.OrganizerPage),
       },
       {
-        path: 'saved',
-        title: 'Saved – Loc',
+        path: 'me',
+        title: 'My Loc – Loc',
         canActivate: [authGuard],
-        loadComponent: () => import('./features/saved/saved-page').then((m) => m.SavedPage),
+        loadComponent: () => import('./features/me/me-page').then((m) => m.MePage),
       },
+      // The Saved page became the first tab of My Loc; keep old links working.
+      { path: 'saved', redirectTo: 'me' },
       {
         path: 'register',
         title: 'Create account – Loc',

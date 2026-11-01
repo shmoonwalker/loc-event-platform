@@ -1,66 +1,60 @@
-<section class="wrap pt-14 pb-10" aria-labelledby="saved-title">
-  <h1 class="display text-[clamp(36px,5vw,60px)]" id="saved-title">Saved</h1>
-  <p class="mt-2 text-muted" aria-live="polite">
-    @if (result(); as page) {
-      @if (page.totalElements) {
-        {{ page.totalElements }} saved {{ page.totalElements === 1 ? 'event' : 'events' }}.
-      }
-    } @else if (saved.isLoading()) {
-      Loading saved events…
-    }
-  </p>
-
-  <div class="mt-7">
-    @if (saved.error()) {
-      <app-error-state
-        message="We couldn't load your saved events. Check your connection and try again."
-        (action)="saved.reload()"
-      />
-    } @else if (result(); as page) {
-      @if (page.items.length) {
-        <ul
-          role="list"
-          class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6"
-        >
-          @for (item of page.items; track item.event.id) {
-            <li><app-event-card [event]="item.event" [unavailable]="!item.available" /></li>
-          }
-        </ul>
-      } @else if (page.totalElements) {
-        <div class="rounded-[18px] border border-dashed border-line px-6 py-12 text-center">
-          <h2 class="mb-1.5 text-xl font-semibold">Nothing on this page</h2>
-          <button type="button" class="btn-dark mt-5" (click)="setPage(0)">
-            Back to the first page
-          </button>
-        </div>
-      } @else {
-        <div class="rounded-[18px] border border-dashed border-line px-6 py-12 text-center">
-          <h2 class="mb-1.5 text-xl font-semibold">No saved events yet</h2>
-          <p class="text-muted">Tap the heart on an event to keep it here.</p>
-          <a routerLink="/" class="btn-dark mt-5 inline-block">Find events</a>
-        </div>
-      }
-    } @else {
-      <div
-        class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6"
-        aria-busy="true"
-      >
-        @for (_ of skeletons; track $index) {
-          <app-event-card-skeleton />
-        }
-      </div>
-    }
-  </div>
-
+<p class="text-muted" aria-live="polite">
   @if (result(); as page) {
-    @if (page.totalPages > 1) {
-      <div class="mt-10">
-        <app-pagination
-          [page]="page.page"
-          [totalPages]="page.totalPages"
-          (pageChange)="setPage($event)"
-        />
+    @if (page.totalElements) {
+      {{ page.totalElements }} saved {{ page.totalElements === 1 ? 'event' : 'events' }}.
+    }
+  } @else if (saved.isLoading()) {
+    Loading saved events…
+  }
+</p>
+
+<div class="mt-7">
+  @if (saved.error()) {
+    <app-error-state
+      message="We couldn't load your saved events. Check your connection and try again."
+      (action)="saved.reload()"
+    />
+  } @else if (result(); as page) {
+    @if (page.items.length) {
+      <ul role="list" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6">
+        @for (item of page.items; track item.event.id) {
+          <li><app-event-card [event]="item.event" [unavailable]="!item.available" /></li>
+        }
+      </ul>
+    } @else if (page.totalElements) {
+      <div class="rounded-[18px] border border-dashed border-line px-6 py-12 text-center">
+        <h3 class="mb-1.5 text-xl font-semibold">Nothing on this page</h3>
+        <button type="button" class="btn-dark mt-5" (click)="pageChange.emit(0)">
+          Back to the first page
+        </button>
+      </div>
+    } @else {
+      <div class="rounded-[18px] border border-dashed border-line px-6 py-12 text-center">
+        <h3 class="mb-1.5 text-xl font-semibold">No saved events yet</h3>
+        <p class="text-muted">Tap the heart on an event to keep it here.</p>
+        <a routerLink="/" class="btn-dark mt-5 inline-block">Find events</a>
       </div>
     }
+  } @else {
+    <div
+      class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6"
+      aria-busy="true"
+    >
+      @for (_ of skeletons; track $index) {
+        <app-event-card-skeleton />
+      }
+    </div>
   }
-</section>
+</div>
+
+@if (result(); as page) {
+  @if (page.totalPages > 1) {
+    <div class="mt-10">
+      <app-pagination
+        [page]="page.page"
+        [totalPages]="page.totalPages"
+        (pageChange)="pageChange.emit($event)"
+      />
+    </div>
+  }
+}
