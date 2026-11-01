@@ -21,7 +21,6 @@ export interface EventCard {
    */
   category?: string | null;
   saved: boolean; // always false when signed out
-
 }
 
 export interface City {
