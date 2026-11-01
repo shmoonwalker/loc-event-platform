@@ -53,6 +53,14 @@
       >
         {{ e.title }}
       </h1>
+      <div class="mt-4 flex items-center gap-3">
+        <app-save-button [eventId]="e.id" [initiallySaved]="e.saved" />
+      </div>
+      @if (!e.available) {
+        <p class="mt-4 rounded-xl border border-line bg-panel p-4 text-muted" role="status">
+          This event is no longer available. You can still see it because you saved it.
+        </p>
+      }
       @if (dates().length > 1) {
         <div class="mt-4 flex flex-wrap items-end gap-3">
           <label class="flex max-w-full min-w-0 flex-col gap-1 text-sm text-muted">

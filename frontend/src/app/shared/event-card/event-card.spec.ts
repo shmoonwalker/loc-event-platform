@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { EventCard } from '../../core/models';
@@ -14,17 +16,36 @@ const base: EventCard = {
   venueName: 'Bimhuis',
   imageUrl: null,
   category: 'music-nightlife',
+  saved: false,
 };
 
-function render(event: EventCard): HTMLElement {
-  TestBed.configureTestingModule({ providers: [provideRouter([])] });
+function render(event: EventCard, unavailable = false): HTMLElement {
+  TestBed.configureTestingModule({
+    providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+  });
   const fixture = TestBed.createComponent(EventCardComponent);
   fixture.componentRef.setInput('event', event);
+  fixture.componentRef.setInput('unavailable', unavailable);
   fixture.detectChanges();
   return fixture.nativeElement as HTMLElement;
 }
 
 describe('EventCardComponent', () => {
+  it('puts the save button next to the link, not inside it, showing the saved state', () => {
+    const el = render({ ...base, saved: true });
+    const button = el.querySelector('button');
+    expect(button?.getAttribute('aria-pressed')).toBe('true');
+    expect(button?.closest('a')).toBeNull();
+  });
+
+  it('marks an unavailable saved event instead of the Online label', () => {
+    const el = render({ ...base, place: 'ONLINE' }, true);
+    expect(el.textContent).toContain('No longer available');
+    expect(el.querySelector('.text-sky-ink')).toBeNull(); // the Online badge
+    TestBed.resetTestingModule();
+    expect(render(base).textContent).not.toContain('No longer available');
+  });
+
   it('shows title, Amsterdam time range, venue and city, and links to the event', () => {
     const el = render(base);
     expect(el.textContent).toContain('Late-night jazz session');

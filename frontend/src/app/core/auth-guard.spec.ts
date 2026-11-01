@@ -28,7 +28,7 @@ describe('authGuard', () => {
   it('sends a signed-out visitor to the login page', async () => {
     const harness = await open('/account', null);
 
-    expect(TestBed.inject(Router).url).toBe('/login');
+    expect(TestBed.inject(Router).url).toBe('/login?returnUrl=%2Faccount');
     expect(harness.routeNativeElement?.textContent).toContain('Log in');
   });
 

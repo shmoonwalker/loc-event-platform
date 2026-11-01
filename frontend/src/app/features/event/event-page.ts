@@ -1,27 +1,32 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, effect, inject, input, linkedSignal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { DomSanitizer, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
+import { catchError, throwError } from 'rxjs';
 import { AuthSession } from '../../core/auth-session';
 import { categoryImage } from '../../core/event-image';
 import { EventsApi, QueryParams } from '../../core/events-api';
 import { externalUrl } from '../../core/external-url';
 import { EMPTY_FILTERS, Filters, filtersToParams } from '../../core/filters';
 import { errorStatus, valueOf } from '../../core/resource';
+import { SavedEventsApi } from '../../core/saved-events-api';
 import { amsterdamDate, formatWhen } from '../../core/time';
 import { ErrorState } from '../../shared/error-state/error-state';
 import { IconComponent } from '../../shared/icon/icon';
 import { NotFoundState } from '../../shared/not-found-state/not-found-state';
 import { weatherMessage, weatherView } from './weather';
+import { SaveButton } from '../../shared/save-button/save-button';
 
 /** One event: everything the API knows about it. 404 (unknown or already over) gets a calm not-found state. */
 @Component({
   selector: 'app-event-page',
-  imports: [RouterLink, IconComponent, ErrorState, NotFoundState],
+  imports: [RouterLink, IconComponent, ErrorState, NotFoundState, SaveButton],
   templateUrl: './event-page.html',
 })
 export class EventPage {
   private readonly api = inject(EventsApi);
+  private readonly savedApi = inject(SavedEventsApi);
   private readonly title = inject(Title);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly session = inject(AuthSession);
@@ -31,7 +36,15 @@ export class EventPage {
 
   protected readonly detail = rxResource({
     params: () => this.id(),
-    stream: ({ params }) => this.api.event(params),
+    stream: ({ params }) =>
+      this.api.event(params).pipe(
+        // Withdrawn or past events are gone from the public API; the member who saved one can still open it.
+        catchError((err: HttpErrorResponse) =>
+          err.status === 404 && this.session.loggedIn()
+            ? this.savedApi.get(params)
+            : throwError(() => err),
+        ),
+      ),
   });
 
   protected readonly event = computed(() => valueOf(this.detail));
