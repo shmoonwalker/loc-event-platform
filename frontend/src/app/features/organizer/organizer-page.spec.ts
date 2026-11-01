@@ -30,6 +30,7 @@ const detail: OrganizerDetail = {
         cityName: 'Amsterdam',
         venueName: 'Bimhuis',
         imageUrl: null,
+        saved: false,
       },
     ],
   },

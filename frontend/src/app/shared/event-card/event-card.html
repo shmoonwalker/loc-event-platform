@@ -1,40 +1,56 @@
-<a
-  [routerLink]="['/events', event().id]"
-  class="group flex h-full flex-col overflow-hidden rounded-[18px] border border-line bg-panel shadow-card"
->
-  <div class="relative grid h-40 place-items-center overflow-hidden bg-panel">
-    <img
-      [src]="imageUrl()"
-      alt=""
-      loading="lazy"
-      class="size-full object-cover"
-      (error)="imageFailed.set(true)"
-    />
+<div class="relative h-full">
+  <a
+    [routerLink]="['/events', event().id]"
+    class="group flex h-full flex-col overflow-hidden rounded-[18px] border border-line bg-panel shadow-card"
+  >
+    <div class="relative grid h-40 place-items-center overflow-hidden bg-panel">
+      <img
+        [src]="imageUrl()"
+        alt=""
+        loading="lazy"
+        class="size-full object-cover"
+        [class.grayscale]="unavailable()"
+        (error)="imageFailed.set(true)"
+      />
 
-    <span
-      class="absolute top-3 left-3 min-w-11 rounded-xl bg-panel px-2 py-1.5 text-center leading-[1.1] text-ink"
-    >
-      <span class="block text-[13px] font-semibold text-blush-ink">{{ day().dow }}</span>
-      <span class="block font-display text-[22px] font-extrabold">{{ day().day }}</span>
-      <span class="block text-[13px] text-muted">{{ day().mon }}</span>
-    </span>
-
-    @if (online()) {
       <span
-        class="absolute top-3 right-3 rounded-full bg-panel px-2.5 py-1 text-[13px] font-semibold text-sky-ink"
+        class="absolute top-3 left-3 min-w-11 rounded-xl bg-panel px-2 py-1.5 text-center leading-[1.1] text-ink"
       >
-        Online
+        <span class="block text-[13px] font-semibold text-blush-ink">{{ day().dow }}</span>
+        <span class="block font-display text-[22px] font-extrabold">{{ day().day }}</span>
+        <span class="block text-[13px] text-muted">{{ day().mon }}</span>
       </span>
-    }
-  </div>
 
-  <div class="flex flex-col gap-1.5 px-4 pt-3.5 pb-4">
-    <span
-      class="line-clamp-2 min-h-[2lh] text-[17px] leading-snug font-semibold group-hover:underline group-hover:underline-offset-3"
-    >
-      {{ event().title }}
-    </span>
-    <span class="text-sm text-muted">{{ time() }}</span>
-    <span class="text-sm text-muted">{{ where() }}</span>
-  </div>
-</a>
+      @if (unavailable()) {
+        <span
+          class="absolute bottom-3 left-3 rounded-full bg-panel px-2.5 py-1 text-[13px] font-semibold text-muted"
+        >
+          No longer available
+        </span>
+      } @else if (online()) {
+        <span
+          class="absolute bottom-3 left-3 rounded-full bg-panel px-2.5 py-1 text-[13px] font-semibold text-sky-ink"
+        >
+          Online
+        </span>
+      }
+    </div>
+
+    <div class="flex flex-col gap-1.5 px-4 pt-3.5 pb-4">
+      <span
+        class="line-clamp-2 min-h-[2lh] text-[17px] leading-snug font-semibold group-hover:underline group-hover:underline-offset-3"
+      >
+        {{ event().title }}
+      </span>
+      <span class="text-sm text-muted">{{ time() }}</span>
+      <span class="text-sm text-muted">{{ where() }}</span>
+    </div>
+  </a>
+
+  <!-- Next to the link, not inside it: a button inside <a> is invalid and would also follow the link. -->
+  <app-save-button
+    class="absolute top-3 right-3"
+    [eventId]="event().id"
+    [initiallySaved]="event().saved"
+  />
+</div>

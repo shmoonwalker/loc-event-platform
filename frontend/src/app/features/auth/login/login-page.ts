@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, input, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
@@ -17,6 +17,9 @@ export class LoginPage {
   private readonly authApi = inject(AuthApi);
   private readonly session = inject(AuthSession);
   private readonly router = inject(Router);
+
+  /** ?returnUrl=: where the visitor was before being sent here (a save click, a members-only page). */
+  readonly returnUrl = input<string>();
 
   // Password is only "required": the strength rules belong to sign-up, not to checking an existing password.
   protected readonly form = this.fb.group({
@@ -55,7 +58,11 @@ export class LoginPage {
       )
       .subscribe({
         next: () => {
-          void this.router.navigateByUrl('/');
+          // navigateByUrl stays inside the app; the check only drops junk like "https://…" or "//host".
+          const target = this.returnUrl();
+          void this.router.navigateByUrl(
+            target?.startsWith('/') && !target.startsWith('//') ? target : '/',
+          );
         },
         error: (err: HttpErrorResponse) => {
           this.sending.set(false);

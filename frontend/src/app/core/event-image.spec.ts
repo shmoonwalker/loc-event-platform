@@ -12,6 +12,7 @@ const event = (change: Partial<EventCard>): EventCard => ({
   venueName: 'Bimhuis',
   imageUrl: null,
   category: null,
+  saved: false,
   ...change,
 });
 

@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/auth-guard';
 
 // loadComponent = lazy route: the page's code is downloaded only when someone visits it
 // (like Spring's @Lazy, but at the browser/bundle level).
@@ -30,6 +31,12 @@ export const routes: Routes = [
         title: 'Organizer – Loc',
         loadComponent: () =>
           import('./features/organizer/organizer-page').then((m) => m.OrganizerPage),
+      },
+      {
+        path: 'saved',
+        title: 'Saved – Loc',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/saved/saved-page').then((m) => m.SavedPage),
       },
       {
         path: 'register',

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { AuthSession } from '../../../core/auth-session';
 import { LoginPage } from './login-page';
@@ -10,18 +10,25 @@ import { LoginPage } from './login-page';
 @Component({ template: 'Home' })
 class HomeStub {}
 
-async function open() {
+@Component({ template: 'Event' })
+class EventStub {}
+
+async function open(url = '/login') {
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
-      provideRouter([
-        { path: 'login', component: LoginPage },
-        { path: '', component: HomeStub },
-      ]),
+      provideRouter(
+        [
+          { path: 'login', component: LoginPage },
+          { path: 'events/:id', component: EventStub },
+          { path: '', component: HomeStub },
+        ],
+        withComponentInputBinding(),
+      ),
     ],
   });
-  const harness = await RouterTestingHarness.create('/login');
+  const harness = await RouterTestingHarness.create(url);
   const el = harness.routeNativeElement!;
 
   const type = (id: string, value: string) => {
@@ -76,6 +83,37 @@ describe('LoginPage', () => {
     expect(TestBed.inject(Router).url).toBe('/');
     expect(setItem).not.toHaveBeenCalled();
     setItem.mockRestore();
+  });
+
+  it('goes back to the returnUrl after logging in, and says why the visitor is here', async () => {
+    const { el, http, harness, fillValid, submit } = await open('/login?returnUrl=%2Fevents%2Fe1');
+    expect(el.textContent).toContain('Log in to save events');
+    fillValid();
+    await submit();
+    http
+      .expectOne('/api/auth/login')
+      .flush({ accessToken: 'jwt', tokenType: 'Bearer', expiresIn: 900 });
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/events/e1');
+  });
+
+  it('ignores a returnUrl that is not a path in this app', async () => {
+    const { http, harness, fillValid, submit } = await open('/login?returnUrl=%2F%2Fevil.example');
+    fillValid();
+    await submit();
+    http
+      .expectOne('/api/auth/login')
+      .flush({ accessToken: 'jwt', tokenType: 'Bearer', expiresIn: 900 });
+    http
+      .expectOne('/api/auth/me')
+      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' });
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/');
   });
 
   it('stays on the form with one generic error for wrong credentials', async () => {

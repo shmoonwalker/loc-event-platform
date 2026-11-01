@@ -1,5 +1,8 @@
 <section class="wrap py-16">
   <h1 class="display text-[clamp(36px,5vw,60px)]">Log in</h1>
+  @if (returnUrl()) {
+    <p class="mt-4 font-semibold">Log in to save events and see your saved list.</p>
+  }
   <p class="mt-4 text-muted">No account yet? <a routerLink="/register" class="link">Sign up</a></p>
 
   <form [formGroup]="form" (ngSubmit)="submit()" class="mt-8 flex max-w-md flex-col gap-5">

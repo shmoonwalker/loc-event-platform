@@ -54,6 +54,9 @@ const event: EventDetail = {
     windSpeedKmh: 18,
     weatherCode: 63,
   },
+  saved: false,
+  saveCount: 0,
+  available: true,
 };
 
 const oneDate = { ...event, occurrences: [event.occurrences[0]] };
@@ -246,6 +249,36 @@ describe('EventPage', () => {
     );
     expect(el.textContent).toContain('Event not found');
     expect(el.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('shows the save button with the saved state from the API', async () => {
+    const el = await open((req) => req.flush({ ...event, saved: true }));
+    expect(el.querySelector('button[aria-label="Save event"]')?.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(el.textContent).not.toContain('no longer available');
+  });
+
+  it('opens a saved event that is no longer public through the saved events API', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([{ path: 'events/:id', component: EventPage }], withComponentInputBinding()),
+      ],
+    });
+    TestBed.inject(AuthSession).start('token');
+    const http = TestBed.inject(HttpTestingController);
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/events/e1');
+    http
+      .expectOne('/api/events/e1')
+      .flush({ status: 404 }, { status: 404, statusText: 'Not Found' });
+    http.expectOne('/api/me/saved-events/e1').flush({ ...event, saved: true, available: false });
+    await harness.fixture.whenStable();
+    const el = harness.routeNativeElement!;
+    expect(el.querySelector('h1')?.textContent).toContain('Late-night jazz session');
+    expect(el.textContent).toContain('This event is no longer available');
   });
 
   it('shows the retryable error state on other failures', async () => {
