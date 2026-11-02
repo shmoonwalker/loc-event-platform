@@ -34,6 +34,7 @@ const detail: OrganizerDetail = {
       },
     ],
   },
+  followed: false,
 };
 
 async function open(url: string) {
@@ -67,6 +68,20 @@ describe('OrganizerPage', () => {
     expect(el.querySelector('a[href="/events/e1"]')).toBeTruthy();
     expect(el.querySelector('[aria-current="page"]')?.textContent).toContain('2');
     expect(TestBed.inject(Title).getTitle()).toBe('Bimhuis – Loc');
+  });
+
+  it('shows the follow state from the API and keeps it while the next page loads', async () => {
+    const { harness, http } = await open('/organizers/o1');
+    http.expectOne('/api/organizers/o1?page=0').flush({ ...detail, followed: true });
+    await harness.fixture.whenStable();
+    const el = harness.routeNativeElement!;
+    const follow = () => el.querySelector('button[aria-pressed]');
+    expect(follow()?.textContent).toContain('Follow');
+    expect(follow()?.getAttribute('aria-pressed')).toBe('true');
+
+    await harness.navigateByUrl('/organizers/o1?page=1');
+    expect(follow()?.getAttribute('aria-pressed')).toBe('true');
+    http.expectOne('/api/organizers/o1?page=1').flush({ ...detail, followed: true });
   });
 
   it('treats a garbage page number as the first page', async () => {

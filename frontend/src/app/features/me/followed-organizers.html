@@ -1,0 +1,64 @@
+<p class="text-muted" aria-live="polite">
+  @if (organizers(); as list) {
+    @if (list.length) {
+      Following {{ list.length }} {{ list.length === 1 ? 'organizer' : 'organizers' }}.
+    }
+  } @else if (followed.isLoading()) {
+    Loading organizers…
+  }
+</p>
+
+<div class="mt-7">
+  @if (followed.error()) {
+    <app-error-state
+      message="We couldn't load the organizers you follow. Check your connection and try again."
+      (action)="followed.reload()"
+    />
+  } @else if (organizers(); as list) {
+    @if (list.length) {
+      <ul role="list" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6">
+        @for (o of list; track o.id) {
+          <li
+            class="relative flex h-full flex-col gap-3 rounded-[18px] border border-line bg-panel p-5 shadow-card"
+          >
+            <h3 class="text-[17px] leading-snug font-semibold">
+              <!-- The link's ::after covers the card, so the whole card opens the organizer. -->
+              <a
+                [routerLink]="['/organizers', o.id]"
+                class="after:absolute after:inset-0 after:rounded-[18px] hover:underline hover:underline-offset-3"
+              >
+                {{ o.name }}
+              </a>
+            </h3>
+            @if (o.description) {
+              <p class="line-clamp-3 text-sm text-muted">{{ o.description }}</p>
+            }
+            <!-- Above the link's overlay, so clicking it follows or unfollows instead of opening the page. -->
+            <app-follow-button
+              class="relative mt-auto self-start"
+              [organizerId]="o.id"
+              [initiallyFollowed]="true"
+            />
+          </li>
+        }
+      </ul>
+    } @else {
+      <div class="rounded-[18px] border border-dashed border-line px-6 py-12 text-center">
+        <h3 class="mb-1.5 text-xl font-semibold">You don't follow any organizers yet</h3>
+        <p class="text-muted">
+          Open an organizer from an event page and tap Follow to keep them here.
+        </p>
+        <a routerLink="/" class="btn-dark mt-5 inline-block">Find events</a>
+      </div>
+    }
+  } @else {
+    <div
+      class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6 motion-safe:animate-pulse"
+      aria-busy="true"
+    >
+      @for (_ of skeletons; track $index) {
+        <div class="h-36 rounded-[18px] border border-line bg-panel" aria-hidden="true"></div>
+      }
+    </div>
+  }
+</div>

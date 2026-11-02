@@ -102,6 +102,7 @@ export interface EventDetail {
 export interface OrganizerDetail {
   organizer: OrganizerInfo;
   events: EventPage;
+  followed: boolean; // always false when signed out
 }
 
 /** value is sent to the API, label is shown to people. */
