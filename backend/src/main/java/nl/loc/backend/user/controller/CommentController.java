@@ -18,7 +18,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -125,5 +127,58 @@ public class CommentController {
                                  @Parameter(description = "Id of the top-level comment.") @PathVariable UUID commentId,
                                  @Valid @RequestBody CommentRequest request) {
         return commentService.reply(UUID.fromString(jwt.getSubject()), commentId, request.body());
+    }
+
+    @PatchMapping("/me/comments/{commentId}")
+    @Operation(
+            summary = "Edit my comment",
+            description = "Replaces the text of a comment or reply of the member of the access token. "
+                    + "The comment then shows as edited. Replies are not included in the response.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "The comment as stored."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "The comment id is not a UUID, or the body is empty or longer than 2000 characters.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Missing, invalid or expired access token, or the account no longer exists.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "No comment of this member with this id, or it is deleted or on a hidden event.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public CommentResponse edit(@AuthenticationPrincipal Jwt jwt,
+                                @Parameter(description = "Id of the comment.") @PathVariable UUID commentId,
+                                @Valid @RequestBody CommentRequest request) {
+        return commentService.editComment(UUID.fromString(jwt.getSubject()), commentId, request.body());
+    }
+
+    @DeleteMapping("/me/comments/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+            summary = "Delete my comment",
+            description = "Deletes a comment or reply of the member of the access token for everyone. "
+                    + "A deleted comment with replies shows without author or text; one without replies disappears. "
+                    + "Deleting it again changes nothing.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "The comment is deleted."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "The comment id is not a UUID.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "No comment of this member with this id.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public void delete(@AuthenticationPrincipal Jwt jwt,
+                       @Parameter(description = "Id of the comment.") @PathVariable UUID commentId) {
+        commentService.deleteComment(UUID.fromString(jwt.getSubject()), commentId);
     }
 }
