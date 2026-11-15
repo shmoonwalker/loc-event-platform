@@ -63,6 +63,10 @@ public class UserAccount {
         }
     }
 
+    public void changeDisplayName(String newDisplayName) {
+        this.displayName = newDisplayName.trim();
+    }
+
     // latest registration wins, so an attacker who registered this email first can't keep their password
     public void replaceRegistration(String replacementPasswordHash, String replacementDisplayName) {
         if (isEmailVerified()) {
