@@ -1,6 +1,6 @@
 # Member API
 
-Endpoints for a signed-in member: saved events, followed organizers and comments.
+Endpoints for a signed-in member: account security, saved events, followed organizers and comments.
 Every route needs `Authorization: Bearer <accessToken>` (see
 [Authentication](../../docs/architecture/authentication.md)); without a valid token
 the answer is `401`. The member is always the one of the token, never an id in the URL.
@@ -9,6 +9,9 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 
 | Endpoint | Purpose |
 | --- | --- |
+| `POST /api/me/password` | Change the password and renew the current browser's refresh cookie. `204`. |
+| `POST /api/me/email` | Request a verification link for a new email address. `202`. |
+| `DELETE /api/me` | Delete the signed-in account. `204`. |
 | `GET /api/me/saved-events` | One page of saved events, most recently saved first. |
 | `GET /api/me/saved-events/{eventId}` | Event page of a saved event, also when it is withdrawn or over. |
 | `PUT /api/me/saved-events/{eventId}` | Save an event. `204`. |
@@ -25,6 +28,21 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 
 Paged routes take `page` (zero-based, default 0) and `size` (1–20, default 20), the same
 as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
+
+## Account security
+
+All three requests take a JSON body with `currentPassword`. An incorrect password
+returns `401`. They share a per-account limit of five attempts per 15 minutes.
+A limited request returns `429` with a `Retry-After` header.
+
+- Password changes also take `newPassword`, with the same length limits as registration.
+  Other devices lose the ability to refresh. Already issued access tokens expire at
+  their normal time. The requesting browser receives a new refresh cookie.
+- Email changes also take `newEmail`. The old address remains active until the verification
+  link is used. A successful verification sends a notice to the old address. An address
+  already in use receives the same empty `202` response.
+- Deletion removes the account, refresh and verification tokens, saved events and follows.
+  Existing comments and replies keep their text and show the author as `Deleted user`.
 
 ## Saved events
 
@@ -83,7 +101,7 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
   deleted comment is never returned.
 - Editing or deleting someone else's comment answers `404`, not `403`, so the API never
   confirms it exists.
-- `author` is `null` when the account was deleted; the comment itself stays.
+- When the account is deleted, the comment stays and `author.displayName` is `Deleted user`.
 - Posting comments and replies shares one rate limit per member (`comment` policy,
   5 per minute): over it, `429` with `Retry-After`. Editing is not limited.
 - Posting answers `401` when the account of the token no longer exists.
