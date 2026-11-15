@@ -319,14 +319,14 @@ class CommentHttpTest {
     }
 
     @Test
-    void deletedAccountKeepsItsCommentsWithoutAuthor() throws Exception {
+    void deletedAccountKeepsItsCommentsWithAnonymousAuthor() throws Exception {
         comment(alice, SHOW_ID, "Is there parking?");
 
         userRepository.delete(alice);
 
         mockMvc.perform(get("/api/events/{id}/comments", SHOW_ID))
                 .andExpect(jsonPath("$.items[0].body").value("Is there parking?"))
-                .andExpect(jsonPath("$.items[0].author").doesNotExist())
+                .andExpect(jsonPath("$.items[0].author.displayName").value("Deleted user"))
                 .andExpect(jsonPath("$.items[0].deleted").value(false));
     }
 
