@@ -65,6 +65,10 @@ app:
       comment:
         capacity: 5
         period: 1m
+      # per member across operations that check the current password
+      account-security:
+        capacity: 5
+        period: 15m
 
 server:
   port: 8080
