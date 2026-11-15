@@ -45,8 +45,12 @@ class CommentRateLimitHttpTest {
     @ServiceConnection
     private static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
-    @Container
     private static final GenericContainer<?> redis = new GenericContainer<>("redis:8.2-alpine").withExposedPorts(6379);
+
+    static {
+        // @Sql before the class loads the context before @Container would start Redis, so start it here
+        redis.start();
+    }
 
     @DynamicPropertySource
     static void redisUrl(DynamicPropertyRegistry registry) {
