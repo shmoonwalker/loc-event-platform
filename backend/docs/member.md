@@ -1,9 +1,10 @@
 # Member API
 
-Endpoints for a signed-in member: saved events and followed organizers.
+Endpoints for a signed-in member: saved events, followed organizers and comments.
 Every route needs `Authorization: Bearer <accessToken>` (see
 [Authentication](../../docs/architecture/authentication.md)); without a valid token
 the answer is `401`. The member is always the one of the token, never an id in the URL.
+The one exception is reading comments, which is public.
 Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 
 | Endpoint | Purpose |
@@ -16,6 +17,11 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 | `GET /api/me/followed-organizers/events` | One page of upcoming events of followed organizers, soonest first. |
 | `PUT /api/me/followed-organizers/{organizerId}` | Follow an organizer. `204`. |
 | `DELETE /api/me/followed-organizers/{organizerId}` | Unfollow an organizer. `204`. |
+| `GET /api/events/{eventId}/comments` | One page of an event's comments with their replies. Public. |
+| `POST /api/events/{eventId}/comments` | Comment on an event. `201` with the comment. |
+| `POST /api/comments/{commentId}/replies` | Reply to a top-level comment. `201` with the reply. |
+| `PATCH /api/me/comments/{commentId}` | Edit an own comment or reply. `200` with the comment. |
+| `DELETE /api/me/comments/{commentId}` | Delete an own comment or reply for everyone. `204`. |
 
 Paged routes take `page` (zero-based, default 0) and `size` (1–20, default 20), the same
 as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
@@ -59,13 +65,52 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
   `/api/events`, one card per show. Withdrawn and ended events are left out.
 - `GET /api/organizers/{id}` returns `followed` for the signed-in member.
 
+## Comments
+
+- Comments belong to a show, not a single date. The id can be a show id or an older
+  event id, like for saved events.
+- Anyone can read comments; only signed-in members can write them. With an access token,
+  `mine` is `true` on the viewer's own comments.
+- Comments stay open on past, cancelled and postponed events. A hidden event (state
+  `UNAVAILABLE`) shows no comments and takes none: `404`.
+- Top-level comments are newest first, their replies oldest first. Replies cannot be
+  replied to: that answers `400`. Replying to a deleted or unknown comment answers `404`.
+- Text is plain text, stored trimmed, at most 2000 characters; empty text answers `400`.
+- Editing sets `editedAt`. A deleted comment cannot be edited.
+- Deleting is for everyone and idempotent. A deleted comment that has replies stays in
+  the list with `deleted: true` and no `author` or `body`, so its replies keep their
+  place; one without replies, and every deleted reply, is left out. The text of a
+  deleted comment is never returned.
+- Editing or deleting someone else's comment answers `404`, not `403`, so the API never
+  confirms it exists.
+- `author` is `null` when the account was deleted; the comment itself stays.
+- Posting comments and replies shares one rate limit per member (`comment` policy,
+  5 per minute): over it, `429` with `Retry-After`. Editing is not limited.
+- Posting answers `401` when the account of the token no longer exists.
+
+```json
+{
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1,
+  "items": [
+    {
+      "id": "…", "author": { "displayName": "Anouk" }, "body": "Is there parking?",
+      "official": false, "deleted": false, "mine": false,
+      "createdAt": "2030-06-01T10:00:00Z", "editedAt": null,
+      "replies": [ { "id": "…", "author": { "displayName": "Bram" }, "body": "Yes, behind the venue", "...": "…", "replies": [] } ]
+    }
+  ]
+}
+```
+
 ## Implementation
 
 ```text
 user/
-  controller/  SavedEventController, FollowedOrganizerController
-  service/     SavedEventService, FollowedOrganizerService
-  repository/  SavedEventRepository, FollowedOrganizerRepository (SQL via JdbcClient)
+  controller/  SavedEventController, FollowedOrganizerController, CommentController
+  service/     SavedEventService, FollowedOrganizerService, CommentService
+  model/       Comment (JPA entity; guards replies, edits and deletes)
+  repository/  SavedEventRepository, FollowedOrganizerRepository, CommentQueryRepository (SQL via JdbcClient),
+               CommentRepository (JPA)
 ```
 
 - Both tables live in the backend-owned `app` schema and store the published id
@@ -80,11 +125,21 @@ user/
   indexed on `(user_id, followed_at DESC)`.
 - Saved events are read from `publication.event_snapshot`, so withdrawn and ended events
   still show. Followed events are read from `publication.discoverable_events`.
+- `app.comment` stores the show (`event_id` is a `loc_group_id`), `parent_id` (null for
+  top-level comments), `user_id` (set to null when the account is deleted), `body`,
+  `official`, `created_at`, `edited_at` and the soft-delete columns `deleted_at`,
+  `deleted_by`, `delete_reason`. Deleted rows are kept for moderation and audit.
+- Comments are written through the `Comment` entity and read with two queries per page:
+  one for the top-level comments, one for all their replies. The SQL itself blanks the
+  `body` and `author` of deleted comments.
+- Indexed on `(event_id, created_at DESC)` for top-level comments and on
+  `(parent_id, created_at)` for replies.
 
 ## Tests
 
-`SavedEventHttpTest` and `FollowedOrganizerHttpTest` run against real PostgreSQL
-(Testcontainers, Docker needed) with a fixed clock.
+`SavedEventHttpTest`, `FollowedOrganizerHttpTest` and `CommentHttpTest` run against real
+PostgreSQL (Testcontainers, Docker needed). `CommentRateLimitHttpTest`
+also starts Redis to check the comment rate limit.
 
 ```bash
 cd backend

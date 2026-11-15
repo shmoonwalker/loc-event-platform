@@ -67,7 +67,7 @@ public class Comment {
         return new Comment(eventId, null, userId, body, now);
     }
 
-    public Comment reply(UUID userId, String body, Instant now) {
+    public Comment reply(UUID replierId, String replyBody, Instant now) {
         // without an id the reply would silently be stored as a top-level comment
         if (id == null) {
             throw new IllegalStateException("Save the comment before replying to it");
@@ -75,7 +75,7 @@ public class Comment {
         if (isReply()) {
             throw new IllegalStateException("A reply can't be replied to");
         }
-        return new Comment(eventId, id, userId, body, now);
+        return new Comment(eventId, id, replierId, replyBody, now);
     }
 
     public boolean isReply() {
@@ -94,12 +94,12 @@ public class Comment {
         this.editedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 
-    public void delete(UUID deletedBy, String reason, Instant now) {
+    public void delete(UUID deleterId, String reason, Instant now) {
         if (isDeleted()) {
             return;
         }
         this.deletedAt = now.truncatedTo(ChronoUnit.MICROS);
-        this.deletedBy = deletedBy;
+        this.deletedBy = deleterId;
         this.deleteReason = reason;
     }
 }
