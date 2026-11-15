@@ -61,8 +61,8 @@ public class UserAccount {
         return emailVerifiedAt != null;
     }
 
-    public void changeVerifiedEmail(String email, Instant now) {
-        this.email = normalizeEmail(email);
+    public void changeVerifiedEmail(String newEmail, Instant now) {
+        this.email = normalizeEmail(newEmail);
         emailVerifiedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 
