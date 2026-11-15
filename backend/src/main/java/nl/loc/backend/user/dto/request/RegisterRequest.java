@@ -18,7 +18,7 @@ public record RegisterRequest(
         String email,
 
         @NotBlank(message = "Please provide a password")
-        @Size(min = 10, message = "Password must be at least 10 characters long")
+        @Size(min = MIN_PASSWORD_LENGTH, message = "Password must be at least 10 characters long")
         @Schema(description = "Password of the user. At least 10 characters and at most 72 bytes in UTF-8.",
                 example = "correct-horse-battery", format = "password", minLength = 10,
                 accessMode = Schema.AccessMode.WRITE_ONLY, requiredMode = Schema.RequiredMode.REQUIRED)
@@ -32,10 +32,16 @@ public record RegisterRequest(
         String displayName
 ) {
 
+    static final int MIN_PASSWORD_LENGTH = 10;
+
     // BCrypt only uses the first 72 bytes, so the limit is in bytes, not characters
     @Schema(hidden = true)
     @AssertTrue(message = "Password must not exceed 72 bytes")
     public boolean isPasswordWithinByteLimit() {
+        return withinPasswordByteLimit(password);
+    }
+
+    static boolean withinPasswordByteLimit(String password) {
         return password == null || password.getBytes(StandardCharsets.UTF_8).length <= 72;
     }
 

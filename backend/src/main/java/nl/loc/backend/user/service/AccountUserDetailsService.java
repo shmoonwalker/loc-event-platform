@@ -18,7 +18,7 @@ public class AccountUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) {
-        return userAccountRepository.findByEmail(UserAccount.normalizeEmail(username))
+        return userAccountRepository.findForLoginByEmail(UserAccount.normalizeEmail(username))
                 // a null hash would make the password encoder throw (500), so treat it like an unknown account
                 .filter(account -> account.getPasswordHash() != null)
                 .map(AccountUserDetails::new)

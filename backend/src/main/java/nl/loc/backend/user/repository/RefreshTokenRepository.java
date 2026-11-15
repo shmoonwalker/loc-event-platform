@@ -14,6 +14,18 @@ import java.util.UUID;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
 
+    // Lock the account first so a rotation cannot insert a successor during password change or deletion.
+    @Query(value = """
+            select id from app.app_user
+            where id = (select user_id from app.refresh_token where token_hash = :tokenHash)
+            for update
+            """, nativeQuery = true)
+    Optional<UUID> lockOwnerByTokenHash(byte[] tokenHash);
+
+    @Modifying
+    @Query("update RefreshToken t set t.revokedAt = :now where t.user.id = :userId and t.revokedAt is null")
+    int revokeAllForUser(UUID userId, Instant now);
+
     // user is loaded here because the access token is built after this transaction ends
     @EntityGraph(attributePaths = "user")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
