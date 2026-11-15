@@ -27,7 +27,7 @@ spring:
     multipart:
       # keep in step with client_max_body_size in frontend/nginx.conf.template
       max-file-size: 5MB
-      max-request-size: 5MB
+      max-request-size: 6MB
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
