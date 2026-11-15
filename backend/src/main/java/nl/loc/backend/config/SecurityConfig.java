@@ -33,6 +33,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/home", "/api/events", "/api/events/filter-options", "/api/cities",
                                 "/api/events/*", "/api/organizers/*", "/api/categories", "/api/tags").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/*/comments").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/events/*/comments", "/api/comments/*/replies").authenticated()
                         // auth routes are opened one by one; never /api/auth/**
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/verify-email",
                                 "/api/auth/resend-verification", "/api/auth/login", "/api/auth/refresh",
