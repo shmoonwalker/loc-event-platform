@@ -44,6 +44,10 @@ public class UserAccount {
     @Column(name = "avatar_preset", nullable = false)
     private AvatarPreset avatarPreset;
 
+    // object key of the uploaded picture in avatar storage; null shows the preset
+    @Column(name = "avatar_key")
+    private String avatarKey;
+
     public UserAccount(String email, String displayName, String passwordHash, Instant createdAt) {
         this.email = normalizeEmail(email);
         this.displayName = displayName.trim();
@@ -72,8 +76,22 @@ public class UserAccount {
         this.displayName = newDisplayName.trim();
     }
 
-    public void choosePreset(AvatarPreset preset) {
+    /** Also removes the uploaded picture, so the chosen preset shows; returns the removed key. */
+    public String choosePreset(AvatarPreset preset) {
         this.avatarPreset = preset;
+        return removeUploadedAvatar();
+    }
+
+    /** Returns the key of the picture it replaces, or null. */
+    public String useUploadedAvatar(String key) {
+        String previous = avatarKey;
+        avatarKey = key;
+        return previous;
+    }
+
+    /** Returns the removed key, or null. */
+    public String removeUploadedAvatar() {
+        return useUploadedAvatar(null);
     }
 
     // latest registration wins, so an attacker who registered this email first can't keep their password

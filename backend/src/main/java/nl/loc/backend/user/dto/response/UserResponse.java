@@ -31,8 +31,8 @@ public record UserResponse(
                 requiredMode = Schema.RequiredMode.REQUIRED)
         AvatarPreset avatarPreset) {
 
-    public static UserResponse from(UserAccount account) {
+    public static UserResponse from(UserAccount account, String avatarUrl) {
         return new UserResponse(account.getId(), account.getEmail(), account.getDisplayName(), account.getRole(),
-                account.getAvatarPreset().url(), account.getAvatarPreset());
+                avatarUrl, account.getAvatarPreset());
     }
 }
