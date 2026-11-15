@@ -25,7 +25,7 @@ public class CommentQueryRepository {
             c.id, c.parent_id, c.official, c.created_at, c.edited_at,
             c.deleted_at IS NOT NULL AS deleted,
             CASE WHEN c.deleted_at IS NULL THEN c.body END AS body,
-            CASE WHEN c.deleted_at IS NULL THEN u.display_name END AS display_name,
+            CASE WHEN c.deleted_at IS NULL THEN COALESCE(u.display_name, 'Deleted user') END AS display_name,
             COALESCE(c.deleted_at IS NULL AND c.user_id = :viewerId, false) AS mine""";
 
     // a deleted top-level comment stays only while it has replies, shown as "Comment deleted"
