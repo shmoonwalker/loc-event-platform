@@ -1,11 +1,14 @@
 package nl.loc.backend.user.repository;
 
+import static nl.loc.backend.event.repository.PublicEventRepository.SHOW_OF;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import nl.loc.backend.user.dto.response.CommentAuthor;
@@ -35,6 +38,18 @@ public class CommentQueryRepository {
 
     public CommentQueryRepository(JdbcClient jdbc) {
         this.jdbc = jdbc;
+    }
+
+    /** The show of {@code id} (a show id or an old event id) unless it is hidden; past events stay open. */
+    public Optional<UUID> findVisibleShow(UUID id) {
+        return jdbc.sql("""
+                SELECT s.loc_group_id FROM publication.event_snapshot s
+                WHERE s.loc_group_id = %s AND s.state <> 'UNAVAILABLE'
+                LIMIT 1
+                """.formatted(SHOW_OF))
+                .param("id", id)
+                .query(UUID.class)
+                .optional();
     }
 
     public long countTopLevel(UUID eventId) {
