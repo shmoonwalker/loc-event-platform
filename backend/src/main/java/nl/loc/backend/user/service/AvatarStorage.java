@@ -4,6 +4,7 @@ import jakarta.annotation.PreDestroy;
 import java.net.URI;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
+import nl.loc.backend.user.model.AvatarPreset;
 import nl.loc.backend.user.model.UserAccount;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -57,9 +58,11 @@ public class AvatarStorage {
     }
 
     public String avatarUrl(UserAccount account) {
-        return account.getAvatarKey() == null
-                ? account.getAvatarPreset().url()
-                : publicUrl + "/" + account.getAvatarKey();
+        return avatarUrl(account.getAvatarKey(), account.getAvatarPreset());
+    }
+
+    public String avatarUrl(String avatarKey, AvatarPreset preset) {
+        return avatarKey == null ? preset.url() : publicUrl + "/" + avatarKey;
     }
 
     public void put(String key, byte[] jpeg) {
