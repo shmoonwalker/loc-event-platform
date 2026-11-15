@@ -1,6 +1,6 @@
 # Backend
 
-The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration, login and sessions, saved events and followed organizers.
+The Loc backend is the product API between the frontend and the event catalog. It is a Spring Boot application (Java 25) that serves public event discovery, user registration, login and sessions, saved events, followed organizers and event comments.
 
 The backend does not collect or normalize external event data. That is the job of the [data application](../data/README.md).
 
@@ -22,6 +22,7 @@ The frontend communicates only with the backend API.
 | Sessions | `POST /api/auth/refresh` (rotates the refresh cookie), `/api/auth/logout` | [Authentication](../docs/architecture/authentication.md) |
 | Saved events | `GET /api/me/saved-events`, `GET`/`PUT`/`DELETE /api/me/saved-events/{eventId}` | [Member API](docs/member.md) |
 | Followed organizers | `GET /api/me/followed-organizers`, `/api/me/followed-organizers/events`, `PUT`/`DELETE /api/me/followed-organizers/{organizerId}` | [Member API](docs/member.md) |
+| Comments | `GET`/`POST /api/events/{eventId}/comments`, `POST /api/comments/{commentId}/replies`, `PATCH`/`DELETE /api/me/comments/{commentId}` | [Member API](docs/member.md#comments) |
 | Profile | `PATCH /api/me/profile`, `PUT /api/me/avatar/preset`, `POST`/`DELETE /api/me/avatar` | [Member API](docs/member.md) |
 
 Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI document at `/api/docs/openapi.yaml`.
@@ -97,7 +98,7 @@ nl.loc.backend
 │   ├── jwt/       access-token signing key and JWT encoder/decoder
 │   └── ratelimit/ Redis-backed rate limiter
 ├── event/         public discovery: events, organizers, cities, categories, tags
-└── user/          user accounts, registration, login, account emails, profile and avatars, saved events, followed organizers
+└── user/          user accounts, registration, login, account emails, profile and avatars, saved events, followed organizers, comments
 ```
 
 Within a feature:
