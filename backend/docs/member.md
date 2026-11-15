@@ -108,6 +108,7 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
 - Editing or deleting someone else's comment answers `404`, not `403`, so the API never
   confirms it exists.
 - `author` is `null` when the account was deleted; the comment itself stays.
+- `author.avatarUrl` is the same as `avatarUrl` on the account: the uploaded picture, or else the preset.
 - Posting comments and replies shares one rate limit per member (`comment` policy,
   5 per minute): over it, `429` with `Retry-After`. Editing is not limited.
 - Posting answers `401` when the account of the token no longer exists.
@@ -117,10 +118,10 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
   "page": 0, "size": 20, "totalElements": 1, "totalPages": 1,
   "items": [
     {
-      "id": "…", "author": { "displayName": "Anouk" }, "body": "Is there parking?",
+      "id": "…", "author": { "displayName": "Anouk", "avatarUrl": "/avatars/sun.svg" }, "body": "Is there parking?",
       "official": false, "deleted": false, "mine": false,
       "createdAt": "2030-06-01T10:00:00Z", "editedAt": null,
-      "replies": [ { "id": "…", "author": { "displayName": "Bram" }, "body": "Yes, behind the venue", "...": "…", "replies": [] } ]
+      "replies": [ { "id": "…", "author": { "displayName": "Bram", "avatarUrl": "https://images-loc.shadibuilds.dev/avatars/…/….jpg" }, "body": "Yes, behind the venue", "...": "…", "replies": [] } ]
     }
   ]
 }
