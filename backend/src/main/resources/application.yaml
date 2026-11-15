@@ -61,6 +61,10 @@ app:
       session:
         capacity: 30
         period: 1m
+      # per member, shared by comments and replies
+      comment:
+        capacity: 5
+        period: 1m
 
 server:
   port: 8080
