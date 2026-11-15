@@ -2,6 +2,7 @@ package nl.loc.backend.user.service;
 
 import java.util.UUID;
 import nl.loc.backend.user.dto.response.UserResponse;
+import nl.loc.backend.user.model.AvatarPreset;
 import nl.loc.backend.user.model.UserAccount;
 import nl.loc.backend.user.repository.UserAccountRepository;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,13 @@ public class ProfileService {
     public UserResponse changeDisplayName(UUID accountId, String displayName) {
         UserAccount account = account(accountId);
         account.changeDisplayName(displayName);
+        return UserResponse.from(account);
+    }
+
+    @Transactional
+    public UserResponse choosePreset(UUID accountId, AvatarPreset preset) {
+        UserAccount account = account(accountId);
+        account.choosePreset(preset);
         return UserResponse.from(account);
     }
 
