@@ -1,6 +1,6 @@
 # Member API
 
-Endpoints for a signed-in member: saved events, followed organizers and comments.
+Endpoints for a signed-in member: profile, saved events, followed organizers and comments.
 Every route needs `Authorization: Bearer <accessToken>` (see
 [Authentication](../../docs/architecture/authentication.md)); without a valid token
 the answer is `401`. The member is always the one of the token, never an id in the URL.
@@ -9,6 +9,10 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 
 | Endpoint | Purpose |
 | --- | --- |
+| `PATCH /api/me/profile` | Change the display name. Returns the account. |
+| `PUT /api/me/avatar/preset` | Pick a preset avatar. Returns the account. |
+| `POST /api/me/avatar` | Upload a profile picture (`multipart/form-data`, part `file`). Returns the account. |
+| `DELETE /api/me/avatar` | Remove the profile picture. Returns the account. |
 | `GET /api/me/saved-events` | One page of saved events, most recently saved first. |
 | `GET /api/me/saved-events/{eventId}` | Event page of a saved event, also when it is withdrawn or over. |
 | `PUT /api/me/saved-events/{eventId}` | Save an event. `204`. |
@@ -25,6 +29,26 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 
 Paged routes take `page` (zero-based, default 0) and `size` (1–20, default 20), the same
 as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
+
+## Profile and avatar
+
+- The profile routes and `GET /api/auth/me` return the account with `avatarUrl` and
+  `avatarPreset`. `avatarUrl` is the uploaded picture when there is one, else the preset.
+- `PATCH /api/me/profile` takes `{ "displayName": "..." }` with the same rules as
+  registration: required, at most 100 characters, stored trimmed.
+- Presets: `SUN`, `MOON`, `LEAF`, `WAVE`, `MOUNTAIN`, `STAR`, `FLOWER`, `CLOUD`. A new
+  account gets a random one. Their images ship with the frontend, so the preset
+  `avatarUrl` is a path on the frontend origin, such as `/avatars/sun.svg`.
+- `PUT /api/me/avatar/preset` takes `{ "preset": "SUN" }`. It also removes an uploaded
+  picture, so the chosen preset shows. An unknown preset gets `400`.
+- `POST /api/me/avatar` accepts JPEG, PNG or WebP up to 5 MB, recognised by the file's
+  content, not its name or content type. The picture is cropped to the centre square,
+  turned upright (EXIF orientation), scaled to 512x512 and saved as JPEG. Re-encoding
+  drops all metadata, including location and camera data. Transparent areas become
+  white. Other files get `400`, larger files `413`.
+- Uploads are limited to 5 per hour per member (`429` with `Retry-After`).
+- `DELETE /api/me/avatar` removes the picture and shows the preset again. Without a
+  picture it changes nothing.
 
 ## Saved events
 
@@ -84,6 +108,7 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
 - Editing or deleting someone else's comment answers `404`, not `403`, so the API never
   confirms it exists.
 - `author` is `null` when the account was deleted; the comment itself stays.
+- `author.avatarUrl` is the same as `avatarUrl` on the account: the uploaded picture, or else the preset.
 - Posting comments and replies shares one rate limit per member (`comment` policy,
   5 per minute): over it, `429` with `Retry-After`. Editing is not limited.
 - Posting answers `401` when the account of the token no longer exists.
@@ -93,10 +118,10 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
   "page": 0, "size": 20, "totalElements": 1, "totalPages": 1,
   "items": [
     {
-      "id": "…", "author": { "displayName": "Anouk" }, "body": "Is there parking?",
+      "id": "…", "author": { "displayName": "Anouk", "avatarUrl": "/avatars/sun.svg" }, "body": "Is there parking?",
       "official": false, "deleted": false, "mine": false,
       "createdAt": "2030-06-01T10:00:00Z", "editedAt": null,
-      "replies": [ { "id": "…", "author": { "displayName": "Bram" }, "body": "Yes, behind the venue", "...": "…", "replies": [] } ]
+      "replies": [ { "id": "…", "author": { "displayName": "Bram", "avatarUrl": "https://images-loc.shadibuilds.dev/avatars/…/….jpg" }, "body": "Yes, behind the venue", "...": "…", "replies": [] } ]
     }
   ]
 }
@@ -106,8 +131,9 @@ as `/api/events`. Anything else returns `400` with a `ProblemDetail` body.
 
 ```text
 user/
-  controller/  SavedEventController, FollowedOrganizerController, CommentController
-  service/     SavedEventService, FollowedOrganizerService, CommentService
+  controller/  ProfileController, SavedEventController, FollowedOrganizerController, CommentController
+  service/     ProfileService, AvatarImages, AvatarStorage, SavedEventService, FollowedOrganizerService,
+               CommentService
   model/       Comment (JPA entity; guards replies, edits and deletes)
   repository/  SavedEventRepository, FollowedOrganizerRepository, CommentQueryRepository (SQL via JdbcClient),
                CommentRepository (JPA)
@@ -134,6 +160,14 @@ user/
   `body` and `author` of deleted comments.
 - Indexed on `(event_id, created_at DESC)` for top-level comments and on
   `(parent_id, created_at)` for replies.
+
+- `app.app_user.avatar_preset` holds the preset, `avatar_key` the R2 object key of the
+  uploaded picture (null without one).
+- Pictures are stored in a public Cloudflare R2 bucket and loaded by browsers from the
+  bucket's own domain (`AVATAR_PUBLIC_URL`), never through the API. Each upload gets a
+  new key, `avatars/<userId>/<random>.jpg`, served with a one-year immutable cache.
+  The replaced or removed object is deleted after the account is saved; a failed
+  delete is logged and leaves an unused object.
 
 ## Tests
 

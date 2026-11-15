@@ -13,6 +13,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import nl.loc.backend.user.dto.response.CommentAuthor;
 import nl.loc.backend.user.dto.response.CommentResponse;
+import nl.loc.backend.user.model.AvatarPreset;
+import nl.loc.backend.user.service.AvatarStorage;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -26,6 +28,7 @@ public class CommentQueryRepository {
             c.deleted_at IS NOT NULL AS deleted,
             CASE WHEN c.deleted_at IS NULL THEN c.body END AS body,
             CASE WHEN c.deleted_at IS NULL THEN u.display_name END AS display_name,
+            u.avatar_preset, u.avatar_key,
             COALESCE(c.deleted_at IS NULL AND c.user_id = :viewerId, false) AS mine""";
 
     // a deleted top-level comment stays only while it has replies, shown as "Comment deleted"
@@ -35,9 +38,11 @@ public class CommentQueryRepository {
                 SELECT 1 FROM app.comment r WHERE r.parent_id = c.id AND r.deleted_at IS NULL))""";
 
     private final JdbcClient jdbc;
+    private final AvatarStorage avatarStorage;
 
-    public CommentQueryRepository(JdbcClient jdbc) {
+    public CommentQueryRepository(JdbcClient jdbc, AvatarStorage avatarStorage) {
         this.jdbc = jdbc;
+        this.avatarStorage = avatarStorage;
     }
 
     /** The show of {@code id} (a show id or an old event id) unless it is hidden; past events stay open. */
@@ -71,7 +76,7 @@ public class CommentQueryRepository {
                 .param("viewerId", viewerId)
                 .param("limit", size)
                 .param("offset", (long) page * size)
-                .query(CommentQueryRepository::row)
+                .query(this::row)
                 .list();
         if (topLevel.isEmpty()) {
             return List.of();
@@ -85,7 +90,7 @@ public class CommentQueryRepository {
                 """.formatted(COLUMNS))
                 .param("parentIds", topLevel.stream().map(Row::id).toList())
                 .param("viewerId", viewerId)
-                .query(CommentQueryRepository::row)
+                .query(this::row)
                 .list().stream()
                 .collect(Collectors.groupingBy(Row::parentId,
                         Collectors.mapping(r -> r.toResponse(List.of()), Collectors.toList())));
@@ -96,13 +101,16 @@ public class CommentQueryRepository {
         return items;
     }
 
-    private static Row row(ResultSet rs, int rowNum) throws SQLException {
+    private Row row(ResultSet rs, int rowNum) throws SQLException {
         String displayName = rs.getString("display_name");
+        // a deleted comment has no display name, so its author is null as well
+        CommentAuthor author = displayName == null ? null : new CommentAuthor(displayName, avatarStorage.avatarUrl(
+                rs.getString("avatar_key"), AvatarPreset.valueOf(rs.getString("avatar_preset"))));
         OffsetDateTime editedAt = rs.getObject("edited_at", OffsetDateTime.class);
         return new Row(
                 rs.getObject("id", UUID.class),
                 rs.getObject("parent_id", UUID.class),
-                displayName == null ? null : new CommentAuthor(displayName),
+                author,
                 rs.getString("body"),
                 rs.getBoolean("official"),
                 rs.getBoolean("deleted"),
