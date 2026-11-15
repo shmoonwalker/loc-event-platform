@@ -68,6 +68,10 @@ public class Comment {
     }
 
     public Comment reply(UUID userId, String body, Instant now) {
+        // without an id the reply would silently be stored as a top-level comment
+        if (id == null) {
+            throw new IllegalStateException("Save the comment before replying to it");
+        }
         if (isReply()) {
             throw new IllegalStateException("A reply can't be replied to");
         }

@@ -41,6 +41,13 @@ class CommentTest {
     }
 
     @Test
+    void refusesToReplyToAnUnsavedComment() {
+        Comment unsaved = Comment.topLevel(EVENT_ID, ALICE, "Is there parking?", NOW);
+
+        assertThatThrownBy(() -> unsaved.reply(BOB, "Yes", NOW)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void editReplacesTheTextAndMarksItEdited() {
         Comment comment = Comment.topLevel(EVENT_ID, ALICE, "Is there parking?", NOW);
 
