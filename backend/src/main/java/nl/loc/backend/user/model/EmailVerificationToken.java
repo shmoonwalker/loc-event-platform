@@ -37,7 +37,15 @@ public class EmailVerificationToken {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "new_email", length = 254)
+    private String newEmail;
+
     public EmailVerificationToken(UserAccount user, byte[] tokenHash, Instant createdAt, Duration ttl) {
+        this(user, tokenHash, createdAt, ttl, null);
+    }
+
+    public EmailVerificationToken(UserAccount user, byte[] tokenHash, Instant createdAt, Duration ttl, String newEmail) {
+        this.newEmail = newEmail;
         this.user = user;
         this.tokenHash = tokenHash;
         this.createdAt = createdAt.truncatedTo(ChronoUnit.MICROS);
@@ -49,6 +57,7 @@ public class EmailVerificationToken {
     }
 
     public void markUsed(Instant now) {
+        newEmail = null;
         usedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 }

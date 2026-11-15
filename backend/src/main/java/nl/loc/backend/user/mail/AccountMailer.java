@@ -1,5 +1,6 @@
 package nl.loc.backend.user.mail;
 
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import nl.loc.backend.config.ratelimit.RateLimitExceededException;
 import nl.loc.backend.config.ratelimit.RateLimitPolicy;
@@ -28,14 +29,6 @@ public class AccountMailer {
 
     @Async
     public void sendVerificationLink(UserAccount user, String rawToken) {
-        String link = UriComponentsBuilder
-                .fromUriString(properties.frontendUrl())
-                .path("/verify-email")
-                .queryParam("token", rawToken)
-                .build()
-                .encode()
-                .toUriString();
-
         String text = """
                 Welcome to Loc!
 
@@ -45,9 +38,39 @@ public class AccountMailer {
                 This link is valid for 24 hours.
 
                 If you didn't create this account, you can ignore this email.
-                """.formatted(link);
+                """.formatted(verificationLink(rawToken));
 
-        send(user, "verification", "Verify your email address", text);
+        sendLimited(user.getId(), user.getEmail(), "verification", "Verify your email address", text);
+    }
+
+    private String verificationLink(String rawToken) {
+        return UriComponentsBuilder
+                .fromUriString(properties.frontendUrl())
+                .path("/verify-email")
+                .queryParam("token", rawToken)
+                .build()
+                .encode()
+                .toUriString();
+    }
+
+    @Async
+    public void sendEmailChangeLink(UUID userId, String newEmail, String rawToken) {
+        String text = """
+                Confirm this address for your Loc account using the link below.
+                The link expires in 24 hours.
+
+                %s
+
+                If you didn't request this change, you can ignore this email.
+                """.formatted(verificationLink(rawToken));
+        sendLimited(userId, newEmail, "email change", "Confirm your new email address", text);
+    }
+
+    @Async
+    public void sendEmailChanged(UUID userId, String oldEmail) {
+        // This security notice must still go out when the account has exhausted its link quota.
+        send(userId, oldEmail, "email changed", "Your Loc email address has changed",
+                "The email address for your Loc account has changed. You can now sign in with your new address.");
     }
 
     @Async
@@ -70,29 +93,33 @@ public class AccountMailer {
                 Your account hasn't been changed.
                 """.formatted(link);
 
-        send(user, "sign-up attempt", "Someone tried to sign up with your email", text);
+        sendLimited(user.getId(), user.getEmail(), "sign-up attempt", "Someone tried to sign up with your email", text);
     }
 
     // logs the user id only: the address is personal data and the text holds the token
-    private void send(UserAccount user, String type, String subject, String text) {
+    private void sendLimited(UUID userId, String address, String type, String subject, String text) {
         try {
-            rateLimiter.consume(RateLimitPolicy.ACCOUNT_MAIL, user.getId().toString());
+            rateLimiter.consume(RateLimitPolicy.ACCOUNT_MAIL, userId.toString());
         } catch (RateLimitExceededException ex) {
-            log.warn("Skipped {} mail to user {}: hourly mail limit reached", type, user.getId());
+            log.warn("Skipped {} mail to user {}: hourly mail limit reached", type, userId);
             return;
         }
 
+        send(userId, address, type, subject, text);
+    }
+
+    private void send(UUID userId, String address, String type, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(properties.from());
-        message.setTo(user.getEmail());
+        message.setTo(address);
         message.setSubject(subject);
         message.setText(text);
 
         try {
             mailSender.send(message);
-            log.info("Sent {} mail to user {}", type, user.getId());
+            log.info("Sent {} mail to user {}", type, userId);
         } catch (MailException ex) {
-            log.warn("Failed to send {} mail to user {}: {}", type, user.getId(), ex.toString());
+            log.warn("Failed to send {} mail to user {}: {}", type, userId, ex.toString());
         }
     }
 }
