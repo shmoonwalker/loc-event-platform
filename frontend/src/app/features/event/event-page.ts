@@ -15,13 +15,14 @@ import { amsterdamDate, formatWhen } from '../../core/time';
 import { ErrorState } from '../../shared/error-state/error-state';
 import { IconComponent } from '../../shared/icon/icon';
 import { NotFoundState } from '../../shared/not-found-state/not-found-state';
+import { EventComments } from './event-comments';
 import { weatherMessage, weatherView } from './weather';
 import { SaveButton } from '../../shared/save-button/save-button';
 
 /** One event: everything the API knows about it. 404 (unknown or already over) gets a calm not-found state. */
 @Component({
   selector: 'app-event-page',
-  imports: [RouterLink, IconComponent, ErrorState, NotFoundState, SaveButton],
+  imports: [RouterLink, IconComponent, ErrorState, NotFoundState, SaveButton, EventComments],
   templateUrl: './event-page.html',
 })
 export class EventPage {
