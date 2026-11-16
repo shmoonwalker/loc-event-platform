@@ -3,16 +3,22 @@ import { rxResource, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { EventsApi } from '../../../core/events-api';
-import { DATE_PRESETS, FILTER_RESET, Filters, TIME_PRESETS } from '../../../core/filters';
-import { FilterOption } from '../../../core/models';
+import {
+  DATE_PRESETS,
+  DatePreset,
+  FILTER_RESET,
+  Filters,
+  TIME_PRESETS,
+  TimePreset,
+} from '../../../core/filters';
 import { valueOf } from '../../../core/resource';
 import { IconComponent } from '../../../shared/icon/icon';
 import { ListFilters } from '../list-filters';
 
-type Panel = 'date' | 'time' | 'city' | 'category' | 'tags';
+type Menu = 'city' | 'category' | 'tags';
 
 interface Trigger {
-  key: Panel;
+  key: Menu;
   label: string;
   value: string;
   active: boolean;
@@ -25,34 +31,13 @@ interface Token {
   remove: Partial<Filters>;
 }
 
-const POPULAR_TAGS = [
-  'free',
-  'live-music',
-  'outdoor',
-  'family-friendly',
-  'workshop',
-  'meetup',
-  'comedy',
-  'festival',
-  'exhibition',
-  'food-and-drink',
-  'techno',
-  'jazz',
-  'beginners',
-  'students',
-  'networking',
-  'theatre',
-  'kids',
-  'wellness',
-];
-
 const toggled = (list: string[], value: string) =>
   list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-const summary = (values: string[], label: (v: string) => string, many: string, none: string) =>
-  values.length === 0 ? none : values.length === 1 ? label(values[0]) : `${values.length} ${many}`;
+const summary = (values: string[], label: (v: string) => string, none: string) =>
+  values.length === 0 ? none : values.map(label).join(', ');
 
 /**
- * Search box, filter triggers with drawers (date, time, city, category, tags), the online switch and the
+ * Search box, date and time lists, menus for city, category and tags, the online switch and the
  * applied-filter chips. It holds NO filter state of its own: every click calls store.patch(), which writes
  * the URL; the new filters flow back in through store.filters(). Only drafts (typed-but-not-applied text) live here.
  */
@@ -60,6 +45,11 @@ const summary = (values: string[], label: (v: string) => string, many: string, n
   selector: 'app-search-console',
   imports: [RouterLink, IconComponent],
   templateUrl: './search-console.html',
+  host: {
+    '(document:click)': 'closeOutside($event)',
+    '(document:focusin)': 'closeOutside($event)',
+    '(keydown.escape)': 'closeMenu($event)',
+  },
 })
 export class SearchConsole {
   protected readonly store = inject(ListFilters);
@@ -68,7 +58,7 @@ export class SearchConsole {
 
   protected readonly datePresets = DATE_PRESETS;
   protected readonly timePresets = TIME_PRESETS;
-  protected readonly open = signal<Panel | null>('date');
+  protected readonly open = signal<Menu | null>(null);
 
   /** Categories and tags (value + label) from the backend; loaded once. */
   private readonly optionsResource = rxResource({ stream: () => this.api.filterOptions() });
@@ -83,6 +73,10 @@ export class SearchConsole {
     from: this.f().dateFrom,
     to: this.f().dateTo,
   }));
+  private readonly customDate = computed(() => this.f().date === 'custom');
+  /** "Choose dates" shows the range inputs before both dates are set; it follows the URL to and from a range. */
+  protected readonly choosingDates = linkedSignal(() => this.customDate());
+  protected readonly dateChoice = computed(() => (this.choosingDates() ? 'custom' : this.f().date));
   protected readonly dateError = computed(
     () =>
       !!this.dateDraft().from &&
@@ -90,7 +84,7 @@ export class SearchConsole {
       this.dateDraft().from > this.dateDraft().to,
   );
 
-  // ----- cities: server-side search, debounced, only while the City drawer is open -----
+  // ----- cities: server-side search, debounced, only while the City menu is open -----
   protected readonly cityText = signal('');
   private readonly cityQuery = toSignal(
     toObservable(this.cityText).pipe(debounceTime(250), distinctUntilChanged()),
@@ -102,16 +96,6 @@ export class SearchConsole {
   });
   protected readonly cityList = computed(() => valueOf(this.citiesResource) ?? []);
   protected readonly citiesLoading = this.citiesResource.isLoading;
-
-  // ----- tags -----
-  protected readonly showAllTags = signal(false);
-  protected readonly tagsShown = computed<FilterOption[]>(() => {
-    const all = this.options()?.tags ?? [];
-    if (this.showAllTags()) return all;
-    return POPULAR_TAGS.map((v) => all.find((t) => t.value === v)).filter(
-      (t): t is FilterOption => !!t,
-    );
-  });
 
   // ----- derived text for the triggers and tokens -----
   private categoryLabel = (v: string) =>
@@ -134,8 +118,6 @@ export class SearchConsole {
   protected readonly triggers = computed<Trigger[]>(() => {
     const f = this.f();
     return [
-      { key: 'date', label: 'Date', value: this.dateText(), active: f.date !== 'any' },
-      { key: 'time', label: 'Time', value: this.timeText(), active: f.time !== 'any' },
       {
         key: 'city',
         label: 'City',
@@ -145,13 +127,13 @@ export class SearchConsole {
       {
         key: 'category',
         label: 'Category',
-        value: summary(f.categories, this.categoryLabel, 'categories', 'All'),
+        value: summary(f.categories, this.categoryLabel, 'All'),
         active: f.categories.length > 0,
       },
       {
         key: 'tags',
         label: 'Tags',
-        value: summary(f.tags, this.tagLabel, 'tags', 'Any'),
+        value: summary(f.tags, (v) => '#' + this.tagLabel(v).toLowerCase(), 'Any'),
         active: f.tags.length > 0,
       },
     ];
@@ -196,8 +178,22 @@ export class SearchConsole {
   });
 
   // ----- actions -----
-  protected togglePanel(panel: Panel): void {
-    this.open.update((current) => (current === panel ? null : panel));
+  protected toggleMenu(menu: Menu): void {
+    this.open.update((current) => (current === menu ? null : menu));
+  }
+
+  /** Escape inside a menu closes it and puts focus back on its button. */
+  protected closeMenu(event: Event): void {
+    const menu = (event.target as Element).closest('[data-menu]');
+    if (!menu) return;
+    this.open.set(null);
+    menu.querySelector('button')?.focus();
+  }
+
+  /** A click or focus outside the open menu closes it, like a native list. */
+  protected closeOutside(event: Event): void {
+    const menu = (event.target as Element).closest?.('[data-menu]')?.getAttribute('data-menu');
+    if (menu !== this.open()) this.open.set(null);
   }
 
   protected search(event: Event): void {
@@ -205,6 +201,17 @@ export class SearchConsole {
     const q = this.query().trim();
     // Without search text "best match" means nothing, so fall back to the default order.
     this.store.patch(q ? { q } : { q, sort: null }, { push: true, fragment: 'all' });
+  }
+
+  protected pickDate(value: string): void {
+    const choosing = value === 'custom';
+    this.choosingDates.set(choosing);
+    // A range applies once both dates are set (setDate); until then there is no date filter.
+    this.store.patch({ date: choosing ? 'any' : (value as DatePreset), dateFrom: '', dateTo: '' });
+  }
+
+  protected pickTime(value: string): void {
+    this.store.patch({ time: value as TimePreset });
   }
 
   protected setDate(which: 'from' | 'to', value: string): void {
@@ -217,8 +224,8 @@ export class SearchConsole {
     this.store.patch(on ? { place: 'online', city: null } : { place: null }); // the backend rejects online + city
   }
 
-  protected pickCity(slug: string): void {
-    this.store.patch({ city: this.f().city === slug ? null : slug });
+  protected pickCity(slug: string | null): void {
+    this.store.patch({ city: slug });
   }
 
   protected toggleCategory(value: string): void {
@@ -231,6 +238,7 @@ export class SearchConsole {
 
   protected clearAll(): void {
     this.query.set('');
+    this.choosingDates.set(false);
     this.store.patch(FILTER_RESET);
   }
 }

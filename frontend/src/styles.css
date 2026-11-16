@@ -159,6 +159,10 @@
   .drawer {
     @apply mx-3 mb-3 flex animate-drawer flex-col gap-4.5 rounded-2xl bg-bg p-5 motion-reduce:animate-none;
   }
+  .option {
+    @apply flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 hover:bg-bg has-checked:bg-blush-soft
+      has-disabled:cursor-not-allowed has-disabled:opacity-45;
+  }
   .field-input {
     @apply min-h-11 rounded-xl border border-line bg-panel px-3 text-ink;
   }

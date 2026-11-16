@@ -41,7 +41,7 @@ export const TIME_PRESETS: {
   from: string | null;
   to: string | null;
 }[] = [
-  { value: 'any', label: 'Any time', hours: 'All day', from: null, to: null },
+  { value: 'any', label: 'Any time', hours: '', from: null, to: null },
   { value: 'morning', label: 'Morning', hours: '06:00 – 12:00', from: '06:00', to: '12:00' },
   { value: 'afternoon', label: 'Afternoon', hours: '12:00 – 18:00', from: '12:00', to: '18:00' },
   { value: 'evening', label: 'Evening', hours: '18:00 – 22:00', from: '18:00', to: '22:00' },
