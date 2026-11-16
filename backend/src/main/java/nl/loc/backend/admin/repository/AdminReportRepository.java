@@ -22,25 +22,49 @@ public class AdminReportRepository {
         this.json = json;
     }
 
-    /** One group per reported item. Resolved reports are left out. Newest activity first. */
+    /**
+     * One group per reported item. Resolved reports are left out. Newest activity first. Each group carries
+     * what an admin needs to judge it: the event title (read from the catalog, so also for hidden events),
+     * and for a comment its text, author and event.
+     */
     public List<ReportGroupResponse> listOpen() {
         return jdbc.sql("""
-                SELECT target_type,
-                       target_id,
-                       count(*) AS open_count,
-                       to_json(array_agg(DISTINCT reason ORDER BY reason))::text AS reasons,
-                       to_json(array_agg(id ORDER BY created_at, id))::text AS report_ids
-                FROM app.report
-                WHERE resolved_at IS NULL
-                GROUP BY target_type, target_id
-                ORDER BY max(created_at) DESC, target_type, target_id
-                """)
+                WITH grouped AS (
+                    SELECT target_type,
+                           target_id,
+                           count(*) AS open_count,
+                           to_json(array_agg(DISTINCT reason ORDER BY reason))::text AS reasons,
+                           to_json(array_agg(id ORDER BY created_at, id))::text AS report_ids,
+                           max(created_at) AS last_reported_at
+                    FROM app.report
+                    WHERE resolved_at IS NULL
+                    GROUP BY target_type, target_id
+                ), items AS (
+                    SELECT g.*,
+                           CASE WHEN g.target_type = 'EVENT' THEN g.target_id ELSE c.event_id END AS event_id,
+                           CASE WHEN c.deleted_at IS NULL THEN c.body END AS comment_body,
+                           u.display_name AS comment_author_name
+                    FROM grouped g
+                    LEFT JOIN app.comment c ON g.target_type = 'COMMENT' AND c.id = g.target_id
+                    LEFT JOIN app.app_user u ON u.id = c.user_id
+                )
+                SELECT i.*,
+                       %s AS event_title,
+                       EXISTS (SELECT 1 FROM app.hidden_event h WHERE h.event_id = i.event_id) AS event_hidden
+                FROM items i
+                ORDER BY i.last_reported_at DESC, i.target_type, i.target_id
+                """.formatted(HiddenEventRepository.titleOf("i.event_id")))
                 .query((rs, row) -> new ReportGroupResponse(
                         rs.getString("target_type"),
                         rs.getObject("target_id", UUID.class),
                         rs.getLong("open_count"),
                         strings(rs.getString("reasons")),
-                        uuids(rs.getString("report_ids"))))
+                        uuids(rs.getString("report_ids")),
+                        rs.getObject("event_id", UUID.class),
+                        rs.getString("event_title"),
+                        rs.getBoolean("event_hidden"),
+                        rs.getString("comment_body"),
+                        rs.getString("comment_author_name")))
                 .list();
     }
 

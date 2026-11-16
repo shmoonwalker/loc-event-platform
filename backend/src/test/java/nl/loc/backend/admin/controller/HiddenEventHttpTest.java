@@ -97,6 +97,7 @@ class HiddenEventHttpTest {
         perform(get("/api/admin/hidden-events"), adminToken())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].eventId").value(showId.toString()))
+                .andExpect(jsonPath("$[0].title").value("Secret concert"))
                 .andExpect(jsonPath("$[0].hiddenBy").value(admin.getId().toString()))
                 .andExpect(jsonPath("$[0].hiddenByName").value("Ada"))
                 .andExpect(jsonPath("$[0].reason").value("Duplicate listing"))
