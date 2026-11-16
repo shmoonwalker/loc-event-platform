@@ -57,9 +57,21 @@ the Admin link in the avatar menu, which members do not see. It has its own layo
 instead of the member header and footer: a plum sidebar with an Admin badge, the
 section links and Back to site, and a top bar with the theme switch. On small screens
 the sidebar becomes a top bar whose Sections button opens the links. Its colours are
-the `--admin-*` tokens in `src/styles.css`. The start page is an overview with a card
-per section; sections are listed in `features/admin/admin-sections.ts`. An unknown
-page under `/admin` opens the overview.
+the `--admin-*` tokens in `src/styles.css`, and its buttons and fields use the
+`admin-*` classes there. The start page is an overview with a card per section and the
+number of items waiting there; sections are listed in `features/admin/admin-sections.ts`.
+An unknown page under `/admin` opens the overview.
+
+- **Reports** (`/admin/reports`) lists open reports, one row per event or comment,
+  newest activity first, with the number of reports and their reasons. Event rows link
+  to the event by title; comment rows show the comment, its author and the event it is
+  on. Dismiss closes all of an item's open reports without changing
+  it. Hide event asks for a reason, takes the event out of every public list and page,
+  and closes its reports.
+- **Hidden events** (`/admin/hidden-events`) lists hidden events, most recent first, with
+  its title, who hid it, when and why, and Unhide.
+
+The endpoints are in the [admin moderation API](../backend/docs/admin-moderation.md).
 
 ### Comments
 

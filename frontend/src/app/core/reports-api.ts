@@ -5,6 +5,13 @@ import { Observable } from 'rxjs';
 export type ReportReason = 'WRONG_INFORMATION' | 'SPAM' | 'INAPPROPRIATE' | 'OTHER';
 export type ReportTarget = 'event' | 'comment';
 
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  WRONG_INFORMATION: 'Wrong information',
+  SPAM: 'Spam',
+  INAPPROPRIATE: 'Inappropriate',
+  OTHER: 'Something else',
+};
+
 export interface ReportRequest {
   reason: ReportReason;
   /** Optional, at most 1000 characters. */
