@@ -38,7 +38,7 @@ public class SecurityConfig {
                         // auth routes are opened one by one; never /api/auth/**
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/verify-email",
                                 "/api/auth/resend-verification", "/api/auth/login", "/api/auth/refresh",
-                                "/api/auth/logout").permitAll()
+                                "/api/auth/logout", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers("/api/me/**").authenticated()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

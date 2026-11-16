@@ -14,9 +14,11 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import nl.loc.backend.config.ratelimit.RateLimitPolicy;
 import nl.loc.backend.config.ratelimit.RateLimiter;
+import nl.loc.backend.user.dto.request.ForgotPasswordRequest;
 import nl.loc.backend.user.dto.request.LoginRequest;
 import nl.loc.backend.user.dto.request.RegisterRequest;
 import nl.loc.backend.user.dto.request.ResendVerificationRequest;
+import nl.loc.backend.user.dto.request.ResetPasswordRequest;
 import nl.loc.backend.user.dto.request.VerifyEmailRequest;
 import nl.loc.backend.user.dto.response.LoginResponse;
 import nl.loc.backend.user.dto.response.UserResponse;
@@ -25,6 +27,7 @@ import nl.loc.backend.user.service.CurrentUserService;
 import nl.loc.backend.user.service.EmailVerificationService;
 import nl.loc.backend.user.service.LoginResult;
 import nl.loc.backend.user.service.LoginService;
+import nl.loc.backend.user.service.PasswordResetService;
 import nl.loc.backend.user.service.RegistrationService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -50,16 +53,19 @@ public class AuthController {
     private final RateLimiter rateLimiter;
     private final LoginService loginService;
     private final CurrentUserService currentUserService;
+    private final PasswordResetService passwordResetService;
 
     public AuthController(RegistrationService registrationService,
                           EmailVerificationService emailVerificationService,
                           RateLimiter rateLimiter, LoginService loginService,
-                          CurrentUserService currentUserService) {
+                          CurrentUserService currentUserService,
+                          PasswordResetService passwordResetService) {
         this.registrationService = registrationService;
         this.emailVerificationService = emailVerificationService;
         this.rateLimiter = rateLimiter;
         this.loginService = loginService;
         this.currentUserService = currentUserService;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/register")
@@ -124,6 +130,48 @@ public class AuthController {
     })
     public void verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
         emailVerificationService.verify(request.token());
+    }
+
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(
+            summary = "Request a password reset",
+            description = "Emails a password reset link, valid for 30 minutes, when the email belongs to an account. "
+                    + "Always returns 202 with no body, so the response never reveals which emails have an account.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "202", description = "Request accepted."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid input or malformed JSON.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many requests for this email from this IP. "
+                            + "Retry-After says how many seconds to wait.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest httpRequest) {
+        String email = UserAccount.normalizeEmail(request.email());
+        rateLimiter.consume(RateLimitPolicy.FORGOT_PASSWORD, httpRequest.getRemoteAddr() + ":" + email);
+        passwordResetService.requestReset(email);
+    }
+
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+            summary = "Reset password",
+            description = "Sets a new password using the token from the reset link, with the same rules as registration. "
+                    + "Signs out every session of the account and marks its email as verified. "
+                    + "Unknown, expired and already used tokens all get the same 400.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Password changed."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid, expired or used token, invalid input or malformed JSON.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.reset(request.token(), request.newPassword());
     }
 
     @PostMapping("/login")

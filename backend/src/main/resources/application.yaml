@@ -55,6 +55,10 @@ app:
         capacity: 3
         period: 1m
       # per IP + email
+      forgot-password:
+        capacity: 5
+        period: 1m
+      # per IP + email
       login:
         capacity: 5
         period: 1m
