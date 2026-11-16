@@ -5,7 +5,7 @@ This Angular application is Loc's user interface. It has these pages:
 | Route | Page |
 |---|---|
 | `/` | Home: highlight rails (tonight, this weekend, near you, online) and a searchable, filterable event list |
-| `/events/:id` | Event detail: description, location, organizers, every upcoming date and per-date weather |
+| `/events/:id` | Event detail: description, location, organizers, every upcoming date, per-date weather and comments |
 | `/organizers/:id` | Organizer profile and their upcoming events |
 | `/register` | Create an account with name, email and password, then "check your email" |
 | `/verify-email` | Opened from the verification email; verifies the account or offers a new link |
@@ -40,6 +40,16 @@ still authorizes every request. The header links a member's avatar and name to t
 profile page and offers logout to members and admins, and login/registration to
 visitors. Google sign-in (#74) is separate work and must use
 this same session path on return.
+
+### Comments
+
+The event page lists comments newest first, each with its replies, one page at a time.
+Anyone can read them. Signed-in members write comments, reply to top-level comments,
+and edit or delete their own; deleting asks to confirm first. Visitors get a link to log
+in instead of the form. A deleted comment that still has replies shows as "Comment
+deleted", authors of deleted accounts show as the API names them, and official replies
+carry an "Official" badge. API errors, such as text that is too long or posting too
+often, show under the form. The endpoints are in the [Member API](../backend/docs/member.md).
 
 ### Deployment
 
