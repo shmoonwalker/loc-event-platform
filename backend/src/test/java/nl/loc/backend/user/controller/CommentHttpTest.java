@@ -225,7 +225,9 @@ class CommentHttpTest {
         UUID comment = comment(alice, SHOW_ID, "Is there parking?");
         UUID reply = reply(bob, comment, "Yes");
 
-        perform(post("/api/comments/{id}/replies", reply), token(alice), "Thanks").andExpect(status().isBadRequest());
+        perform(post("/api/comments/{id}/replies", reply), token(alice), "Thanks")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("A reply can't be replied to."));
 
         assertThat(commentCount()).isEqualTo(2);
     }
