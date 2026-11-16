@@ -1,6 +1,7 @@
 package nl.loc.backend.user.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
@@ -24,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -256,6 +258,39 @@ class ReportHttpTest {
                 .andExpect(jsonPath("$.reason").value("OTHER"));
 
         assertThat(reportCount()).isEqualTo(2);
+    }
+
+    @Test
+    void partialUniqueIndexRejectsASecondOpenReport() throws Exception {
+        reportEvent(token(alice), SHOW_ID, "SPAM", "Once").andExpect(status().isCreated());
+
+        String predicate = jdbc.sql("""
+                SELECT pg_get_expr(i.indpred, i.indrelid)
+                FROM pg_index i
+                JOIN pg_class c ON c.oid = i.indexrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'app'
+                  AND c.relname = 'report_open_per_member_idx'
+                  AND i.indisunique
+                """).query(String.class).single();
+        assertThat(predicate.replace("(", "").replace(")", "")).isEqualToIgnoringCase("resolved_at IS NULL");
+
+        String definition = jdbc.sql("""
+                SELECT pg_get_indexdef(c.oid)
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'app' AND c.relname = 'report_open_per_member_idx'
+                """).query(String.class).single();
+        assertThat(definition).contains("(target_type, target_id, reporter_id)");
+
+        assertThatThrownBy(() -> jdbc.sql("""
+                INSERT INTO app.report (target_type, target_id, reporter_id, reason)
+                SELECT target_type, target_id, reporter_id, reason FROM app.report
+                """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("report_open_per_member_idx");
+
+        assertThat(reportCount()).isEqualTo(1);
     }
 
     private UUID comment(UserAccount user, String body) throws Exception {
