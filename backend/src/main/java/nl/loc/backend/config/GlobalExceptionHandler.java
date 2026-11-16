@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -136,6 +137,12 @@ public class GlobalExceptionHandler {
         problem.setTitle("Invalid image");
         problem.setDetail(ex.getMessage());
         return problem;
+    }
+
+    // keeps the reason ("Comment not found.") in the body; Spring's default error page drops it
+    @ExceptionHandler(ResponseStatusException.class)
+    public ProblemDetail handleResponseStatus(ResponseStatusException ex) {
+        return ex.getBody();
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
