@@ -12,6 +12,7 @@ import {
   TimePreset,
 } from '../../../core/filters';
 import { valueOf } from '../../../core/resource';
+import { amsterdamDate, formatDay } from '../../../core/time';
 import { IconComponent } from '../../../shared/icon/icon';
 import { ListFilters } from '../list-filters';
 
@@ -77,12 +78,15 @@ export class SearchConsole {
   /** "Choose dates" shows the range inputs before both dates are set; it follows the URL to and from a range. */
   protected readonly choosingDates = linkedSignal(() => this.customDate());
   protected readonly dateChoice = computed(() => (this.choosingDates() ? 'custom' : this.f().date));
-  protected readonly dateError = computed(
-    () =>
-      !!this.dateDraft().from &&
-      !!this.dateDraft().to &&
-      this.dateDraft().from > this.dateDraft().to,
-  );
+  /** The earliest day the range can start: past days never match an upcoming event. */
+  protected readonly today = amsterdamDate();
+  /** Why the draft range cannot apply ('' when it can); the calendars block this, typing can still get here. */
+  protected readonly dateError = computed(() => {
+    const { from, to } = this.dateDraft();
+    if ((from && from < this.today) || (to && to < this.today)) return 'Pick today or a later day.';
+    if (from && to && from > to) return '“From” must not be after “To”.';
+    return '';
+  });
 
   // ----- cities: server-side search, debounced, only while the City menu is open -----
   protected readonly cityText = signal('');
@@ -107,9 +111,9 @@ export class SearchConsole {
 
   protected readonly dateText = computed(() => {
     const f = this.f();
-    return f.date === 'custom'
-      ? `${f.dateFrom} to ${f.dateTo}`
-      : (DATE_PRESETS.find((p) => p.value === f.date)?.label ?? '');
+    if (f.date !== 'custom') return DATE_PRESETS.find((p) => p.value === f.date)?.label ?? '';
+    const [from, to] = [formatDay(f.dateFrom, this.today), formatDay(f.dateTo, this.today)];
+    return from === to ? from : `${from} – ${to}`;
   });
   protected readonly timeText = computed(
     () => TIME_PRESETS.find((p) => p.value === this.f().time)?.label ?? '',
@@ -190,10 +194,18 @@ export class SearchConsole {
     menu.querySelector('button')?.focus();
   }
 
-  /** A click or focus outside the open menu closes it, like a native list. */
+  /**
+   * A click or focus outside the open menu closes it, like a native list. Leaving the Date box and
+   * range drawer drops an unfinished range: back to the applied filter ("Any date" when there is none).
+   */
   protected closeOutside(event: Event): void {
-    const menu = (event.target as Element).closest?.('[data-menu]')?.getAttribute('data-menu');
+    const target = event.target as Element;
+    const menu = target.closest?.('[data-menu]')?.getAttribute('data-menu');
     if (menu !== this.open()) this.open.set(null);
+    if (this.choosingDates() && !target.closest?.('[data-date-area]')) {
+      this.choosingDates.set(this.customDate());
+      this.dateDraft.set({ from: this.f().dateFrom, to: this.f().dateTo });
+    }
   }
 
   protected search(event: Event): void {
@@ -217,7 +229,8 @@ export class SearchConsole {
   protected setDate(which: 'from' | 'to', value: string): void {
     this.dateDraft.update((d) => ({ ...d, [which]: value }));
     const { from, to } = this.dateDraft();
-    if (from && to && from <= to) this.store.patch({ date: 'custom', dateFrom: from, dateTo: to });
+    if (from && to && !this.dateError())
+      this.store.patch({ date: 'custom', dateFrom: from, dateTo: to });
   }
 
   protected setOnline(on: boolean): void {
