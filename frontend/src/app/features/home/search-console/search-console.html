@@ -24,6 +24,7 @@
     <label
       class="flex min-h-14 min-w-0 flex-col justify-center rounded-[14px] border border-line bg-panel py-1.5 pr-3 pl-4 focus-within:shadow-[0_0_0_4px_var(--glow)] hover:bg-bg data-[active=true]:border-blush data-[active=true]:bg-blush-soft max-sm:flex-[1_1_calc(50%-8px)]"
       [attr.data-active]="f().date !== 'any'"
+      data-date-area
     >
       <small class="text-[13px] leading-tight text-muted">Date</small>
       <select
@@ -209,7 +210,7 @@
   </div>
 
   @if (choosingDates()) {
-    <div class="drawer">
+    <div class="drawer" data-date-area>
       <div class="flex flex-wrap items-end gap-3">
         <label class="flex flex-col gap-1.5 text-sm text-muted">
           From

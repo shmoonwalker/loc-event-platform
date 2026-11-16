@@ -190,10 +190,18 @@ export class SearchConsole {
     menu.querySelector('button')?.focus();
   }
 
-  /** A click or focus outside the open menu closes it, like a native list. */
+  /**
+   * A click or focus outside the open menu closes it, like a native list. Leaving the Date box and
+   * range drawer drops an unfinished range: back to the applied filter ("Any date" when there is none).
+   */
   protected closeOutside(event: Event): void {
-    const menu = (event.target as Element).closest?.('[data-menu]')?.getAttribute('data-menu');
+    const target = event.target as Element;
+    const menu = target.closest?.('[data-menu]')?.getAttribute('data-menu');
     if (menu !== this.open()) this.open.set(null);
+    if (this.choosingDates() && !target.closest?.('[data-date-area]')) {
+      this.choosingDates.set(this.customDate());
+      this.dateDraft.set({ from: this.f().dateFrom, to: this.f().dateTo });
+    }
   }
 
   protected search(event: Event): void {
