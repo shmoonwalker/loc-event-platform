@@ -70,15 +70,43 @@ async function open(user: CurrentUser = USER) {
   };
 }
 
+/** A decoded 800×600 picture. */
+const bitmap = { width: 800, height: 600, close: vi.fn<() => void>() };
+let drawImage: ReturnType<typeof vi.fn>;
+const lastDraw = () => drawImage.mock.lastCall;
+
 const image = (type = 'image/png', size = 1000) =>
   new File([new Uint8Array(size)], 'me.png', { type });
 
 describe('ProfileSettings', () => {
   beforeEach(() => {
-    URL.createObjectURL = vi.fn(() => 'blob:preview');
-    URL.revokeObjectURL = vi.fn();
+    bitmap.close = vi.fn<() => void>();
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => bitmap),
+    );
+    drawImage = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      clearRect: vi.fn(),
+      drawImage,
+    } as never);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (callback, type) {
+      callback(new Blob(['cropped'], { type }));
+    });
+    // jsdom has no layout, pointer capture or modal dialogs.
+    HTMLElement.prototype.setPointerCapture = vi.fn();
+    HTMLDialogElement.prototype.showModal = function () {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close = function () {
+      this.open = false;
+    };
   });
-  afterEach(() => TestBed.inject(HttpTestingController).verify());
+  afterEach(() => {
+    TestBed.inject(HttpTestingController).verify();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   it('starts with the current name and avatar, with the preset marked', async () => {
     const { nameInput, avatar, preset } = await open();
@@ -153,23 +181,94 @@ describe('ProfileSettings', () => {
     expect(el.textContent).toContain('The picture must be 5 MB or smaller.');
   });
 
-  it('previews a picked picture and uploads it on confirm', async () => {
-    const { http, harness, session, pickFile, button, avatar } = await open();
-    const file = image();
-    await pickFile(file);
+  it('shows the centre of a picked picture in the circle', async () => {
+    const { el, pickFile, avatar } = await open();
+    await pickFile(image());
 
-    expect(avatar().getAttribute('src')).toBe('blob:preview');
+    expect(avatar()).toBeNull();
+    expect(el.querySelector('canvas')?.getAttribute('aria-label')).toBe(
+      'Preview of your new picture',
+    );
+    // 800×600: the largest centred square is 600 wide, starting 100 from the left.
+    expect(lastDraw()).toEqual([bitmap, 100, 0, 600, 600, 0, 0, 512, 512]);
+  });
+
+  it('zooms in around the centre of the circle', async () => {
+    const { harness, el, pickFile } = await open();
+    await pickFile(image());
+    const zoom = el.querySelector<HTMLInputElement>('input[type="range"]')!;
+    zoom.value = '2';
+    zoom.dispatchEvent(new Event('input'));
+    await harness.fixture.whenStable();
+
+    expect(lastDraw()).toEqual([bitmap, 250, 150, 300, 300, 0, 0, 512, 512]);
+  });
+
+  it('moves the picture by dragging, never past its edges', async () => {
+    const { harness, el, pickFile } = await open();
+    await pickFile(image());
+    const canvas = el.querySelector('canvas')!;
+    const pointer = (type: string, clientX: number) =>
+      canvas.dispatchEvent(new MouseEvent(type, { clientX, clientY: 0, bubbles: true }));
+
+    pointer('pointerdown', 100);
+    pointer('pointermove', 150);
+    await harness.fixture.whenStable();
+    // jsdom has no layout, so one CSS pixel counts as 600 / 512 image pixels.
+    expect(lastDraw()![1]).toBeCloseTo(100 - (50 * 600) / 512);
+
+    pointer('pointermove', 1000);
+    await harness.fixture.whenStable();
+    expect(lastDraw()![1]).toBe(0);
+
+    pointer('pointerup', 1000);
+    pointer('pointermove', 0);
+    await harness.fixture.whenStable();
+    expect(lastDraw()![1]).toBe(0);
+  });
+
+  it('moves the picture with the arrow keys', async () => {
+    const { harness, el, pickFile } = await open();
+    await pickFile(image());
+    el.querySelector('canvas')!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+    );
+    await harness.fixture.whenStable();
+
+    expect(lastDraw()![1]).toBe(40);
+  });
+
+  it('uploads the cropped square in the format of the picked file', async () => {
+    const { http, harness, session, pickFile, button, avatar } = await open();
+    await pickFile(image());
     button('Use this picture')!.click();
 
+    expect(HTMLCanvasElement.prototype.toBlob).toHaveBeenCalledWith(
+      expect.any(Function),
+      'image/png',
+      0.92,
+    );
     const req = http.expectOne('/api/me/avatar');
     expect(req.request.method).toBe('POST');
-    expect((req.request.body as FormData).get('file')).toBe(file);
+    const sent = (req.request.body as FormData).get('file') as File;
+    expect(sent.name).toBe('me.png');
+    expect(sent.type).toBe('image/png');
+    expect(await sent.text()).toBe('cropped');
     req.flush({ ...USER, avatarUrl: UPLOADED });
     await harness.fixture.whenStable();
 
     expect(session.currentUser()?.avatarUrl).toBe(UPLOADED);
     expect(avatar().getAttribute('src')).toBe(UPLOADED);
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview');
+    expect(bitmap.close).toHaveBeenCalled();
+  });
+
+  it('says so when the picked file cannot be read as an image', async () => {
+    const { el, pickFile } = await open();
+    vi.mocked(createImageBitmap).mockRejectedValueOnce(new Error('broken'));
+    await pickFile(image());
+
+    expect(el.textContent).toContain('The file could not be read as an image.');
+    expect(el.querySelector('canvas')).toBeNull();
   });
 
   it('cancels a picked picture without sending it', async () => {
@@ -179,10 +278,11 @@ describe('ProfileSettings', () => {
     await harness.fixture.whenStable();
 
     expect(avatar().getAttribute('src')).toBe('/avatars/sun.svg');
+    expect(bitmap.close).toHaveBeenCalled();
   });
 
-  it('shows why an upload was refused and keeps the preview', async () => {
-    const { el, http, harness, pickFile, button, avatar } = await open();
+  it('shows why an upload was refused and keeps the crop', async () => {
+    const { el, http, harness, pickFile, button } = await open();
     await pickFile(image());
     button('Use this picture')!.click();
 
@@ -192,7 +292,24 @@ describe('ProfileSettings', () => {
     await harness.fixture.whenStable();
 
     expect(el.textContent).toContain('Picture uploads are not available right now.');
-    expect(avatar().getAttribute('src')).toBe('blob:preview');
+    expect(el.querySelector('canvas')).not.toBeNull();
+  });
+
+  it('opens a larger view of the avatar in a dialog', async () => {
+    const { el, harness } = await open({ ...USER, avatarUrl: UPLOADED });
+    const dialog = el.querySelector('dialog')!;
+    expect(dialog.open).toBe(false);
+
+    el.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]')!.click();
+    await harness.fixture.whenStable();
+
+    expect(dialog.open).toBe(true);
+    expect(dialog.getAttribute('aria-labelledby')).toBe('avatar-view-title');
+    expect(dialog.querySelector('img')?.getAttribute('src')).toBe(UPLOADED);
+    expect(dialog.querySelector('img')?.getAttribute('alt')).toBe('Avatar of Shadi');
+
+    [...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Close')!.click();
+    expect(dialog.open).toBe(false);
   });
 
   it('shows the backend reason for an unreadable image', async () => {
