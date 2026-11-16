@@ -8,7 +8,7 @@ import { addDays } from './time';
 // Pure functions are trivial to unit test: see filters.spec.ts.
 
 export type DatePreset = 'any' | 'today' | 'tonight' | 'tomorrow' | 'weekend' | 'custom';
-export type TimePreset = 'any' | 'morning' | 'afternoon' | 'evening' | 'late' | 'custom';
+export type TimePreset = 'any' | 'morning' | 'afternoon' | 'evening' | 'late';
 export type PlaceFilter = 'online' | 'physical';
 export type SortKey = 'start_time' | 'relevance';
 
@@ -18,8 +18,6 @@ export interface Filters {
   dateFrom: string; // only used when date === 'custom'
   dateTo: string;
   time: TimePreset;
-  timeFrom: string; // only used when time === 'custom'
-  timeTo: string;
   place: PlaceFilter | null;
   city: string | null; // the backend accepts a single city
   categories: string[]; // OR
@@ -37,7 +35,7 @@ export const DATE_PRESETS: { value: Exclude<DatePreset, 'custom'>; label: string
 ];
 
 export const TIME_PRESETS: {
-  value: Exclude<TimePreset, 'custom'>;
+  value: TimePreset;
   label: string;
   hours: string;
   from: string | null;
@@ -61,8 +59,6 @@ export const EMPTY_FILTERS: Filters = {
   dateFrom: '',
   dateTo: '',
   time: 'any',
-  timeFrom: '',
-  timeTo: '',
   place: null,
   city: null,
   categories: [],
@@ -107,9 +103,6 @@ export function filtersToParams(f: Filters, today: string): QueryParams {
   if (preset?.from && preset.to) {
     p['timeFrom'] = preset.from;
     p['timeTo'] = preset.to;
-  } else if (f.time === 'custom' && f.timeFrom && f.timeTo) {
-    p['timeFrom'] = f.timeFrom;
-    p['timeTo'] = f.timeTo;
   }
 
   if (f.place) p['place'] = f.place;
@@ -141,20 +134,10 @@ export function paramsToFilters(p: ParamMap, today: string): Filters {
     }
   }
 
-  const timeFrom = p.get('timeFrom');
-  const timeTo = p.get('timeTo');
-  let time: TimePreset = 'any';
-  let tFrom = '';
-  let tTo = '';
-  if (timeFrom && timeTo) {
-    const preset = TIME_PRESETS.find((t) => t.from === timeFrom && t.to === timeTo);
-    if (preset) time = preset.value;
-    else {
-      time = 'custom';
-      tFrom = timeFrom;
-      tTo = timeTo;
-    }
-  }
+  // Only the fixed ranges exist; any other time range (older links had typed times) means any time.
+  const time =
+    TIME_PRESETS.find((t) => t.from === p.get('timeFrom') && t.to === p.get('timeTo'))?.value ??
+    'any';
 
   const rawPlace = p.get('place')?.toLowerCase();
   const place: PlaceFilter | null =
@@ -168,8 +151,6 @@ export function paramsToFilters(p: ParamMap, today: string): Filters {
     dateFrom: from,
     dateTo: to,
     time,
-    timeFrom: tFrom,
-    timeTo: tTo,
     place,
     city: place === 'online' ? null : p.get('city'), // the backend rejects online + city
     categories: p.getAll('category'),

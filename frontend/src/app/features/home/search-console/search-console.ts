@@ -83,18 +83,11 @@ export class SearchConsole {
     from: this.f().dateFrom,
     to: this.f().dateTo,
   }));
-  protected readonly timeDraft = linkedSignal(() => ({
-    from: this.f().timeFrom,
-    to: this.f().timeTo,
-  }));
   protected readonly dateError = computed(
     () =>
       !!this.dateDraft().from &&
       !!this.dateDraft().to &&
       this.dateDraft().from > this.dateDraft().to,
-  );
-  protected readonly timeError = computed(
-    () => !!this.timeDraft().from && this.timeDraft().from === this.timeDraft().to,
   );
 
   // ----- cities: server-side search, debounced, only while the City drawer is open -----
@@ -134,12 +127,9 @@ export class SearchConsole {
       ? `${f.dateFrom} to ${f.dateTo}`
       : (DATE_PRESETS.find((p) => p.value === f.date)?.label ?? '');
   });
-  protected readonly timeText = computed(() => {
-    const f = this.f();
-    return f.time === 'custom'
-      ? `${f.timeFrom} – ${f.timeTo}`
-      : (TIME_PRESETS.find((p) => p.value === f.time)?.label ?? '');
-  });
+  protected readonly timeText = computed(
+    () => TIME_PRESETS.find((p) => p.value === this.f().time)?.label ?? '',
+  );
 
   protected readonly triggers = computed<Trigger[]>(() => {
     const f = this.f();
@@ -181,7 +171,7 @@ export class SearchConsole {
       t.push({
         key: 'time',
         label: this.timeText(),
-        remove: { time: 'any', timeFrom: '', timeTo: '' },
+        remove: { time: 'any' },
       });
     if (f.place)
       t.push({
@@ -221,12 +211,6 @@ export class SearchConsole {
     this.dateDraft.update((d) => ({ ...d, [which]: value }));
     const { from, to } = this.dateDraft();
     if (from && to && from <= to) this.store.patch({ date: 'custom', dateFrom: from, dateTo: to });
-  }
-
-  protected setTime(which: 'from' | 'to', value: string): void {
-    this.timeDraft.update((d) => ({ ...d, [which]: value }));
-    const { from, to } = this.timeDraft();
-    if (from && to && from !== to) this.store.patch({ time: 'custom', timeFrom: from, timeTo: to });
   }
 
   protected setOnline(on: boolean): void {

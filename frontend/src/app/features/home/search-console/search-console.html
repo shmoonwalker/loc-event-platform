@@ -121,46 +121,12 @@
               type="button"
               class="tile"
               [attr.aria-pressed]="f().time === p.value"
-              (click)="store.patch({ time: p.value, timeFrom: '', timeTo: '' })"
+              (click)="store.patch({ time: p.value })"
             >
               <b class="font-semibold">{{ p.label }}</b>
               <small class="text-[13px] text-muted">{{ p.hours }}</small>
             </button>
           }
-        </div>
-        <div class="flex flex-wrap items-end gap-3">
-          <label class="flex flex-col gap-1.5 text-sm text-muted">
-            Starts after
-            <input
-              type="time"
-              class="field-input"
-              [value]="timeDraft().from"
-              (change)="setTime('from', fromTime.value)"
-              #fromTime
-            />
-          </label>
-          <label class="flex flex-col gap-1.5 text-sm text-muted">
-            Starts before
-            <input
-              type="time"
-              class="field-input"
-              [value]="timeDraft().to"
-              (change)="setTime('to', toTime.value)"
-              #toTime
-            />
-          </label>
-          <p
-            class="mb-2.5 text-sm"
-            [class.text-muted]="!timeError()"
-            [class.text-blush-ink]="timeError()"
-            [attr.role]="timeError() ? 'alert' : null"
-          >
-            {{
-              timeError()
-                ? 'The two times must differ.'
-                : 'Late ranges like 22:00 to 02:00 run past midnight.'
-            }}
-          </p>
         </div>
       </div>
     }

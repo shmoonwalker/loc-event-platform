@@ -56,11 +56,13 @@ describe('filters <-> query params', () => {
       timeTo: '02:00',
     });
     expect(parse({ timeFrom: '12:00', timeTo: '18:00' }).time).toBe('afternoon');
-    expect(parse({ timeFrom: '09:30', timeTo: '11:00' })).toMatchObject({
-      time: 'custom',
-      timeFrom: '09:30',
-      timeTo: '11:00',
-    });
+  });
+
+  it('opens older links with a typed time as any time and sends no time', () => {
+    const old = parse({ timeFrom: '09:30', timeTo: '11:00', city: 'utrecht' });
+    expect(old).toMatchObject({ time: 'any', city: 'utrecht' });
+    expect(filtersToParams(old, TODAY)).toEqual({ city: 'utrecht' });
+    expect(parse({ timeFrom: '06:00' }).time).toBe('any');
   });
 
   it('repeats category and tag parameters', () => {
