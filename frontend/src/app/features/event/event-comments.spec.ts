@@ -221,6 +221,86 @@ describe('EventComments', () => {
     expect(button('Report')).toBeUndefined();
   });
 
+  it('gives members no admin actions', async () => {
+    const { button } = await render(true);
+    expect(button('Remove')).toBeUndefined();
+    expect(button('Official reply')).toBeUndefined();
+  });
+
+  it('gives an admin Official reply on top-level comments and Remove on every comment', async () => {
+    const { button, item } = await render('ADMIN');
+    expect(button('Official reply', item('Anouk'))).toBeTruthy();
+    expect(button('Official reply', item('Loc team'))).toBeUndefined();
+    expect(button('Reply')).toBeUndefined();
+    expect(button('Remove', item('Anouk'))).toBeTruthy();
+    expect(button('Remove', item('Loc team'))).toBeTruthy();
+    expect(button('Remove', item('Deleted user'))).toBeTruthy();
+    expect(button('Remove', item('Comment deleted'))).toBeUndefined();
+    expect(button('Delete')).toBeUndefined();
+    expect(button('Edit', item('Anouk'))).toBeTruthy();
+  });
+
+  it('posts an official reply through the admin API', async () => {
+    const { el, http, button, item, write, settle, tick } = await render('ADMIN');
+    button('Official reply', item('Anouk'))!.click();
+    await settle();
+    const form = [...el.querySelectorAll('form')].find((f) =>
+      f.textContent?.includes('Official reply to Anouk'),
+    )!;
+    expect(button('Post official reply', form)).toBeTruthy();
+    await write(' Yes, behind the venue. ', form);
+
+    const req = http.expectOne('/api/admin/comments/c1/official-replies');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ body: 'Yes, behind the venue.' });
+    req.flush(comment({ id: 'r3', official: true }), { status: 201, statusText: 'Created' });
+    tick();
+    http.expectOne(LIST).flush(thread);
+  });
+
+  it('removes a comment only with a reason', async () => {
+    const { el, http, button, item, settle, tick } = await render('ADMIN');
+    button('Remove', item('Loc team'))!.click();
+    await settle();
+    const form = item('Loc team').querySelector('form')!;
+    form.dispatchEvent(new Event('submit'));
+    tick();
+    expect(form.textContent).toContain('Say why the comment is removed.');
+    http.expectNone((req) => req.url.startsWith('/api/admin/comments'));
+
+    const box = el.querySelector<HTMLTextAreaElement>('#remove-reason')!;
+    box.value = '  Spam  ';
+    box.dispatchEvent(new Event('input'));
+    form.dispatchEvent(new Event('submit'));
+
+    const req = http.expectOne('/api/admin/comments/r1');
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.body).toEqual({ reason: 'Spam' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    tick();
+    http.expectOne(LIST).flush(thread);
+  });
+
+  it('shows a failed removal in the form and Cancel closes it', async () => {
+    const { el, http, button, item, settle, tick } = await render('ADMIN');
+    button('Remove', item('Anouk'))!.click();
+    await settle();
+    const box = el.querySelector<HTMLTextAreaElement>('#remove-reason')!;
+    box.value = 'Spam';
+    box.dispatchEvent(new Event('input'));
+    item('Anouk').querySelector('form')!.dispatchEvent(new Event('submit'));
+
+    http.expectOne('/api/admin/comments/c1').flush({}, { status: 404, statusText: 'Not Found' });
+    tick();
+    expect(item('Anouk').querySelector('[role="alert"]')?.textContent).toContain(
+      'This comment is no longer available.',
+    );
+
+    button('Cancel', item('Anouk'))!.click();
+    await settle();
+    expect(item('Anouk').querySelector('form')).toBeNull();
+  });
+
   it('edits your comment starting from its text', async () => {
     const { http, button, item, write, settle, tick } = await render(true);
     button('Edit', item('Anouk'))!.click();
