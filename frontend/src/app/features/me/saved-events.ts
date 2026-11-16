@@ -5,7 +5,6 @@ import {
   input,
   linkedSignal,
   output,
-  signal,
   viewChild,
 } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
@@ -36,8 +35,8 @@ export class SavedEvents {
   });
   /** The loaded page, minus the events unsaved here since; a reload starts from the server's answer again. */
   protected readonly result = linkedSignal(() => valueOf(this.saved));
-  /** Announced in the count line after an unsave. */
-  protected readonly removed = signal(false);
+  /** Announced in the count line after an unsave, until another page opens. */
+  protected readonly removed = linkedSignal({ source: this.page, computation: () => false });
   private readonly status = viewChild.required<ElementRef<HTMLElement>>('status');
   protected readonly skeletons = Array.from({ length: 8 });
 

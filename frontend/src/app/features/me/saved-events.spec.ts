@@ -210,5 +210,20 @@ describe('SavedEvents (the Saved tab of My Loc)', () => {
       await harness.fixture.whenStable();
       expect(cards()[0].textContent).toContain('Old market');
     });
+
+    it('stops saying Removed after moving to another page', async () => {
+      const { harness, http, heart, status } = await openSaved('/me?page=1', twoPages);
+      heart(0).click();
+      http
+        .expectOne('/api/me/saved-events/e1')
+        .flush(null, { status: 204, statusText: 'No Content' });
+      await harness.fixture.whenStable();
+      expect(status().textContent).toContain('Removed.');
+
+      await harness.navigateByUrl('/me?page=0');
+      http.expectOne('/api/me/saved-events?page=0').flush({ ...twoPages, page: 0 });
+      await harness.fixture.whenStable();
+      expect(status().textContent).not.toContain('Removed.');
+    });
   });
 });
