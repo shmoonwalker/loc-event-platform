@@ -19,27 +19,178 @@
     <button type="submit" class="btn-primary max-sm:w-full">Search</button>
   </form>
 
-  <!-- Filter triggers + online switch -->
-  <div class="flex flex-wrap items-stretch gap-2 px-3 pb-3">
-    @for (t of triggers(); track t.key) {
-      <button
-        type="button"
-        class="group flex min-h-14 items-center gap-3 rounded-[14px] border border-line bg-panel py-1.5 pr-3 pl-4 text-left hover:bg-bg aria-expanded:border-blush data-[active=true]:border-blush data-[active=true]:bg-blush-soft max-sm:flex-[1_1_calc(50%-8px)] max-sm:justify-between"
-        [attr.aria-expanded]="open() === t.key"
-        [attr.aria-controls]="open() === t.key ? 'panel-' + t.key : null"
-        [attr.data-active]="t.active"
-        (click)="togglePanel(t.key)"
+  <!-- Filter lists and menus + online switch. On phones a menu spans the row, so the row anchors it. -->
+  <div class="relative flex flex-wrap items-stretch gap-2 px-3 pb-3">
+    <label
+      class="flex min-h-14 min-w-0 flex-col justify-center rounded-[14px] border border-line bg-panel py-1.5 pr-3 pl-4 focus-within:shadow-[0_0_0_4px_var(--glow)] hover:bg-bg data-[active=true]:border-blush data-[active=true]:bg-blush-soft max-sm:flex-[1_1_calc(50%-8px)]"
+      [attr.data-active]="dateChoice() !== 'any'"
+    >
+      <small class="text-[13px] leading-tight text-muted">Date</small>
+      <select
+        class="min-w-0 bg-transparent text-[15px] leading-tight font-semibold outline-none"
+        (change)="pickDate(dateSelect.value)"
+        #dateSelect
       >
-        <span>
-          <small class="block text-[13px] leading-tight text-muted">{{ t.label }}</small>
-          <b class="block text-[15px] leading-tight font-semibold">{{ t.value }}</b>
-        </span>
-        <app-icon
-          name="chevron"
-          [size]="16"
-          class="text-muted transition-transform group-aria-expanded:rotate-180"
-        />
-      </button>
+        @for (p of datePresets; track p.value) {
+          <option [value]="p.value" [selected]="dateChoice() === p.value">{{ p.label }}</option>
+        }
+        <option value="custom" [selected]="dateChoice() === 'custom'">Choose dates</option>
+      </select>
+    </label>
+
+    <label
+      class="flex min-h-14 min-w-0 flex-col justify-center rounded-[14px] border border-line bg-panel py-1.5 pr-3 pl-4 focus-within:shadow-[0_0_0_4px_var(--glow)] hover:bg-bg data-[active=true]:border-blush data-[active=true]:bg-blush-soft max-sm:flex-[1_1_calc(50%-8px)]"
+      [attr.data-active]="f().time !== 'any'"
+    >
+      <small class="text-[13px] leading-tight text-muted">Time</small>
+      <select
+        class="min-w-0 bg-transparent text-[15px] leading-tight font-semibold outline-none"
+        (change)="pickTime(timeSelect.value)"
+        #timeSelect
+      >
+        @for (p of timePresets; track p.value) {
+          <option [value]="p.value" [selected]="f().time === p.value">
+            {{ p.hours ? p.label + ' (' + p.hours + ')' : p.label }}
+          </option>
+        }
+      </select>
+    </label>
+
+    @for (t of triggers(); track t.key) {
+      <div
+        class="flex min-w-0 max-sm:flex-[1_1_calc(50%-8px)] sm:relative"
+        [attr.data-menu]="t.key"
+      >
+        <button
+          type="button"
+          class="group flex min-h-14 w-full min-w-0 items-center gap-3 rounded-[14px] border border-line bg-panel py-1.5 pr-3 pl-4 text-left hover:bg-bg aria-expanded:border-blush data-[active=true]:border-blush data-[active=true]:bg-blush-soft max-sm:justify-between"
+          [attr.aria-expanded]="open() === t.key"
+          [attr.aria-controls]="open() === t.key ? 'menu-' + t.key : null"
+          [attr.data-active]="t.active"
+          (click)="toggleMenu(t.key)"
+        >
+          <span class="min-w-0">
+            <small class="block text-[13px] leading-tight text-muted">{{ t.label }}</small>
+            <b class="block max-w-56 truncate text-[15px] leading-tight font-semibold">{{
+              t.value
+            }}</b>
+          </span>
+          <app-icon
+            name="chevron"
+            [size]="16"
+            class="flex-none text-muted transition-transform group-aria-expanded:rotate-180"
+          />
+        </button>
+
+        @if (open() === t.key) {
+          <div
+            class="absolute top-full right-3 left-3 z-20 mt-2 flex max-h-96 animate-drawer flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-panel p-3 shadow-card motion-reduce:animate-none sm:right-auto sm:left-0 sm:w-80"
+            [id]="'menu-' + t.key"
+          >
+            @switch (t.key) {
+              @case ('city') {
+                <label
+                  class="flex min-h-11 items-center rounded-xl border border-line bg-bg px-3.5"
+                >
+                  <span class="sr-only">Find a city</span>
+                  <input
+                    type="text"
+                    class="min-w-0 flex-1 bg-transparent outline-none"
+                    placeholder="Find a city"
+                    maxlength="100"
+                    [value]="cityText()"
+                    (input)="cityText.set(cityInput.value)"
+                    #cityInput
+                  />
+                </label>
+                @if (f().place === 'online') {
+                  <p class="text-sm text-muted">
+                    Online events have no city. Turn off Online only to filter by city.
+                  </p>
+                }
+                <fieldset [disabled]="f().place === 'online'">
+                  <legend class="sr-only">City</legend>
+                  <label class="option">
+                    <input
+                      type="radio"
+                      name="city"
+                      class="size-4 accent-blush"
+                      [checked]="!f().city"
+                      (change)="pickCity(null)"
+                    />
+                    Anywhere
+                  </label>
+                  @for (c of cityList(); track c.slug) {
+                    <label class="option">
+                      <input
+                        type="radio"
+                        name="city"
+                        class="size-4 accent-blush"
+                        [checked]="f().city === c.slug"
+                        (change)="pickCity(c.slug)"
+                      />
+                      {{ c.name }}
+                    </label>
+                  } @empty {
+                    <p class="px-3 py-2 text-sm text-muted">
+                      {{
+                        citiesLoading()
+                          ? 'Loading cities…'
+                          : 'No city with upcoming events matches that name.'
+                      }}
+                    </p>
+                  }
+                </fieldset>
+              }
+              @case ('category') {
+                <fieldset>
+                  <legend class="sr-only">Categories</legend>
+                  @for (c of options()?.categories; track c.value) {
+                    <label class="option">
+                      <input
+                        type="checkbox"
+                        class="size-4 accent-blush"
+                        [checked]="f().categories.includes(c.value)"
+                        (change)="toggleCategory(c.value)"
+                      />
+                      {{ c.label }}
+                    </label>
+                  } @empty {
+                    <p class="px-3 py-2 text-sm text-muted">
+                      {{
+                        optionsLoading()
+                          ? 'Loading categories…'
+                          : 'Categories are not available right now.'
+                      }}
+                    </p>
+                  }
+                </fieldset>
+              }
+              @case ('tags') {
+                <p class="px-3 text-sm text-muted">Events must have every tag you pick.</p>
+                <fieldset>
+                  <legend class="sr-only">Tags</legend>
+                  @for (g of options()?.tags; track g.value) {
+                    <label class="option">
+                      <input
+                        type="checkbox"
+                        class="size-4 accent-blush"
+                        [checked]="f().tags.includes(g.value)"
+                        (change)="toggleTag(g.value)"
+                      />
+                      #{{ g.label.toLowerCase() }}
+                    </label>
+                  } @empty {
+                    <p class="px-3 py-2 text-sm text-muted">
+                      {{ optionsLoading() ? 'Loading tags…' : 'Tags are not available right now.' }}
+                    </p>
+                  }
+                </fieldset>
+              }
+            }
+          </div>
+        }
+      </div>
     }
 
     <button
@@ -57,222 +208,43 @@
     </button>
   </div>
 
-  <!-- Drawers: only the open one exists in the DOM -->
-  @switch (open()) {
-    @case ('date') {
-      <div class="drawer" id="panel-date">
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Date">
-          @for (p of datePresets; track p.value) {
-            <button
-              type="button"
-              class="chip"
-              [attr.aria-pressed]="f().date === p.value"
-              (click)="store.patch({ date: p.value, dateFrom: '', dateTo: '' })"
-            >
-              {{ p.label }}
-            </button>
-          }
-        </div>
-        <div class="flex flex-wrap items-end gap-3">
-          <label class="flex flex-col gap-1.5 text-sm text-muted">
-            From
-            <input
-              type="date"
-              class="field-input"
-              [value]="dateDraft().from"
-              (change)="setDate('from', fromDate.value)"
-              #fromDate
-            />
-          </label>
-          <label class="flex flex-col gap-1.5 text-sm text-muted">
-            To
-            <input
-              type="date"
-              class="field-input"
-              [value]="dateDraft().to"
-              (change)="setDate('to', toDate.value)"
-              #toDate
-            />
-          </label>
-          <p
-            class="mb-2.5 text-sm"
-            [class.text-muted]="!dateError()"
-            [class.text-blush-ink]="dateError()"
-            [attr.role]="dateError() ? 'alert' : null"
-          >
-            {{
-              dateError()
-                ? '“From” must not be after “To”.'
-                : 'Pick both dates to set your own range.'
-            }}
-          </p>
-        </div>
-      </div>
-    }
-    @case ('time') {
-      <div class="drawer" id="panel-time">
-        <div
-          class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2"
-          role="group"
-          aria-label="Start time"
-        >
-          @for (p of timePresets; track p.value) {
-            <button
-              type="button"
-              class="tile"
-              [attr.aria-pressed]="f().time === p.value"
-              (click)="store.patch({ time: p.value, timeFrom: '', timeTo: '' })"
-            >
-              <b class="font-semibold">{{ p.label }}</b>
-              <small class="text-[13px] text-muted">{{ p.hours }}</small>
-            </button>
-          }
-        </div>
-        <div class="flex flex-wrap items-end gap-3">
-          <label class="flex flex-col gap-1.5 text-sm text-muted">
-            Starts after
-            <input
-              type="time"
-              class="field-input"
-              [value]="timeDraft().from"
-              (change)="setTime('from', fromTime.value)"
-              #fromTime
-            />
-          </label>
-          <label class="flex flex-col gap-1.5 text-sm text-muted">
-            Starts before
-            <input
-              type="time"
-              class="field-input"
-              [value]="timeDraft().to"
-              (change)="setTime('to', toTime.value)"
-              #toTime
-            />
-          </label>
-          <p
-            class="mb-2.5 text-sm"
-            [class.text-muted]="!timeError()"
-            [class.text-blush-ink]="timeError()"
-            [attr.role]="timeError() ? 'alert' : null"
-          >
-            {{
-              timeError()
-                ? 'The two times must differ.'
-                : 'Late ranges like 22:00 to 02:00 run past midnight.'
-            }}
-          </p>
-        </div>
-      </div>
-    }
-    @case ('city') {
-      <div class="drawer" id="panel-city">
-        <label
-          class="flex min-h-11 max-w-sm items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5"
-        >
-          <span class="sr-only">Find a city</span>
+  @if (choosingDates()) {
+    <div class="drawer">
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="flex flex-col gap-1.5 text-sm text-muted">
+          From
           <input
-            type="text"
-            class="min-w-0 flex-1 bg-transparent outline-none"
-            placeholder="Find a city"
-            maxlength="100"
-            [value]="cityText()"
-            (input)="cityText.set(cityInput.value)"
-            #cityInput
+            type="date"
+            class="field-input"
+            [value]="dateDraft().from"
+            (change)="setDate('from', fromDate.value)"
+            #fromDate
           />
         </label>
-        @if (f().place === 'online') {
-          <p class="text-sm text-muted">
-            Online events have no city. Turn off Online only to filter by city.
-          </p>
-        }
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Cities">
-          @for (c of cityList(); track c.slug) {
-            <button
-              type="button"
-              class="chip group"
-              [attr.aria-pressed]="f().city === c.slug"
-              [disabled]="f().place === 'online'"
-              (click)="pickCity(c.slug)"
-            >
-              <app-icon
-                name="check"
-                [size]="16"
-                class="hidden text-blush-ink group-aria-pressed:inline-flex"
-              />{{ c.name }}
-            </button>
-          } @empty {
-            <p class="text-sm text-muted">
-              {{
-                citiesLoading()
-                  ? 'Loading cities…'
-                  : 'No city with upcoming events matches that name.'
-              }}
-            </p>
-          }
-        </div>
-      </div>
-    }
-    @case ('category') {
-      <div class="drawer" id="panel-category">
-        <div
-          class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2"
-          role="group"
-          aria-label="Categories"
+        <label class="flex flex-col gap-1.5 text-sm text-muted">
+          To
+          <input
+            type="date"
+            class="field-input"
+            [value]="dateDraft().to"
+            (change)="setDate('to', toDate.value)"
+            #toDate
+          />
+        </label>
+        <p
+          class="mb-2.5 text-sm"
+          [class.text-muted]="!dateError()"
+          [class.text-blush-ink]="dateError()"
+          [attr.role]="dateError() ? 'alert' : null"
         >
-          @for (c of options()?.categories; track c.value) {
-            <button
-              type="button"
-              class="tile group min-h-13 flex-row items-center justify-between font-medium"
-              [attr.aria-pressed]="f().categories.includes(c.value)"
-              (click)="toggleCategory(c.value)"
-            >
-              {{ c.label }}
-              <span
-                class="grid size-5 flex-none place-items-center rounded-md border-2 border-line text-on-blush group-aria-pressed:border-blush group-aria-pressed:bg-blush"
-              >
-                <app-icon name="check" [size]="12" class="invisible group-aria-pressed:visible" />
-              </span>
-            </button>
-          } @empty {
-            <p class="text-sm text-muted">
-              {{
-                optionsLoading() ? 'Loading categories…' : 'Categories are not available right now.'
-              }}
-            </p>
-          }
-        </div>
+          {{
+            dateError()
+              ? '“From” must not be after “To”.'
+              : 'Pick both dates to set your own range.'
+          }}
+        </p>
       </div>
-    }
-    @case ('tags') {
-      <div class="drawer" id="panel-tags">
-        <p class="text-sm text-muted">Events must have every tag you pick.</p>
-        <div class="flex flex-wrap gap-2" role="group" aria-label="Tags">
-          @for (t of tagsShown(); track t.value) {
-            <button
-              type="button"
-              class="chip chip-sm"
-              [attr.aria-pressed]="f().tags.includes(t.value)"
-              (click)="toggleTag(t.value)"
-            >
-              #{{ t.label.toLowerCase() }}
-            </button>
-          } @empty {
-            <p class="text-sm text-muted">
-              {{ optionsLoading() ? 'Loading tags…' : 'Tags are not available right now.' }}
-            </p>
-          }
-        </div>
-        @if (options(); as opts) {
-          <button
-            type="button"
-            class="min-h-11 self-start px-1 font-semibold text-blush-ink underline underline-offset-3"
-            (click)="showAllTags.set(!showAllTags())"
-          >
-            {{ showAllTags() ? 'Show popular tags' : 'Show all ' + opts.tags.length + ' tags' }}
-          </button>
-        }
-      </div>
-    }
+    </div>
   }
 
   <!-- Applied filters -->
