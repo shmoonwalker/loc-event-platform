@@ -22,9 +22,28 @@
                 <span class="admin-tag">{{ g.targetType === 'EVENT' ? 'Event' : 'Comment' }}</span>
                 <div class="mt-1 break-words">
                   @if (g.targetType === 'EVENT') {
-                    <app-admin-event-link [eventId]="g.targetId" />
+                    @if (g.eventTitle) {
+                      <a [routerLink]="['/events', g.eventId ?? g.targetId]" class="admin-link">{{
+                        g.eventTitle
+                      }}</a>
+                    } @else {
+                      Event <code class="text-xs text-admin-muted">{{ g.targetId }}</code>
+                    }
                   } @else {
-                    Comment <code class="text-xs text-admin-muted">{{ g.targetId }}</code>
+                    @if (g.commentBody !== null) {
+                      <q class="line-clamp-3 whitespace-pre-line">{{ g.commentBody }}</q>
+                    } @else {
+                      <span class="text-admin-muted">Comment removed</span>
+                    }
+                    <span class="mt-1 block text-sm text-admin-muted">
+                      {{ g.commentAuthorName ?? 'Deleted user' }}
+                      @if (g.eventTitle) {
+                        · on
+                        <a [routerLink]="['/events', g.eventId]" class="admin-link">{{
+                          g.eventTitle
+                        }}</a>
+                      }
+                    </span>
                   }
                 </div>
               </div>
