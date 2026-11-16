@@ -32,6 +32,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/admin-hidden-events').then((m) => m.AdminHiddenEvents),
       },
+      {
+        path: 'feedback',
+        title: 'Feedback – Admin – Loc',
+        loadComponent: () => import('./features/admin/admin-feedback').then((m) => m.AdminFeedback),
+      },
       { path: '**', redirectTo: '' },
     ],
   },
@@ -95,6 +100,12 @@ export const routes: Routes = [
       { path: 'me/account', redirectTo: 'me/settings/security' },
       // The Saved page became the first tab of My Loc; keep old links working.
       { path: 'saved', redirectTo: 'me' },
+      {
+        path: 'feedback',
+        title: 'Send feedback – Loc',
+        loadComponent: () =>
+          import('./features/feedback/feedback-page').then((m) => m.FeedbackPage),
+      },
       {
         path: 'register',
         title: 'Create account – Loc',
