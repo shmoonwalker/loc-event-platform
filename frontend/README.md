@@ -10,7 +10,7 @@ This Angular application is Loc's user interface. It has these pages:
 | `/register` | Create an account with name, email and password, then "check your email" |
 | `/verify-email` | Opened from the verification or email-change email; verifies the account (or its new address) or offers a new link |
 | `/login` | Log in with email and password, or resend verification for an unverified account |
-| `/account` | Signed in: change the password or email, or delete the account |
+| `/me/account` | Signed in: change the password or email, or delete the account |
 | `/me/profile` | Signed-in members: change the display name, pick a preset avatar, or upload a picture (preview first) and remove it again |
 | `/holding` | Holding page from the earlier version of the site |
 
