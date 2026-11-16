@@ -22,6 +22,8 @@ export class ChangePassword {
 
   protected readonly status = signal<'form' | 'sending' | 'saved'>('form');
   protected readonly formError = signal<string | null>(null);
+  protected readonly showCurrent = signal(false);
+  protected readonly showNew = signal(false);
 
   protected submit(): void {
     if (this.form.invalid) {
@@ -34,6 +36,8 @@ export class ChangePassword {
     this.api.changePassword(currentPassword, newPassword).subscribe({
       next: () => {
         this.form.reset();
+        this.showCurrent.set(false);
+        this.showNew.set(false);
         this.status.set('saved');
       },
       error: (err: HttpErrorResponse) => {

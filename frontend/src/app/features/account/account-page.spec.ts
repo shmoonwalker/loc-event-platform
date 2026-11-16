@@ -54,6 +54,24 @@ async function open() {
 describe('AccountPage', () => {
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
+  it('shows and hides each password field on its own', async () => {
+    const { el, settle } = await open();
+    const ids = ['#password-current', '#password-new', '#email-password', '#delete-password'];
+    const typeOf = (id: string) => el.querySelector<HTMLInputElement>(id)!.type;
+    expect(ids.map(typeOf)).toEqual(['password', 'password', 'password', 'password']);
+
+    const toggle = (id: string) =>
+      el.querySelector(id)!.parentElement!.querySelector<HTMLButtonElement>('button')!;
+    toggle('#password-new').click();
+    await settle();
+    expect(ids.map(typeOf)).toEqual(['password', 'text', 'password', 'password']);
+    expect(toggle('#password-new').textContent).toContain('Hide');
+
+    toggle('#password-new').click();
+    await settle();
+    expect(typeOf('#password-new')).toBe('password');
+  });
+
   describe('password', () => {
     it('checks the fields with the sign-up rules before sending anything', async () => {
       const { el, type, submit } = await open();

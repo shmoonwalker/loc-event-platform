@@ -25,6 +25,7 @@ export class DeleteAccount {
   /** form → confirm (ask once more) → sending; a failure goes back to form. */
   protected readonly status = signal<'form' | 'confirm' | 'sending'>('form');
   protected readonly formError = signal<string | null>(null);
+  protected readonly showPassword = signal(false);
 
   protected submit(): void {
     if (this.form.invalid) {
