@@ -170,6 +170,7 @@ class HiddenEventHttpTest {
         publish(stream, stream, "Visible stream", "ONLINE", null);
         perform(put("/api/me/followed-organizers/{id}", ORGANIZER), memberToken()).andExpect(status().isNoContent());
         perform(put("/api/me/saved-events/{id}", secret), memberToken()).andExpect(status().isNoContent());
+        perform(put("/api/me/saved-events/{id}", canal), memberToken()).andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/events")).andExpect(jsonPath("$.totalElements").value(3));
         mockMvc.perform(get("/api/events").param("q", "Secret"))
@@ -212,12 +213,12 @@ class HiddenEventHttpTest {
         mockMvc.perform(get("/api/events/{id}", secret)).andExpect(status().isNotFound());
         perform(get("/api/me/saved-events"), memberToken())
                 .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.items[0].event.id").value(secret.toString()))
-                .andExpect(jsonPath("$.items[0].event.title").value("Secret concert"));
-        perform(get("/api/me/saved-events/{id}", secret), memberToken())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(secret.toString()))
-                .andExpect(jsonPath("$.title").value("Secret concert"));
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].event.id").value(canal.toString()));
+        perform(get("/api/me/saved-events/{id}", secret), memberToken()).andExpect(status().isNotFound());
+        perform(put("/api/me/saved-events/{id}", secret), memberToken()).andExpect(status().isNotFound());
+        assertThat(savedRows(secret)).isEqualTo(1);
         assertThat(stillDiscoverable(secret)).isTrue();
 
         perform(delete("/api/admin/events/{id}/hide", secret), adminToken()).andExpect(status().isNoContent());
@@ -232,6 +233,12 @@ class HiddenEventHttpTest {
                 .andExpect(jsonPath("$.events.totalElements").value(3));
         perform(get("/api/me/followed-organizers/events"), memberToken())
                 .andExpect(jsonPath("$.totalElements").value(3));
+        perform(get("/api/me/saved-events"), memberToken())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.items[1].event.id").value(secret.toString()));
+        perform(get("/api/me/saved-events/{id}", secret), memberToken())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Secret concert"));
         assertThat(hiddenShowIds()).isEmpty();
     }
 
@@ -344,6 +351,13 @@ class HiddenEventHttpTest {
         return jdbc.sql("SELECT payload->>'title' FROM publication.event_snapshot WHERE loc_group_id = :id")
                 .param("id", showId)
                 .query(String.class)
+                .single();
+    }
+
+    private long savedRows(UUID eventId) {
+        return jdbc.sql("SELECT count(*) FROM app.saved_event WHERE event_id = :id")
+                .param("id", eventId)
+                .query(Long.class)
                 .single();
     }
 
