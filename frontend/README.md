@@ -8,8 +8,9 @@ This Angular application is Loc's user interface. It has these pages:
 | `/events/:id` | Event detail: description, location, organizers, every upcoming date and per-date weather |
 | `/organizers/:id` | Organizer profile and their upcoming events |
 | `/register` | Create an account with name, email and password, then "check your email" |
-| `/verify-email` | Opened from the verification email; verifies the account or offers a new link |
+| `/verify-email` | Opened from the verification or email-change email; verifies the account (or its new address) or offers a new link |
 | `/login` | Log in with email and password, or resend verification for an unverified account |
+| `/account` | Signed in: change the password or email, or delete the account |
 | `/holding` | Holding page from the earlier version of the site |
 
 Filters live in the URL query string, so every filtered view is a shareable link. The
@@ -33,9 +34,16 @@ the token and account. Neither is persisted in browser storage.
 
 Use `isAdmin()` for admin-only actions and `adminGuard` for admin routes. The backend
 still authorizes every request. Account and admin navigation will be added with their
-pages (#104, #108, #113); the header currently offers logout to members and admins,
-and login/registration to visitors. Google sign-in (#74) is separate work and must use
+pages (#104, #108, #113); the header currently offers My Loc, Account and logout to
+members and admins, and login/registration to visitors. Google sign-in (#74) is separate work and must use
 this same session path on return.
+
+### Account settings
+
+Changing the password, changing the email and deleting the account each ask for the
+current password. A wrong one is shown under that field; the interceptor does not
+refresh the session for it, because the API answers it with `401` like an expired token.
+Deleting the account ends the session in the UI and opens the home page.
 
 ### Deployment
 
