@@ -5,7 +5,7 @@ This Angular application is Loc's user interface. It has these pages:
 | Route | Page |
 |---|---|
 | `/` | Home: highlight rails (tonight, this weekend, near you, online) and a searchable, filterable event list |
-| `/events/:id` | Event detail: description, location, organizers, every upcoming date, per-date weather and comments |
+| `/events/:id` | Event detail: description, location, organizers, every upcoming date, per-date weather, photos and comments |
 | `/organizers/:id` | Organizer profile and their upcoming events |
 | `/register` | Create an account with name, email and password, then "check your email" |
 | `/verify-email` | Opened from the verification or email-change email; verifies the account (or its new address) or offers a new link |
@@ -102,6 +102,13 @@ admins do not see Report. An admin sees Official reply instead of Reply, which p
 reply with the "Official" badge, and Remove on every comment and reply instead of
 Delete. Remove asks for a reason, which only admins see, and takes the comment away
 for everyone; the admin endpoints are in [Admin comments](../backend/docs/admin-comments.md). The endpoints are in the [Member API](../backend/docs/member.md).
+
+### Photos
+
+The event page has a Photos section in the side column, after the organizers, for every event
+including online ones. It lists approved photos newest first and opens each one at the URL the
+API returns. When there are none, it says so. A signed-in member can add a picture, see their own
+photos (waiting for approval, or not approved) and delete them, and report a photo that isn't theirs.
 
 ### Account settings
 
