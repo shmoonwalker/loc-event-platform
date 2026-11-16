@@ -12,6 +12,7 @@ import {
   TimePreset,
 } from '../../../core/filters';
 import { valueOf } from '../../../core/resource';
+import { amsterdamDate } from '../../../core/time';
 import { IconComponent } from '../../../shared/icon/icon';
 import { ListFilters } from '../list-filters';
 
@@ -77,12 +78,15 @@ export class SearchConsole {
   /** "Choose dates" shows the range inputs before both dates are set; it follows the URL to and from a range. */
   protected readonly choosingDates = linkedSignal(() => this.customDate());
   protected readonly dateChoice = computed(() => (this.choosingDates() ? 'custom' : this.f().date));
-  protected readonly dateError = computed(
-    () =>
-      !!this.dateDraft().from &&
-      !!this.dateDraft().to &&
-      this.dateDraft().from > this.dateDraft().to,
-  );
+  /** The earliest day the range can start: past days never match an upcoming event. */
+  protected readonly today = amsterdamDate();
+  /** Why the draft range cannot apply ('' when it can); the calendars block this, typing can still get here. */
+  protected readonly dateError = computed(() => {
+    const { from, to } = this.dateDraft();
+    if ((from && from < this.today) || (to && to < this.today)) return 'Pick today or a later day.';
+    if (from && to && from > to) return '“From” must not be after “To”.';
+    return '';
+  });
 
   // ----- cities: server-side search, debounced, only while the City menu is open -----
   protected readonly cityText = signal('');
@@ -225,7 +229,7 @@ export class SearchConsole {
   protected setDate(which: 'from' | 'to', value: string): void {
     this.dateDraft.update((d) => ({ ...d, [which]: value }));
     const { from, to } = this.dateDraft();
-    if (from && to && from <= to) this.store.patch({ date: 'custom', dateFrom: from, dateTo: to });
+    if (from && to && !this.dateError()) this.store.patch({ date: 'custom', dateFrom: from, dateTo: to });
   }
 
   protected setOnline(on: boolean): void {

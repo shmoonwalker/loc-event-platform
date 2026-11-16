@@ -151,6 +151,39 @@ describe('SearchConsole', () => {
     expect(router.url).toBe(`/?dateFrom=${day(15)}&dateTo=${day(17)}`);
   });
 
+  it('starts the calendars at today and "To" at the chosen "From"', async () => {
+    const { el, router, settle, select, choose } = await open();
+    await choose(select('Date'), 'custom');
+    const [from, to] = [...el.querySelectorAll<HTMLInputElement>('input[type="date"]')];
+    expect(from.min).toBe(day(0));
+    expect(to.min).toBe(day(0));
+
+    from.value = day(15);
+    from.dispatchEvent(new Event('change'));
+    await settle();
+    expect(to.min).toBe(day(15));
+
+    to.value = day(10); // typed: the calendar would not offer it
+    to.dispatchEvent(new Event('change'));
+    await settle();
+    expect(router.url).toBe('/');
+    expect(el.textContent).toContain('“From” must not be after “To”.');
+  });
+
+  it('does not apply a typed range that starts in the past', async () => {
+    const { el, router, settle, select, choose } = await open();
+    await choose(select('Date'), 'custom');
+    const [from, to] = [...el.querySelectorAll<HTMLInputElement>('input[type="date"]')];
+    from.value = day(-3);
+    from.dispatchEvent(new Event('change'));
+    to.value = day(2);
+    to.dispatchEvent(new Event('change'));
+    await settle();
+
+    expect(router.url).toBe('/');
+    expect(el.textContent).toContain('Pick today or a later day.');
+  });
+
   it('offers only the fixed time ranges and no typed time', async () => {
     const { el, router, select, choose } = await open();
     const time = select('Time');
