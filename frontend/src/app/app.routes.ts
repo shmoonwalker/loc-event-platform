@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth-guard';
+import { adminGuard, authGuard } from './core/auth-guard';
 
 // loadComponent = lazy route: the page's code is downloaded only when someone visits it
 // (like Spring's @Lazy, but at the browser/bundle level).
@@ -8,6 +8,21 @@ export const routes: Routes = [
     path: 'holding',
     title: 'Loc is under change',
     loadComponent: () => import('./features/holding/holding-page').then((m) => m.HoldingPage),
+  },
+  {
+    // The admin panel has its own layout instead of the member header and footer.
+    path: 'admin',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/admin-shell').then((m) => m.AdminShell),
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        title: 'Overview – Admin – Loc',
+        loadComponent: () => import('./features/admin/admin-overview').then((m) => m.AdminOverview),
+      },
+      { path: '**', redirectTo: '' },
+    ],
   },
   {
     // Layout route: renders Shell (header + footer) and puts the matching child inside it.
