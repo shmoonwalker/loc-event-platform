@@ -24,6 +24,7 @@ The frontend communicates only with the backend API.
 | Followed organizers | `GET /api/me/followed-organizers`, `/api/me/followed-organizers/events`, `PUT`/`DELETE /api/me/followed-organizers/{organizerId}` | [Member API](docs/member.md) |
 | Comments | `GET`/`POST /api/events/{eventId}/comments`, `POST /api/comments/{commentId}/replies`, `PATCH`/`DELETE /api/me/comments/{commentId}` | [Member API](docs/member.md#comments) |
 | Profile | `PATCH /api/me/profile`, `PUT /api/me/avatar/preset`, `POST`/`DELETE /api/me/avatar` | [Member API](docs/member.md) |
+| Event photos | `POST`/`GET /api/events/{eventId}/photos`, `GET /api/me/events/{eventId}/photos`, admin review under `/api/admin/photos` | [Event photos](docs/photos.md) |
 
 Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI document at `/api/docs/openapi.yaml`.
 
@@ -81,8 +82,11 @@ Redis is only needed for rate limiting. Without it the backend still starts and 
 | `AVATAR_R2_ACCESS_KEY`, `AVATAR_R2_SECRET_KEY` | empty | R2 API token for the avatar bucket |
 | `AVATAR_R2_BUCKET` | empty | Public bucket for profile pictures |
 | `AVATAR_PUBLIC_URL` | empty | Public domain of that bucket; avatar URLs start with it |
+| `EVENT_PHOTO_R2_ACCESS_KEY`, `EVENT_PHOTO_R2_SECRET_KEY` | avatar key | R2 API token for event photos. Unset uses the avatar token |
+| `EVENT_PHOTO_R2_BUCKET` | avatar bucket | Bucket for event photos. Unset uses the avatar bucket |
+| `EVENT_PHOTO_PUBLIC_URL` | empty | Public domain for approved photos. Empty keeps every photo on the file route |
 
-Without the R2 settings the backend starts with picture uploads turned off: `POST /api/me/avatar` answers `503`, and preset avatars keep working.
+Without the R2 settings the backend starts with picture uploads turned off: `POST /api/me/avatar` and `POST /api/events/{eventId}/photos` answer `503`, and preset avatars keep working. Event photos use the avatar bucket when their own key or bucket is unset. They share `R2_ENDPOINT` and `R2_REGION`.
 
 Rate limits are set under `app.rate-limit.policies` in `src/main/resources/application.yaml`.
 
@@ -98,7 +102,8 @@ nl.loc.backend
 │   ├── jwt/       access-token signing key and JWT encoder/decoder
 │   └── ratelimit/ Redis-backed rate limiter
 ├── event/         public discovery: events, organizers, cities, categories, tags
-└── user/          user accounts, registration, login, account emails, profile and avatars, saved events, followed organizers, comments
+├── photo/         event photo album: upload, approval, and the stored JPEGs
+└── user/          user accounts, registration, login, account emails, profile and avatars, saved events, followed organizers, comments, reports
 ```
 
 Within a feature:

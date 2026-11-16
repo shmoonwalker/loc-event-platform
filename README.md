@@ -112,7 +112,7 @@ Requirements: Docker, Java 25 and Node.js.
 - [System architecture](docs/architecture/system-architecture.md)
 - [Data architecture](docs/architecture/data-architecture.md)
 - [Authentication](docs/architecture/authentication.md)
-- [Backend guide](backend/README.md), [Discovery API](backend/docs/discovery.md) and [Member API](backend/docs/member.md)
+- [Backend guide](backend/README.md), [Discovery API](backend/docs/discovery.md), [Member API](backend/docs/member.md) and [Event photos](backend/docs/photos.md)
 - [Data guide](data/README.md)
 - [Frontend guide](frontend/README.md)
 - [Development scripts](scripts/README.md)

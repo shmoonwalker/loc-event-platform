@@ -52,7 +52,9 @@ Resolved reports are left out. What remains is grouped by `target_type` and
 ]
 ```
 
-- `targetType` is `EVENT` or `COMMENT`. For an event, `targetId` is the show id.
+- `targetType` is `EVENT`, `COMMENT` or `PHOTO`. For an event, `targetId` is the show id.
+  For a photo it is the photo id. Removing that photo sets open `PHOTO` reports to
+  `resolution` `REMOVED`. Event and comment reports are left as they are.
 - `reasons` are the distinct reasons, alphabetical:
   `WRONG_INFORMATION`, `SPAM`, `INAPPROPRIATE`, `OTHER`.
 - `reportIds` are the open report ids, oldest first. Dismiss one of them to close it.
