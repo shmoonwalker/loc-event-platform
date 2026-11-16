@@ -1,8 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { AuthSession } from '../../core/auth-session';
 import { EventCard, SavedEventPage } from '../../core/models';
 import { MePage } from './me-page';
 
@@ -86,5 +87,128 @@ describe('SavedEvents (the Saved tab of My Loc)', () => {
     expect(harness.routeNativeElement!.querySelector('[role="alert"]')?.textContent).toContain(
       'Try again',
     );
+  });
+
+  describe('unsaving', () => {
+    /** Signed in, so the heart calls the API instead of opening the login page. */
+    async function openSaved(url: string, page: SavedEventPage) {
+      const opened = await open(url);
+      TestBed.inject(AuthSession).start('token');
+      opened.http.expectOne(`/api/me/saved-events?page=${page.page}`).flush(page);
+      await opened.harness.fixture.whenStable();
+      const el = opened.harness.routeNativeElement!;
+      const cards = () => el.querySelectorAll('ul[role="list"] > li');
+      const heart = (i: number) => cards()[i].querySelector<HTMLButtonElement>('button')!;
+      const status = () => el.querySelector('p[aria-live="polite"]')!;
+      return { ...opened, el, cards, heart, status };
+    }
+
+    it('removes the card at once, says Removed and counts one less', async () => {
+      const { harness, http, cards, heart, status } = await openSaved('/me?page=1', twoPages);
+      heart(0).click();
+      const req = http.expectOne('/api/me/saved-events/e1');
+      expect(req.request.method).toBe('DELETE');
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await harness.fixture.whenStable();
+
+      expect(cards().length).toBe(1);
+      expect(cards()[0].textContent).toContain('Old market');
+      expect(status().textContent).toContain('Removed.');
+      expect(status().textContent).toContain('21 saved events.');
+      expect(document.activeElement).toBe(status());
+    });
+
+    it('removes an event that is no longer available the same way', async () => {
+      const { harness, http, cards, heart, status } = await openSaved('/me?page=1', twoPages);
+      heart(1).click();
+      http
+        .expectOne('/api/me/saved-events/e2')
+        .flush(null, { status: 204, statusText: 'No Content' });
+      await harness.fixture.whenStable();
+
+      expect(cards().length).toBe(1);
+      expect(cards()[0].textContent).toContain('Late-night jazz session');
+      expect(status().textContent).toContain('Removed.');
+    });
+
+    it('keeps the card when the server refuses', async () => {
+      const { harness, http, cards, heart, status } = await openSaved('/me?page=1', twoPages);
+      heart(0).click();
+      http
+        .expectOne('/api/me/saved-events/e1')
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      await harness.fixture.whenStable();
+
+      expect(cards().length).toBe(2);
+      expect(heart(0).getAttribute('aria-pressed')).toBe('true');
+      expect(status().textContent).not.toContain('Removed.');
+    });
+
+    it('shows the empty state after the last saved event is removed', async () => {
+      const one: SavedEventPage = {
+        page: 0,
+        size: 20,
+        totalElements: 1,
+        totalPages: 1,
+        items: [twoPages.items[0]],
+      };
+      const { harness, http, el, heart, status } = await openSaved('/me', one);
+      heart(0).click();
+      http
+        .expectOne('/api/me/saved-events/e1')
+        .flush(null, { status: 204, statusText: 'No Content' });
+      await harness.fixture.whenStable();
+
+      expect(el.textContent).toContain('No saved events yet');
+      expect(status().textContent).toContain('Removed.');
+      expect(status().textContent).not.toContain('saved event');
+    });
+
+    it('opens the previous page when the last page becomes empty', async () => {
+      const lastPage: SavedEventPage = {
+        page: 1,
+        size: 20,
+        totalElements: 21,
+        totalPages: 2,
+        items: [twoPages.items[0]],
+      };
+      const { harness, http, heart } = await openSaved('/me?page=1', lastPage);
+      heart(0).click();
+      http
+        .expectOne('/api/me/saved-events/e1')
+        .flush(null, { status: 204, statusText: 'No Content' });
+
+      await vi.waitFor(() => expect(TestBed.inject(Router).url).toBe('/me'));
+      http
+        .expectOne('/api/me/saved-events?page=0')
+        .flush({ ...lastPage, page: 0, totalElements: 20, totalPages: 1 });
+      await harness.fixture.whenStable();
+    });
+
+    it('reloads a page that becomes empty while later pages remain', async () => {
+      const middle: SavedEventPage = {
+        page: 0,
+        size: 1,
+        totalElements: 3,
+        totalPages: 3,
+        items: [twoPages.items[0]],
+      };
+      const { harness, http, cards, heart } = await openSaved('/me', middle);
+      heart(0).click();
+      http
+        .expectOne('/api/me/saved-events/e1')
+        .flush(null, { status: 204, statusText: 'No Content' });
+
+      await vi.waitFor(() =>
+        http.expectOne('/api/me/saved-events?page=0').flush({
+          ...middle,
+          totalElements: 2,
+          totalPages: 2,
+          items: [twoPages.items[1]],
+        }),
+      );
+      await harness.fixture.whenStable();
+      expect(cards()[0].textContent).toContain('Old market');
+    });
   });
 });

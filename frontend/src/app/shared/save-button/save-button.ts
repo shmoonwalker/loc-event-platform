@@ -1,4 +1,4 @@
-import { Component, inject, input, linkedSignal, signal } from '@angular/core';
+import { Component, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthSession } from '../../core/auth-session';
@@ -31,6 +31,9 @@ export class SaveButton {
   /** What the server said. A refetch resets the local state to it. */
   readonly initiallySaved = input.required<boolean>();
 
+  /** The new state, once the server has accepted it. */
+  readonly savedChange = output<boolean>();
+
   protected readonly saved = linkedSignal(() => this.initiallySaved());
   protected readonly pending = signal(false);
 
@@ -45,6 +48,9 @@ export class SaveButton {
     this.pending.set(true);
     (next ? this.api.save(this.eventId()) : this.api.unsave(this.eventId()))
       .pipe(finalize(() => this.pending.set(false)))
-      .subscribe({ error: () => this.saved.set(!next) });
+      .subscribe({
+        complete: () => this.savedChange.emit(next),
+        error: () => this.saved.set(!next),
+      });
   }
 }
