@@ -2,7 +2,7 @@
 -- Not a migration: the application creates app.report on the issue 95 branch.
 CREATE TABLE IF NOT EXISTS app.report (
     id           uuid PRIMARY KEY DEFAULT uuidv7(),
-    target_type  varchar NOT NULL CHECK (target_type IN ('EVENT', 'COMMENT')),
+    target_type  varchar NOT NULL CHECK (target_type IN ('EVENT', 'COMMENT', 'PHOTO')),
     target_id    uuid NOT NULL,
     reporter_id  uuid NOT NULL REFERENCES app.app_user (id),
     reason       varchar NOT NULL CHECK (reason IN ('WRONG_INFORMATION', 'SPAM', 'INAPPROPRIATE', 'OTHER')),
