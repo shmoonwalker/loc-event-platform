@@ -7,8 +7,8 @@ import { formatWhen } from '../../core/time';
 import { AdminError } from './admin-error';
 
 /**
- * Events an admin took out of public lists: who, when and why, most recent first, with Unhide.
- * The public event API answers 404 for a hidden event, so the list shows the event id, not its title.
+ * Events an admin took out of public lists: title, who, when and why, most recent first, with Unhide.
+ * The title is not linked: the public event page answers 404 while the event is hidden.
  */
 @Component({
   selector: 'app-admin-hidden-events',
