@@ -18,12 +18,8 @@
         @for (h of list; track h.eventId) {
           <li class="flex flex-wrap items-start gap-x-6 gap-y-2 p-4">
             <div class="min-w-0 flex-1 basis-64">
-              <p class="font-semibold break-words">
-                @if (h.title; as title) {
-                  {{ title }}
-                } @else {
-                  Event <code class="text-xs font-normal text-admin-muted">{{ h.eventId }}</code>
-                }
+              <p class="break-words">
+                Event <code class="text-xs text-admin-muted">{{ h.eventId }}</code>
               </p>
               <p class="mt-1 text-sm text-admin-muted">
                 Hidden by {{ h.hiddenByName ?? 'a deleted admin' }} ·
