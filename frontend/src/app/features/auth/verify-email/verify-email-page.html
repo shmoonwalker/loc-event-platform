@@ -9,7 +9,7 @@
         <p class="mt-4 text-muted">
           Your new email address is confirmed. Use it to log in from now on.
         </p>
-        <a routerLink="/account" class="btn-dark mt-6">Back to account</a>
+        <a routerLink="/me/account" class="btn-dark mt-6">Back to account</a>
       } @else {
         <p class="mt-4 text-muted">Your account is ready. You can log in now.</p>
         <a routerLink="/login" class="btn-dark mt-6">Log in</a>
@@ -21,7 +21,7 @@
       @if (session.loggedIn()) {
         <p class="mt-4 text-muted">
           To change your email, request a new link from your
-          <a routerLink="/account" class="link">account settings</a>.
+          <a routerLink="/me/account" class="link">account settings</a>.
         </p>
       } @else if (resendStatus() === 'sent') {
         <p class="mt-6 font-semibold" role="status">
