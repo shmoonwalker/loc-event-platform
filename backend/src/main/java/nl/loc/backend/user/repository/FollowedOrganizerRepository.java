@@ -2,6 +2,7 @@ package nl.loc.backend.user.repository;
 
 import static nl.loc.backend.event.repository.PublicEventRepository.CITY_SLUG;
 import static nl.loc.backend.event.repository.PublicEventRepository.ENDS;
+import static nl.loc.backend.event.repository.PublicEventRepository.NOT_HIDDEN;
 import static nl.loc.backend.event.repository.PublicEventRepository.SAVED;
 import static nl.loc.backend.event.repository.PublicEventRepository.STARTS;
 
@@ -26,7 +27,8 @@ public class FollowedOrganizerRepository {
                     WHERE f.user_id = :userId
                       AND s.payload->'organizers' @> jsonb_build_array(
                               jsonb_build_object('locOrganizerId', f.organizer_id::text)))
-              AND %1$s IS NOT NULL AND %2$s > :now""".formatted(STARTS, ENDS);
+              AND %1$s IS NOT NULL AND %2$s > :now
+              AND %3$s""".formatted(STARTS, ENDS, NOT_HIDDEN);
 
     private final JdbcClient jdbc;
     private final EventCardRowMapper cardMapper;
