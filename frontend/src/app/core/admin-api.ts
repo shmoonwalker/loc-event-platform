@@ -14,6 +14,14 @@ export interface ReportGroup {
   reasons: ReportReason[];
   /** Oldest first. */
   reportIds: string[];
+  /** The show the item belongs to; null for a comment that no longer exists. */
+  eventId: string | null;
+  /** Null when the show is no longer published. */
+  eventTitle: string | null;
+  /** Null for an event, and once the comment was removed. */
+  commentBody: string | null;
+  /** Null for an event, and after the author's account was deleted. */
+  commentAuthorName: string | null;
 }
 
 export interface HiddenEvent {
@@ -23,6 +31,8 @@ export interface HiddenEvent {
   hiddenByName: string | null;
   hiddenAt: string;
   reason: string;
+  /** Null when the show is no longer published. */
+  eventTitle: string | null;
 }
 
 /** Website feedback; null fields are left out of the JSON. */

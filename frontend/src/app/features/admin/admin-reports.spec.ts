@@ -2,8 +2,6 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { EventsApi } from '../../core/events-api';
 import { ReportGroup } from '../../core/admin-api';
 import { AdminReports } from './admin-reports';
 
@@ -13,6 +11,10 @@ const EVENT_GROUP: ReportGroup = {
   openCount: 2,
   reasons: ['INAPPROPRIATE', 'SPAM'],
   reportIds: ['r1', 'r2'],
+  eventId: 'e1',
+  eventTitle: 'Jazz night',
+  commentBody: null,
+  commentAuthorName: null,
 };
 const COMMENT_GROUP: ReportGroup = {
   targetType: 'COMMENT',
@@ -20,21 +22,16 @@ const COMMENT_GROUP: ReportGroup = {
   openCount: 1,
   reasons: ['WRONG_INFORMATION'],
   reportIds: ['r3'],
+  eventId: 'e2',
+  eventTitle: 'Old market',
+  commentBody: 'Parking is free here',
+  commentAuthorName: 'Anouk',
 };
 const LIST = '/api/admin/reports';
 
-/** Event rows look up their title; the stub answers right away, or fails when there is no title. */
-function setup(title: string | null = 'Jazz night') {
+function setup() {
   TestBed.configureTestingModule({
-    providers: [
-      provideHttpClient(),
-      provideHttpClientTesting(),
-      provideRouter([]),
-      {
-        provide: EventsApi,
-        useValue: { event: () => (title ? of({ title }) : throwError(() => new Error('404'))) },
-      },
-    ],
+    providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
   });
 }
 
@@ -66,17 +63,26 @@ describe('AdminReports', () => {
     expect(row('Jazz night').textContent).toContain('2 reports');
     expect(row('Jazz night').textContent).toContain('Inappropriate, Spam');
     expect(row('Jazz night').querySelector('a')?.getAttribute('href')).toBe('/events/e1');
-    expect(row('c1').textContent).toContain('Comment');
-    expect(row('c1').textContent).toContain('1 report');
-    expect(row('c1').textContent).toContain('Wrong information');
+    expect(row('Parking is free here').textContent).toContain('Comment');
+    expect(row('Parking is free here').textContent).toContain('1 report');
+    expect(row('Parking is free here').textContent).toContain('Wrong information');
+    expect(row('Parking is free here').textContent).toContain('Anouk');
+    expect(row('Parking is free here').querySelector('a')?.getAttribute('href')).toBe('/events/e2');
   });
 
-  it('shows the event id when its title cannot be loaded', async () => {
-    setup(null);
+  it('shows a removed comment and a deleted author without their text or name', async () => {
+    const { row } = await render([
+      { ...COMMENT_GROUP, commentBody: null, commentAuthorName: null },
+    ]);
+    expect(row('Comment removed').textContent).toContain('Deleted user');
+  });
+
+  it('shows the event id when it has no title', async () => {
+    setup();
     const http = TestBed.inject(HttpTestingController);
     const fixture = TestBed.createComponent(AdminReports);
     fixture.detectChanges();
-    http.expectOne(LIST).flush([EVENT_GROUP]);
+    http.expectOne(LIST).flush([{ ...EVENT_GROUP, eventTitle: null }]);
     await fixture.whenStable();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -87,8 +93,8 @@ describe('AdminReports', () => {
   it('offers Hide only for events', async () => {
     const { row, button } = await render();
     expect(button('Hide event', row('Jazz night'))).toBeDefined();
-    expect(button('Hide event', row('c1'))).toBeUndefined();
-    expect(button('Dismiss', row('c1'))).toBeDefined();
+    expect(button('Hide event', row('Parking is free here'))).toBeUndefined();
+    expect(button('Dismiss', row('Parking is free here'))).toBeDefined();
   });
 
   it('dismisses every open report of the item, then loads the list again', async () => {
@@ -110,7 +116,7 @@ describe('AdminReports', () => {
 
   it('treats a report that is already closed as done', async () => {
     const { http, tick, row, button, settle } = await render();
-    button('Dismiss', row('c1'))!.click();
+    button('Dismiss', row('Parking is free here'))!.click();
 
     http
       .expectOne('/api/admin/reports/r3/dismiss')
@@ -122,11 +128,11 @@ describe('AdminReports', () => {
 
   it('shows a failed dismiss on its row', async () => {
     const { http, tick, row, button } = await render();
-    button('Dismiss', row('c1'))!.click();
+    button('Dismiss', row('Parking is free here'))!.click();
     http.expectOne('/api/admin/reports/r3/dismiss').error(new ProgressEvent('error'));
     tick();
 
-    expect(row('c1').querySelector('[role="alert"]')?.textContent).toContain(
+    expect(row('Parking is free here').querySelector('[role="alert"]')?.textContent).toContain(
       "We couldn't dismiss these reports.",
     );
   });

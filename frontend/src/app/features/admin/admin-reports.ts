@@ -2,12 +2,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Observable, finalize, forkJoin } from 'rxjs';
 import { AdminApi, ReportGroup } from '../../core/admin-api';
 import { REPORT_REASON_LABELS } from '../../core/reports-api';
 import { valueOf } from '../../core/resource';
 import { AdminError } from './admin-error';
-import { AdminEventLink } from './admin-event-link';
 
 /**
  * The open reports, one row per reported event or comment, newest activity first. Dismiss closes all of
@@ -16,7 +16,7 @@ import { AdminEventLink } from './admin-event-link';
  */
 @Component({
   selector: 'app-admin-reports',
-  imports: [ReactiveFormsModule, AdminError, AdminEventLink],
+  imports: [ReactiveFormsModule, RouterLink, AdminError],
   templateUrl: './admin-reports.html',
 })
 export class AdminReports {

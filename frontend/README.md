@@ -64,12 +64,12 @@ An unknown page under `/admin` opens the overview.
 
 - **Reports** (`/admin/reports`) lists open reports, one row per event or comment,
   newest activity first, with the number of reports and their reasons. Event rows link
-  to the event by title. Dismiss closes all of an item's open reports without changing
+  to the event by title; comment rows show the comment, its author and the event it is
+  on. Dismiss closes all of an item's open reports without changing
   it. Hide event asks for a reason, takes the event out of every public list and page,
   and closes its reports.
 - **Hidden events** (`/admin/hidden-events`) lists hidden events, most recent first, with
-  who hid each one, when and why, and Unhide. The public event API does not return a
-  hidden event, so rows show its id instead of its title.
+  its title, who hid it, when and why, and Unhide.
 - **Feedback** (`/admin/feedback`) lists website feedback, open items first and then the
   newest, one page at a time, with the date, whether a member or a visitor sent it, and
   the contact email. Mark handled closes an item. The overview counts the open items on
