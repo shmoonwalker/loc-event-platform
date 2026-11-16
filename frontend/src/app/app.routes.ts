@@ -45,7 +45,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/me/profile-page').then((m) => m.ProfilePage),
       },
       {
-        path: 'account',
+        path: 'me/account',
         title: 'Account – Loc',
         canActivate: [authGuard],
         loadComponent: () => import('./features/account/account-page').then((m) => m.AccountPage),

@@ -91,7 +91,7 @@ export class CommentForm implements OnInit {
 function commentErrorMessage(err: HttpErrorResponse): string {
   switch (err.status) {
     case 400:
-      return err.error?.errors?.body ?? 'Check your comment and try again.';
+      return err.error?.errors?.body ?? err.error?.detail ?? 'Check your comment and try again.';
     case 404:
       return 'This comment is no longer available.';
     case 429:

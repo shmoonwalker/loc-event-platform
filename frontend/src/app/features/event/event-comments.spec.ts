@@ -163,6 +163,16 @@ describe('EventComments', () => {
     expect(el.querySelector('form')?.textContent).toContain(
       'Comment must not exceed 2000 characters',
     );
+
+    await write('Hello');
+    http
+      .expectOne('/api/events/e1/comments')
+      .flush(
+        { title: 'Bad Request', detail: "A reply can't be replied to." },
+        { status: 400, statusText: 'Bad Request' },
+      );
+    await settle();
+    expect(el.querySelector('form')?.textContent).toContain("A reply can't be replied to.");
   });
 
   it('replies only to top-level comments that are not deleted', async () => {

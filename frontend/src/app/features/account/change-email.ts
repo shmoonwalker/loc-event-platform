@@ -22,6 +22,7 @@ export class ChangeEmail {
   /** form → sending → sent (show "check your new inbox"). */
   protected readonly status = signal<'form' | 'sending' | 'sent'>('form');
   protected readonly formError = signal<string | null>(null);
+  protected readonly showPassword = signal(false);
 
   protected submit(): void {
     if (this.form.invalid) {
@@ -34,6 +35,7 @@ export class ChangeEmail {
     this.api.changeEmail(currentPassword, newEmail).subscribe({
       next: () => {
         this.form.controls.currentPassword.reset();
+        this.showPassword.set(false);
         this.status.set('sent');
       },
       error: (err: HttpErrorResponse) => {

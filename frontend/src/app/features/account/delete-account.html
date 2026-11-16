@@ -10,15 +10,24 @@
   <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-5">
     <div class="flex flex-col gap-1.5">
       <label for="delete-password" class="font-semibold">Current password</label>
-      <input
-        id="delete-password"
-        formControlName="currentPassword"
-        type="password"
-        autocomplete="current-password"
-        class="field-input"
-        aria-describedby="delete-password-error"
-        [attr.aria-invalid]="errorFor() ? true : null"
-      />
+      <div class="relative">
+        <input
+          id="delete-password"
+          formControlName="currentPassword"
+          [type]="showPassword() ? 'text' : 'password'"
+          autocomplete="current-password"
+          class="field-input w-full pr-16"
+          aria-describedby="delete-password-error"
+          [attr.aria-invalid]="errorFor() ? true : null"
+        />
+        <button
+          type="button"
+          class="absolute inset-y-0 right-0 px-3 text-sm font-semibold text-muted hover:text-ink"
+          (click)="showPassword.update((shown) => !shown)"
+        >
+          {{ showPassword() ? 'Hide' : 'Show' }}<span class="sr-only"> password</span>
+        </button>
+      </div>
       <p id="delete-password-error" class="text-sm text-danger">
         @if (errorFor(); as message) {
           {{ message }}
