@@ -232,4 +232,22 @@
   .link {
     @apply font-semibold text-blush-ink underline underline-offset-4;
   }
+  /* Admin panel controls: square, flat and dense, unlike the member pills. */
+  .admin-btn {
+    @apply inline-flex min-h-10 items-center justify-center rounded bg-admin-fill px-3.5 text-sm font-semibold text-admin-on-fill
+      hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .admin-btn-quiet {
+    @apply inline-flex min-h-10 items-center justify-center rounded border border-admin-line bg-admin-surface px-3.5 text-sm font-semibold
+      hover:border-admin-accent disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .admin-input {
+    @apply rounded border border-admin-line bg-admin-surface px-3 py-2 text-admin-ink;
+  }
+  .admin-link {
+    @apply font-semibold text-admin-accent underline underline-offset-2;
+  }
+  .admin-tag {
+    @apply inline-flex rounded bg-admin-tag px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-admin-tag-ink uppercase;
+  }
 }
