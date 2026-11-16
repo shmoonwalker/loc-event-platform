@@ -31,6 +31,28 @@ class CommentTest {
         assertThat(reply.getEventId()).isEqualTo(EVENT_ID);
         assertThat(reply.getUserId()).isEqualTo(BOB);
         assertThat(reply.isReply()).isTrue();
+        assertThat(reply.isOfficial()).isFalse();
+    }
+
+    @Test
+    void officialReplyIsMarkedOfficialAndStaysOneLevel() {
+        Comment parent = saved(Comment.topLevel(EVENT_ID, ALICE, "Is there parking?", NOW));
+
+        Comment reply = parent.officialReply(BOB, "  Yes, behind the venue  ", NOW);
+
+        assertThat(reply.isOfficial()).isTrue();
+        assertThat(reply.getBody()).isEqualTo("Yes, behind the venue");
+        assertThat(reply.getEventId()).isEqualTo(EVENT_ID);
+        assertThat(reply.getParentId()).isEqualTo(parent.getId());
+        assertThat(reply.isReply()).isTrue();
+        assertThatThrownBy(() -> reply.officialReply(ALICE, "Thanks", NOW)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void refusesAnOfficialReplyToAnUnsavedComment() {
+        Comment unsaved = Comment.topLevel(EVENT_ID, ALICE, "Is there parking?", NOW);
+
+        assertThatThrownBy(() -> unsaved.officialReply(BOB, "Yes", NOW)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
