@@ -1,0 +1,59 @@
+<section aria-labelledby="email-title" class="flex max-w-md flex-col gap-5">
+  <h2 id="email-title" class="display text-3xl">Email</h2>
+
+  @if (status() === 'sent') {
+    <div role="status">
+      <p class="text-xl font-semibold">Check your new inbox</p>
+      <p class="mt-2 text-muted">
+        We sent a link to <strong class="text-ink">{{ form.controls.newEmail.value }}</strong
+        >. Open it to confirm the change. Until then you keep logging in with your current address.
+        The link expires in 24 hours.
+      </p>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-5">
+      <div class="flex flex-col gap-1.5">
+        <label for="email-new" class="font-semibold">New email</label>
+        <input
+          id="email-new"
+          formControlName="newEmail"
+          type="email"
+          autocomplete="email"
+          class="field-input"
+          aria-describedby="email-new-error"
+          [attr.aria-invalid]="errorFor('newEmail') ? true : null"
+        />
+        <p id="email-new-error" class="text-sm text-danger">
+          @if (errorFor('newEmail'); as message) {
+            {{ message }}
+          }
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label for="email-password" class="font-semibold">Current password</label>
+        <input
+          id="email-password"
+          formControlName="currentPassword"
+          type="password"
+          autocomplete="current-password"
+          class="field-input"
+          aria-describedby="email-password-error"
+          [attr.aria-invalid]="errorFor('currentPassword') ? true : null"
+        />
+        <p id="email-password-error" class="text-sm text-danger">
+          @if (errorFor('currentPassword'); as message) {
+            {{ message }}
+          }
+        </p>
+      </div>
+
+      @if (formError(); as message) {
+        <p role="alert" class="text-sm text-danger">{{ message }}</p>
+      }
+      <button type="submit" class="btn-dark self-start" [disabled]="status() === 'sending'">
+        {{ status() === 'sending' ? 'Sending link…' : 'Change email' }}
+      </button>
+    </form>
+  }
+</section>

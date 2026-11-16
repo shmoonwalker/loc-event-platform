@@ -144,4 +144,67 @@ describe('AccountPage', () => {
       );
     });
   });
+
+  describe('email', () => {
+    it('checks the new address before sending anything', async () => {
+      const { http, el, type, submit } = await open();
+      type('#email-new', 'not-an-email');
+      await submit('Email');
+
+      http.expectNone('/api/me/email');
+      expect(el.querySelector('#email-new-error')?.textContent).toContain('Enter a valid email.');
+      expect(el.querySelector('#email-password-error')?.textContent).toContain(
+        'Enter your current password.',
+      );
+    });
+
+    it('sends the new address with the password, then asks to check the new inbox', async () => {
+      const { http, section, type, submit, settle } = await open();
+      type('#email-new', 'new@example.com');
+      type('#email-password', 'old-password-123');
+      await submit('Email');
+
+      const req = http.expectOne('/api/me/email');
+      expect(req.request.body).toEqual({
+        currentPassword: 'old-password-123',
+        newEmail: 'new@example.com',
+      });
+      req.flush(null, { status: 202, statusText: 'Accepted' });
+      await settle();
+
+      const status = section('Email').querySelector('[role="status"]')?.textContent;
+      expect(status).toContain('Check your new inbox');
+      expect(status).toContain('new@example.com');
+    });
+
+    it('shows a wrong current password under its field', async () => {
+      const { http, el, type, submit, settle } = await open();
+      type('#email-new', 'new@example.com');
+      type('#email-password', 'wrong-password');
+      await submit('Email');
+
+      http
+        .expectOne('/api/me/email')
+        .flush(WRONG_PASSWORD, { status: 401, statusText: 'Unauthorized' });
+      await settle();
+
+      expect(el.querySelector('#email-password-error')?.textContent).toContain(
+        'Your current password is incorrect.',
+      );
+    });
+
+    it('shows a failed request above the button', async () => {
+      const { http, section, type, submit, settle } = await open();
+      type('#email-new', 'new@example.com');
+      type('#email-password', 'old-password-123');
+      await submit('Email');
+
+      http.expectOne('/api/me/email').error(new ProgressEvent('error'));
+      await settle();
+
+      expect(section('Email').querySelector('[role="alert"]')?.textContent).toContain(
+        "We couldn't save this change.",
+      );
+    });
+  });
 });
