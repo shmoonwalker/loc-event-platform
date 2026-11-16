@@ -1,15 +1,14 @@
-<section class="wrap pt-14 pb-16" aria-labelledby="profile-title">
-  <a routerLink="/me" class="link">My Loc</a>
-  <h1 class="display mt-4 text-[clamp(36px,5vw,60px)]" id="profile-title">Profile</h1>
-  <p class="mt-2 text-muted">How others see you on Loc.</p>
-
+<div class="flex flex-col gap-12">
   <form
     [formGroup]="form"
     (ngSubmit)="saveName()"
-    class="mt-10 flex max-w-md flex-col gap-5"
+    class="flex max-w-md flex-col gap-5"
     aria-labelledby="name-title"
   >
-    <h2 id="name-title" class="text-xl font-semibold">Name</h2>
+    <div>
+      <h2 id="name-title" class="display text-3xl">Name</h2>
+      <p class="mt-1 text-muted">How others see you on Loc.</p>
+    </div>
     <div class="flex flex-col gap-1.5">
       <label for="displayName" class="font-semibold">Display name</label>
       <input
@@ -42,17 +41,61 @@
   </form>
 
   @if (session.currentUser(); as user) {
-    <section class="mt-14 flex max-w-xl flex-col gap-5" aria-labelledby="avatar-title">
-      <h2 id="avatar-title" class="text-xl font-semibold">Avatar</h2>
+    <section class="flex max-w-xl flex-col gap-5" aria-labelledby="avatar-title">
+      <h2 id="avatar-title" class="display text-3xl">Avatar</h2>
 
       <div class="flex flex-wrap items-center gap-5">
-        <img
-          [src]="picked()?.url ?? user.avatarUrl"
-          [alt]="picked() ? 'Preview of your new picture' : 'Your avatar'"
-          class="size-28 rounded-full border border-line bg-panel object-cover"
-          width="112"
-          height="112"
-        />
+        @if (picked()) {
+          <div class="flex flex-col items-center gap-3">
+            <!-- The circle shows exactly what is kept: the square canvas is uploaded, the round mask is CSS. -->
+            <canvas
+              class="size-56 cursor-move touch-none rounded-full border border-line bg-panel"
+              [width]="cropSize"
+              [height]="cropSize"
+              tabindex="0"
+              aria-label="Preview of your new picture"
+              aria-describedby="crop-hint"
+              (pointerdown)="startDrag($event)"
+              (pointermove)="drag($event)"
+              (pointerup)="endDrag()"
+              (pointercancel)="endDrag()"
+              (keydown)="nudge($event)"
+              #cropCanvas
+            ></canvas>
+            <label class="flex w-56 flex-col gap-1 text-sm font-semibold">
+              Zoom
+              <input
+                type="range"
+                min="1"
+                [max]="maxZoom"
+                step="0.01"
+                [value]="crop().zoom"
+                [disabled]="avatarBusy()"
+                (input)="zoomTo(zoomInput.valueAsNumber)"
+                #zoomInput
+              />
+            </label>
+            <p id="crop-hint" class="w-56 text-center text-sm text-muted">
+              Drag the picture, or use the arrow keys, to choose what shows in the circle.
+            </p>
+          </div>
+        } @else {
+          <button
+            type="button"
+            class="rounded-full"
+            aria-haspopup="dialog"
+            (click)="avatarView.showModal()"
+          >
+            <img
+              [src]="user.avatarUrl"
+              alt=""
+              class="size-28 rounded-full border border-line bg-panel object-cover"
+              width="112"
+              height="112"
+            />
+            <span class="sr-only">View your avatar larger</span>
+          </button>
+        }
         <div class="flex flex-wrap gap-3">
           @if (picked()) {
             <button type="button" class="btn-dark" (click)="upload()" [disabled]="avatarBusy()">
@@ -93,6 +136,23 @@
         </div>
       </div>
       <p id="upload-hint" class="text-sm text-muted">JPEG, PNG or WebP, up to 5 MB.</p>
+
+      <!-- Native modal dialog: it traps focus, closes on Escape and gives focus back to the avatar. -->
+      <dialog
+        class="m-auto max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-panel p-6 text-ink backdrop:bg-ink/60"
+        aria-labelledby="avatar-view-title"
+        #avatarView
+      >
+        <h3 id="avatar-view-title" class="text-xl font-semibold">Your avatar</h3>
+        <img
+          [src]="user.avatarUrl"
+          [alt]="'Avatar of ' + user.displayName"
+          class="mt-4 aspect-square w-80 max-w-full rounded-full border border-line bg-bg object-cover"
+          width="320"
+          height="320"
+        />
+        <button type="button" class="btn-dark mt-5" (click)="avatarView.close()">Close</button>
+      </dialog>
       @if (avatarError(); as message) {
         <p role="alert" class="text-sm text-danger">{{ message }}</p>
       }
@@ -116,4 +176,4 @@
       </div>
     </section>
   }
-</section>
+</div>

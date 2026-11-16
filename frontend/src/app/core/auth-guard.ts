@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { ActivatedRouteSnapshot, CanActivateFn, Router } from '@angular/router';
 import { AuthSession } from './auth-session';
 
 /**
@@ -15,3 +15,9 @@ export const adminGuard: CanActivateFn = () => {
   const session = inject(AuthSession);
   return session.isAdmin() || inject(Router).createUrlTree([session.loggedIn() ? '/' : '/login']);
 };
+
+/** True when the page, or a route around it, is guarded for signed-in members or admins. */
+export const needsAccount = (route: ActivatedRouteSnapshot | null): boolean =>
+  !!route &&
+  (!!route.routeConfig?.canActivate?.some((g) => g === authGuard || g === adminGuard) ||
+    needsAccount(route.firstChild));

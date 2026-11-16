@@ -1,17 +1,18 @@
 import { Component, computed, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { AuthSession } from '../core/auth-session';
 import { EventsApi } from '../core/events-api';
 import { HomeCity } from '../core/home-city';
 import { valueOf } from '../core/resource';
 import { ThemeService } from '../core/theme';
 import { IconComponent } from '../shared/icon/icon';
+import { AccountMenu } from './account-menu';
 
-/** Brand, "Your city" picker (drives the Near-you rail), theme switch and current account. */
+/** Brand, "Your city" picker (drives the Near-you rail), theme switch and the account menu (or sign-up and login). */
 @Component({
   selector: 'app-site-header',
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink, IconComponent, AccountMenu],
   templateUrl: './site-header.html',
 })
 export class SiteHeader {
@@ -19,13 +20,6 @@ export class SiteHeader {
   protected readonly homeCity = inject(HomeCity);
   protected readonly theme = inject(ThemeService);
   protected readonly session = inject(AuthSession);
-  private readonly router = inject(Router);
-
-  /** Back to the home page once the server has answered, also when it could not be reached (the UI is logged out anyway). */
-  protected logout(): void {
-    const home = () => void this.router.navigateByUrl('/');
-    this.session.logout().subscribe({ complete: home, error: home });
-  }
 
   // rxResource = "run this Observable, expose value/loading/error as signals". No params => runs once.
   private readonly cities = rxResource({ stream: () => this.api.cities() });

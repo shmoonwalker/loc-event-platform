@@ -58,7 +58,7 @@
       </div>
       @if (!e.available) {
         <p class="mt-4 rounded-xl border border-line bg-panel p-4 text-muted" role="status">
-          This event is no longer available. You can still see it because you saved it.
+          This event is no longer available.
         </p>
       }
       @if (dates().length > 1) {
@@ -134,7 +134,7 @@
     </div>
 
     <aside class="flex min-w-0 flex-col gap-8 wrap-break-word">
-      @if (!online()) {
+      @if (!online() && e.available) {
         <section aria-labelledby="weather-title">
           <h2 class="text-xl font-semibold" id="weather-title">Weather</h2>
           <div class="mt-2 flex items-center gap-3 rounded-[14px] border border-line bg-panel p-4">

@@ -44,6 +44,28 @@ describe('SaveButton', () => {
     expect(http.expectOne('/api/me/saved-events/e1').request.method).toBe('DELETE');
   });
 
+  it('reports the new state only once the server accepted it', () => {
+    const { click, http, fixture } = render(true);
+    const changes: boolean[] = [];
+    fixture.componentInstance.savedChange.subscribe((saved) => changes.push(saved));
+    click();
+    expect(changes).toEqual([]);
+
+    http
+      .expectOne('/api/me/saved-events/e1')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    expect(changes).toEqual([false]);
+  });
+
+  it('reports nothing when the call fails', () => {
+    const { click, http, fixture } = render(true);
+    const changes: boolean[] = [];
+    fixture.componentInstance.savedChange.subscribe((saved) => changes.push(saved));
+    click();
+    http.expectOne('/api/me/saved-events/e1').flush(null, { status: 500, statusText: 'Error' });
+    expect(changes).toEqual([]);
+  });
+
   it('rolls back when the call fails', () => {
     const { button, click, http, fixture } = render(false);
     click();

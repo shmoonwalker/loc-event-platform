@@ -1,0 +1,26 @@
+<section class="wrap pt-14 pb-16" aria-labelledby="settings-title">
+  <h1 class="display text-[clamp(36px,5vw,60px)]" id="settings-title">Account settings</h1>
+
+  <div class="mt-10 grid gap-10 md:grid-cols-[220px_minmax(0,1fr)]">
+    <nav aria-label="Settings sections">
+      <ul role="list" class="flex flex-col gap-1">
+        @for (s of sections; track s.path) {
+          <li>
+            <a
+              [routerLink]="s.path"
+              routerLinkActive
+              ariaCurrentWhenActive="page"
+              class="flex min-h-11 items-center rounded-xl border-l-4 border-transparent px-4 font-semibold text-muted hover:text-ink aria-[current=page]:border-blush aria-[current=page]:bg-panel aria-[current=page]:text-ink"
+            >
+              {{ s.label }}
+            </a>
+          </li>
+        }
+      </ul>
+    </nav>
+
+    <div class="min-w-0">
+      <router-outlet />
+    </div>
+  </div>
+</section>

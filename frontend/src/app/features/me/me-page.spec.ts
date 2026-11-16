@@ -51,6 +51,20 @@ describe('MePage', () => {
     expect(el().textContent).toContain('No saved events yet');
   });
 
+  it('greets a signed-in member and links to the profile settings', async () => {
+    const { harness, http, el } = await open('/me');
+    http.expectOne('/api/me/saved-events?page=0').flush(emptySaved);
+    TestBed.inject(AuthSession).start('token').subscribe();
+    http.expectOne('/api/auth/me').flush({ id: 'member-id', displayName: 'Shadi', role: 'USER' });
+    await harness.fixture.whenStable();
+
+    expect(el().textContent).toContain('Hi Shadi');
+    const edit = [...el().querySelectorAll('a')].find(
+      (a) => a.textContent?.trim() === 'Edit profile',
+    );
+    expect(edit?.getAttribute('href')).toBe('/me/settings/profile');
+  });
+
   it('switches to the Following tab and drops the Saved page number', async () => {
     const { harness, http, tab } = await open('/me?page=2');
     http.expectOne('/api/me/saved-events?page=2').flush({ ...emptySaved, page: 2 });

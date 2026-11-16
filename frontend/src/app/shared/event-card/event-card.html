@@ -52,5 +52,6 @@
     class="absolute top-3 right-3"
     [eventId]="event().id"
     [initiallySaved]="event().saved"
+    (savedChange)="savedChange.emit($event)"
   />
 </div>

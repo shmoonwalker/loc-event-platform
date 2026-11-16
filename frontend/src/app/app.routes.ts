@@ -39,17 +39,34 @@ export const routes: Routes = [
         loadComponent: () => import('./features/me/me-page').then((m) => m.MePage),
       },
       {
-        path: 'me/profile',
-        title: 'Profile – Loc',
+        path: 'me/settings',
         canActivate: [authGuard],
-        loadComponent: () => import('./features/me/profile-page').then((m) => m.ProfilePage),
+        loadComponent: () => import('./features/account/settings-page').then((m) => m.SettingsPage),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'profile' },
+          {
+            path: 'profile',
+            title: 'Profile – Account settings – Loc',
+            loadComponent: () =>
+              import('./features/account/profile-settings').then((m) => m.ProfileSettings),
+          },
+          {
+            path: 'security',
+            title: 'Sign-in & security – Account settings – Loc',
+            loadComponent: () =>
+              import('./features/account/security-settings').then((m) => m.SecuritySettings),
+          },
+          {
+            path: 'account',
+            title: 'Account – Account settings – Loc',
+            loadComponent: () =>
+              import('./features/account/delete-account').then((m) => m.DeleteAccount),
+          },
+        ],
       },
-      {
-        path: 'me/account',
-        title: 'Account – Loc',
-        canActivate: [authGuard],
-        loadComponent: () => import('./features/account/account-page').then((m) => m.AccountPage),
-      },
+      // Profile and account settings became sections of one settings page; keep old links working.
+      { path: 'me/profile', redirectTo: 'me/settings/profile' },
+      { path: 'me/account', redirectTo: 'me/settings/security' },
       // The Saved page became the first tab of My Loc; keep old links working.
       { path: 'saved', redirectTo: 'me' },
       {

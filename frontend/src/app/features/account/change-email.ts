@@ -1,7 +1,14 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { AccountApi } from '../../core/account-api';
+import { AuthSession } from '../../core/auth-session';
 import { fieldError, showApiError } from './form-errors';
 
 /** New address plus the current password; the change completes from the link sent to the new address. */
@@ -13,9 +20,19 @@ import { fieldError, showApiError } from './form-errors';
 export class ChangeEmail {
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly api = inject(AccountApi);
+  protected readonly session = inject(AuthSession);
+
+  /** Checked first, so the current address is refused before any format message. */
+  private readonly notCurrent = (control: AbstractControl<string>): ValidationErrors | null =>
+    control.value.trim().toLowerCase() === this.session.currentUser()?.email.trim().toLowerCase()
+      ? { sameEmail: true }
+      : null;
 
   protected readonly form = this.fb.group({
-    newEmail: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
+    newEmail: [
+      '',
+      [this.notCurrent, Validators.required, Validators.email, Validators.maxLength(254)],
+    ],
     currentPassword: ['', Validators.required],
   });
 
@@ -52,6 +69,7 @@ export class ChangeEmail {
 
 const MESSAGES: Record<string, Record<string, string>> = {
   newEmail: {
+    sameEmail: 'This is already your email. Enter a different one.',
     required: 'Enter your new email.',
     email: 'Enter a valid email.',
     maxlength: 'Use at most 254 characters.',

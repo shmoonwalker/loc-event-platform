@@ -10,8 +10,10 @@ This Angular application is Loc's user interface. It has these pages:
 | `/register` | Create an account with name, email and password, then "check your email" |
 | `/verify-email` | Opened from the verification or email-change email; verifies the account (or its new address) or offers a new link |
 | `/login` | Log in with email and password, or resend verification for an unverified account |
-| `/me/account` | Signed in: change the password or email, or delete the account |
-| `/me/profile` | Signed-in members: change the display name, pick a preset avatar, or upload a picture (preview first) and remove it again |
+| `/me` | Signed in: the dashboard with saved events and followed organizers |
+| `/me/settings/profile` | Signed in: change the display name, pick a preset avatar, or upload a picture (cropped and zoomed in a round preview first) and remove it again |
+| `/me/settings/security` | Signed in: change the email (the current one is shown) or the password |
+| `/me/settings/account` | Signed in: delete the account |
 | `/holding` | Holding page from the earlier version of the site |
 
 Filters live in the URL query string, so every filtered view is a shareable link. The
@@ -31,16 +33,18 @@ Styling uses Tailwind CSS v4. The design tokens (light and dark) are CSS variabl
 `AuthSession.start(accessToken)` loads `/api/auth/me`; sign-in callers subscribe before
 opening the app. `refresh()` uses the same path on startup and after an expired token.
 The header reads `currentUser` for the avatar, display name and role, and logout clears
-both the token and account. Neither is persisted in browser storage. The profile page
-hands each account the profile API returns to `AuthSession.update()`, so the header
+both the token and account. Neither is persisted in browser storage. The profile settings
+hand each account the profile API returns to `AuthSession.update()`, so the header
 shows a new name or avatar without a reload. Preset avatars are served from
 `public/avatars/`; uploaded pictures come from the image bucket's own domain.
 
 Use `isAdmin()` for admin-only actions and `adminGuard` for admin routes. The backend
-still authorizes every request. The header links a member's avatar and name to the
-profile page and offers My Loc, Account and logout to members and admins, and
-login/registration to visitors. Google sign-in (#74) is separate work and must use
-this same session path on return.
+still authorizes every request. Visitors see sign-up and login in the header; members
+and admins see only their avatar. It opens a small menu with their name and role,
+Account settings, Dashboard (`/me`) and Log out; Escape or a click outside closes it.
+Logging out keeps the visitor on a public page and opens the home page from a page
+that needs an account (`needsAccount()` checks the route's guards). Google sign-in
+must use this same session path on return.
 
 ### Comments
 
@@ -54,10 +58,24 @@ often, show under the form. The endpoints are in the [Member API](../backend/doc
 
 ### Account settings
 
+`/me/settings` is one page with the sections Profile, Sign-in & security and Account
+listed on the left (above the section on small screens); each section has its own URL.
+`/me/profile` and `/me/account` redirect to it. The email form shows the current address
+and refuses it as the new one. A picked avatar picture is drawn on a canvas inside a
+circle: drag it (or use the arrow keys) and zoom to choose the part to keep. Only that
+square, 512 × 512 pixels, is uploaded, in the picked file's format. Clicking the avatar
+opens a larger view in a dialog.
+
 Changing the password, changing the email and deleting the account each ask for the
 current password. A wrong one is shown under that field; the interceptor does not
 refresh the session for it, because the API answers it with `401` like an expired token.
 Deleting the account ends the session in the UI and opens the home page.
+
+### Saved events
+
+Unsaving an event on the dashboard removes its card at once and says "Removed"; the
+count goes down with it. An event that is no longer available still opens from the saved
+list; its page says "This event is no longer available." and shows no weather.
 
 ### Deployment
 

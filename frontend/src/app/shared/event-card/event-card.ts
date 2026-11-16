@@ -1,4 +1,4 @@
-import { Component, computed, input, linkedSignal } from '@angular/core';
+import { Component, computed, input, linkedSignal, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { categoryImage, eventImageUrl } from '../../core/event-image';
 import { dayParts, formatTime } from '../../core/time';
@@ -15,6 +15,8 @@ export class EventCardComponent {
   readonly event = input.required<EventCard>();
   /** Saved events that were withdrawn or are over: still shown on the Saved page, marked as gone. */
   readonly unavailable = input(false);
+  /** The save button's new state, once the server has accepted it. */
+  readonly savedChange = output<boolean>();
 
   protected readonly online = computed(() => this.event().place === 'ONLINE');
   protected readonly day = computed(() => dayParts(this.event().startAt));

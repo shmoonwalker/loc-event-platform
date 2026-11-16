@@ -1,5 +1,13 @@
 <section aria-labelledby="email-title" class="flex max-w-md flex-col gap-5">
-  <h2 id="email-title" class="display text-3xl">Email</h2>
+  <div>
+    <h2 id="email-title" class="display text-3xl">Email</h2>
+    @if (session.currentUser(); as user) {
+      <p class="mt-1 text-muted">
+        You log in with <strong class="text-ink">{{ user.email }}</strong
+        >.
+      </p>
+    }
+  </div>
 
   @if (status() === 'sent') {
     <div role="status">

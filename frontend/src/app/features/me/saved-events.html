@@ -1,4 +1,7 @@
-<p class="text-muted" aria-live="polite">
+<p class="text-muted outline-none" aria-live="polite" tabindex="-1" #status>
+  @if (removed()) {
+    <strong class="text-ink">Removed.</strong>
+  }
   @if (result(); as page) {
     @if (page.totalElements) {
       {{ page.totalElements }} saved {{ page.totalElements === 1 ? 'event' : 'events' }}.
@@ -18,7 +21,13 @@
     @if (page.items.length) {
       <ul role="list" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-5 gap-y-6">
         @for (item of page.items; track item.event.id) {
-          <li><app-event-card [event]="item.event" [unavailable]="!item.available" /></li>
+          <li>
+            <app-event-card
+              [event]="item.event"
+              [unavailable]="!item.available"
+              (savedChange)="!$event && remove(item.event.id)"
+            />
+          </li>
         }
       </ul>
     } @else if (page.totalElements) {

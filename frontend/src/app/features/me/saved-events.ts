@@ -1,4 +1,12 @@
-import { Component, computed, inject, input, output } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  inject,
+  input,
+  linkedSignal,
+  output,
+  viewChild,
+} from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { valueOf } from '../../core/resource';
@@ -25,6 +33,30 @@ export class SavedEvents {
     params: () => this.page(),
     stream: ({ params }) => this.api.list(params),
   });
-  protected readonly result = computed(() => valueOf(this.saved));
+  /** The loaded page, minus the events unsaved here since; a reload starts from the server's answer again. */
+  protected readonly result = linkedSignal(() => valueOf(this.saved));
+  /** Announced in the count line after an unsave, until another page opens. */
+  protected readonly removed = linkedSignal({ source: this.page, computation: () => false });
+  private readonly status = viewChild.required<ElementRef<HTMLElement>>('status');
   protected readonly skeletons = Array.from({ length: 8 });
+
+  /**
+   * An unsaved event leaves the list at once (no undo: saving it again happens on the event's page).
+   * When that empties the page, the previous page opens if this was the last one; otherwise the page reloads
+   * so the next events move up.
+   */
+  protected remove(id: string): void {
+    const page = this.result();
+    if (!page) return;
+    const totalElements = page.totalElements - 1;
+    const totalPages = Math.ceil(totalElements / page.size);
+    const items = page.items.filter((item) => item.event.id !== id);
+    this.result.set({ ...page, items, totalElements, totalPages });
+    this.removed.set(true);
+    // The focused heart left with its card; keep keyboard focus on the page, where "Removed" is said.
+    this.status().nativeElement.focus();
+    if (items.length || !totalElements) return;
+    if (this.page() >= totalPages) this.pageChange.emit(totalPages - 1);
+    else this.saved.reload();
+  }
 }
