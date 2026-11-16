@@ -70,6 +70,10 @@ app:
       comment:
         capacity: 5
         period: 1m
+      # per member
+      report:
+        capacity: 5
+        period: 1h
       # per member across operations that check the current password
       account-security:
         capacity: 5
