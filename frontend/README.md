@@ -14,9 +14,11 @@ This Angular application is Loc's user interface. It has these pages:
 | `/me/profile` | Signed-in members: change the display name, pick a preset avatar, or upload a picture (preview first) and remove it again |
 | `/holding` | Holding page from the earlier version of the site |
 
-Filters live in the URL query string, so every filtered view is a shareable link. The
-list shows one card per event; the event page lists all of its dates. The frontend talks
-only to the backend API, described in the [Discovery API](../backend/docs/discovery.md).
+The list's filters are picked from menus: date (a preset or your own date range), time
+of day (morning, afternoon, evening or late night), one city, and any number of
+categories and tags. Filters live in the URL query string, so every filtered view is a
+shareable link. The list shows one card per event; the event page lists all of its
+dates. The frontend talks only to the backend API, described in the [Discovery API](../backend/docs/discovery.md).
 
 From `frontend/`, install dependencies with `npm ci`. Use `npm start` for the
 development server at `http://localhost:4200/` (it proxies `/api` to the backend on
