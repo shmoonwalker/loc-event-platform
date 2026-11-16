@@ -138,6 +138,19 @@ describe('authInterceptor', () => {
     expect(status).toBe(401);
   });
 
+  it('sends no token to the password reset calls, so an expired one cannot make them fail', () => {
+    const { client, http } = setup('expired-token');
+    client.post('/api/auth/forgot-password', {}).subscribe();
+    client.post('/api/auth/reset-password', {}).subscribe();
+
+    expect(http.expectOne('/api/auth/forgot-password').request.headers.has('Authorization')).toBe(
+      false,
+    );
+    expect(http.expectOne('/api/auth/reset-password').request.headers.has('Authorization')).toBe(
+      false,
+    );
+  });
+
   it('does not refresh when a signed-in call is refused for a wrong current password', () => {
     const { client, http, navigate } = setup('access-token');
     let status: number | undefined;

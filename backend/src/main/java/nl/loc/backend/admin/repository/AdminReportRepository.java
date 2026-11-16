@@ -22,25 +22,52 @@ public class AdminReportRepository {
         this.json = json;
     }
 
-    /** One group per reported item. Resolved reports are left out. Newest activity first. */
+    /**
+     * One group per reported item, with its show and title and, for a comment, its body and author.
+     * An event report filed on an older {@code loc_event_id} still resolves to its show.
+     * Resolved reports are left out. Newest activity first.
+     */
     public List<ReportGroupResponse> listOpen() {
         return jdbc.sql("""
-                SELECT target_type,
-                       target_id,
-                       count(*) AS open_count,
-                       to_json(array_agg(DISTINCT reason ORDER BY reason))::text AS reasons,
-                       to_json(array_agg(id ORDER BY created_at, id))::text AS report_ids
-                FROM app.report
-                WHERE resolved_at IS NULL
-                GROUP BY target_type, target_id
-                ORDER BY max(created_at) DESC, target_type, target_id
+                WITH grouped AS (
+                    SELECT target_type,
+                           target_id,
+                           count(*) AS open_count,
+                           to_json(array_agg(DISTINCT reason ORDER BY reason))::text AS reasons,
+                           to_json(array_agg(id ORDER BY created_at, id))::text AS report_ids,
+                           max(created_at) AS last_reported_at
+                    FROM app.report
+                    WHERE resolved_at IS NULL
+                    GROUP BY target_type, target_id
+                )
+                SELECT g.*, coalesce(e.event_id, t.id) AS event_id, e.event_title,
+                       CASE WHEN c.deleted_at IS NULL THEN c.body END AS comment_body,
+                       u.display_name AS comment_author_name
+                FROM grouped g
+                LEFT JOIN app.comment c ON g.target_type = 'COMMENT' AND c.id = g.target_id
+                LEFT JOIN app.app_user u ON u.id = c.user_id
+                CROSS JOIN LATERAL (
+                    SELECT CASE WHEN g.target_type = 'EVENT' THEN g.target_id ELSE c.event_id END AS id
+                ) t
+                LEFT JOIN LATERAL (
+                    SELECT s.loc_group_id AS event_id, s.payload->>'title' AS event_title
+                    FROM publication.event_snapshot s
+                    WHERE s.loc_group_id = t.id OR s.loc_event_id = t.id
+                    ORDER BY s.updated_at DESC
+                    LIMIT 1
+                ) e ON true
+                ORDER BY g.last_reported_at DESC, g.target_type, g.target_id
                 """)
                 .query((rs, row) -> new ReportGroupResponse(
                         rs.getString("target_type"),
                         rs.getObject("target_id", UUID.class),
                         rs.getLong("open_count"),
                         strings(rs.getString("reasons")),
-                        uuids(rs.getString("report_ids"))))
+                        uuids(rs.getString("report_ids")),
+                        rs.getObject("event_id", UUID.class),
+                        rs.getString("event_title"),
+                        rs.getString("comment_body"),
+                        rs.getString("comment_author_name")))
                 .list();
     }
 

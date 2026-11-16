@@ -96,18 +96,20 @@ describe('SiteHeader', () => {
       'Account settings',
     );
     expect(menu()?.querySelector('a[href="/me"]')?.textContent).toContain('Dashboard');
+    expect(menu()?.querySelector('a[href="/admin"]')).toBeNull();
     expect(button('Log out')).toBeDefined();
 
     toggleMenu();
     expect(menu()).toBeNull();
   });
 
-  it('shows Admin for an admin account', async () => {
+  it('shows Admin and a link to the admin panel for an admin account', async () => {
     const { menu, toggleMenu } = await open('ADMIN');
     toggleMenu();
     expect(menu()?.textContent).toContain('Admin');
     expect(menu()?.textContent).not.toContain('Dashboard');
     expect(menu()?.querySelector('a[href="/me"]')).toBeNull();
+    expect(menu()?.querySelector('a[href="/admin"]')?.textContent?.trim()).toBe('Admin');
   });
 
   it('closes on Escape and gives the focus back to the avatar', async () => {

@@ -274,6 +274,25 @@ describe('EventPage', () => {
     expect(el.textContent).not.toContain('no longer available');
   });
 
+  it('offers members, not visitors or admins, to report the event', async () => {
+    const el = await open((req) => req.flush(event));
+    const report = () =>
+      [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Report');
+    expect(report()).toBeUndefined();
+
+    const session = TestBed.inject(AuthSession);
+    session.start('token');
+    await settle();
+    expect(report()).toBeDefined();
+
+    session.start('token').subscribe();
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/auth/me')
+      .flush({ id: 'a1', displayName: 'Loc team', role: 'ADMIN' });
+    await settle();
+    expect(report()).toBeUndefined();
+  });
+
   it('opens a saved event that is no longer public through the saved events API', async () => {
     TestBed.configureTestingModule({
       providers: [

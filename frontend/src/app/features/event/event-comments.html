@@ -46,8 +46,11 @@
                   @if (replyingTo() === c.id) {
                     <li>
                       <app-comment-form
-                        [label]="'Reply to ' + (c.author?.displayName ?? 'this comment')"
-                        submitLabel="Reply"
+                        [label]="
+                          (session.isAdmin() ? 'Official reply to ' : 'Reply to ') +
+                          (c.author?.displayName ?? 'this comment')
+                        "
+                        [submitLabel]="session.isAdmin() ? 'Post official reply' : 'Reply'"
                         [cancelable]="true"
                         [save]="sendReply"
                         (saved)="changed()"
@@ -131,7 +134,7 @@
         } @else {
           <p class="mt-1 wrap-break-word whitespace-pre-line">{{ c.body }}</p>
 
-          @if (member()) {
+          @if (session.loggedIn()) {
             @if (confirmingDelete() === c.id) {
               <div class="mt-2 flex flex-wrap items-center gap-4 text-sm" role="group">
                 <span class="font-semibold">Delete this comment for everyone?</span>
@@ -148,14 +151,48 @@
               @if (deleteError(); as message) {
                 <p role="alert" class="mt-1 text-sm text-danger">{{ message }}</p>
               }
+            } @else if (removing() === c.id) {
+              <form
+                class="mt-2 flex max-w-[70ch] flex-col gap-1.5"
+                (submit)="$event.preventDefault(); remove(c.id)"
+              >
+                <label for="remove-reason" class="text-sm font-semibold">
+                  Why remove this comment? Only admins see the reason.
+                </label>
+                <textarea
+                  id="remove-reason"
+                  rows="2"
+                  class="field-input py-2"
+                  [formControl]="removeReason"
+                  aria-describedby="remove-reason-error"
+                  [attr.aria-invalid]="reasonError() ? true : null"
+                ></textarea>
+                <p id="remove-reason-error" class="text-sm text-danger">{{ reasonError() }}</p>
+                @if (removeError(); as message) {
+                  <p role="alert" class="text-sm text-danger">{{ message }}</p>
+                }
+                <div class="flex items-center gap-4 text-sm">
+                  <button type="submit" class="link text-danger" [disabled]="deleting()">
+                    {{ deleting() ? 'Removing…' : 'Remove for everyone' }}
+                  </button>
+                  <button type="button" class="link" (click)="closeForms()">Cancel</button>
+                </div>
+              </form>
             } @else {
               <div class="mt-2 flex gap-4 text-sm">
                 @if (!reply) {
-                  <button type="button" class="link" (click)="openReply(c.id)">Reply</button>
+                  <button type="button" class="link" (click)="openReply(c.id)">
+                    {{ session.isAdmin() ? 'Official reply' : 'Reply' }}
+                  </button>
                 }
-                @if (c.mine) {
+                @if (session.isAdmin()) {
+                  <!-- the edit endpoint is for members; an admin removes an official reply instead -->
+                  <button type="button" class="link" (click)="askRemove(c.id)">Remove</button>
+                } @else if (c.mine) {
                   <button type="button" class="link" (click)="openEdit(c.id)">Edit</button>
                   <button type="button" class="link" (click)="askDelete(c.id)">Delete</button>
+                } @else {
+                  <app-report-button target="comment" [targetId]="c.id" />
                 }
               </div>
             }

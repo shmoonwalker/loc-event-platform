@@ -54,30 +54,18 @@ const thread = pageOf([
 
 const LIST = '/api/events/e1/comments?page=0';
 
-/** Signs in an admin account, whose session knows its role once /api/auth/me answered. */
-function signInAdmin() {
-  TestBed.inject(AuthSession).start('token').subscribe();
-  TestBed.inject(HttpTestingController)
-    .expectOne('/api/auth/me')
-    .flush({
-      id: 'admin-id',
-      email: 'admin@example.com',
-      displayName: 'Admin',
-      role: 'ADMIN',
-      avatarUrl: '/avatars/sun.svg',
-      avatarPreset: 'SUN',
-    } satisfies CurrentUser);
-}
-
-async function render(signedIn: boolean | 'admin', list: CommentPage = thread) {
+/** true signs in a member whose account is not loaded; 'ADMIN' signs in an admin. */
+async function render(signedIn: boolean | 'ADMIN', list: CommentPage = thread) {
   TestBed.configureTestingModule({
     providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
   });
-  if (signedIn === 'admin') signInAdmin();
-  else if (signedIn) TestBed.inject(AuthSession).start('token');
+  const http = TestBed.inject(HttpTestingController);
+  if (signedIn === 'ADMIN') {
+    TestBed.inject(AuthSession).start('token').subscribe();
+    http.expectOne('/api/auth/me').flush({ id: 'a1', displayName: 'Loc team', role: 'ADMIN' });
+  } else if (signedIn) TestBed.inject(AuthSession).start('token');
   const fixture = TestBed.createComponent(EventComments);
   fixture.componentRef.setInput('eventId', 'e1');
-  const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
   http.expectOne(LIST).flush(list);
   await fixture.whenStable();
@@ -127,10 +115,11 @@ describe('EventComments', () => {
     expect(el.querySelector('form')).toBeNull();
     expect(button('Reply')).toBeUndefined();
     expect(button('Edit')).toBeUndefined();
+    expect(button('Report')).toBeUndefined();
   });
 
-  it('offers the admin account no forms or actions, and no login prompt', async () => {
-    const { el, button } = await render('admin', pageOf([comment({ mine: true })]));
+  it('gives the admin account no member comment form, member actions or login prompt', async () => {
+    const { el, button } = await render('ADMIN', pageOf([comment({ mine: true })]));
 
     expect(el.querySelector('form')).toBeNull();
     expect(el.querySelector('a[href^="/login"]')).toBeNull();
@@ -228,6 +217,100 @@ describe('EventComments', () => {
     expect(button('Delete', item('Anouk'))).toBeTruthy();
     expect(button('Edit', item('Loc team'))).toBeUndefined();
     expect(button('Delete', item('Deleted user'))).toBeUndefined();
+  });
+
+  it("offers Report on other members' comments, not on your own or deleted ones", async () => {
+    const { button, item } = await render(true);
+    expect(button('Report', item('Loc team'))).toBeTruthy();
+    expect(button('Report', item('Deleted user'))).toBeTruthy();
+    expect(button('Report', item('Anouk'))).toBeUndefined();
+    expect(button('Report', item('Comment deleted'))).toBeUndefined();
+  });
+
+  it('offers no Report to an admin', async () => {
+    const { button } = await render('ADMIN');
+    expect(button('Report')).toBeUndefined();
+  });
+
+  it('gives members no admin actions', async () => {
+    const { button } = await render(true);
+    expect(button('Remove')).toBeUndefined();
+    expect(button('Official reply')).toBeUndefined();
+  });
+
+  it('gives an admin Official reply on top-level comments and Remove on every comment', async () => {
+    const { button, item } = await render('ADMIN');
+    expect(button('Official reply', item('Anouk'))).toBeTruthy();
+    expect(button('Official reply', item('Loc team'))).toBeUndefined();
+    expect(button('Reply')).toBeUndefined();
+    expect(button('Remove', item('Anouk'))).toBeTruthy();
+    expect(button('Remove', item('Loc team'))).toBeTruthy();
+    expect(button('Remove', item('Deleted user'))).toBeTruthy();
+    expect(button('Remove', item('Comment deleted'))).toBeUndefined();
+    expect(button('Delete')).toBeUndefined();
+    // editing uses the member endpoint, which refuses admins
+    expect(button('Edit')).toBeUndefined();
+  });
+
+  it('posts an official reply through the admin API', async () => {
+    const { el, http, button, item, write, settle, tick } = await render('ADMIN');
+    button('Official reply', item('Anouk'))!.click();
+    await settle();
+    const form = [...el.querySelectorAll('form')].find((f) =>
+      f.textContent?.includes('Official reply to Anouk'),
+    )!;
+    expect(button('Post official reply', form)).toBeTruthy();
+    await write(' Yes, behind the venue. ', form);
+
+    const req = http.expectOne('/api/admin/comments/c1/official-replies');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ body: 'Yes, behind the venue.' });
+    req.flush(comment({ id: 'r3', official: true }), { status: 201, statusText: 'Created' });
+    tick();
+    http.expectOne(LIST).flush(thread);
+  });
+
+  it('removes a comment only with a reason', async () => {
+    const { el, http, button, item, settle, tick } = await render('ADMIN');
+    button('Remove', item('Loc team'))!.click();
+    await settle();
+    const form = item('Loc team').querySelector('form')!;
+    form.dispatchEvent(new Event('submit'));
+    tick();
+    expect(form.textContent).toContain('Say why the comment is removed.');
+    http.expectNone((req) => req.url.startsWith('/api/admin/comments'));
+
+    const box = el.querySelector<HTMLTextAreaElement>('#remove-reason')!;
+    box.value = '  Spam  ';
+    box.dispatchEvent(new Event('input'));
+    form.dispatchEvent(new Event('submit'));
+
+    const req = http.expectOne('/api/admin/comments/r1');
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.body).toEqual({ reason: 'Spam' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    tick();
+    http.expectOne(LIST).flush(thread);
+  });
+
+  it('shows a failed removal in the form and Cancel closes it', async () => {
+    const { el, http, button, item, settle, tick } = await render('ADMIN');
+    button('Remove', item('Anouk'))!.click();
+    await settle();
+    const box = el.querySelector<HTMLTextAreaElement>('#remove-reason')!;
+    box.value = 'Spam';
+    box.dispatchEvent(new Event('input'));
+    item('Anouk').querySelector('form')!.dispatchEvent(new Event('submit'));
+
+    http.expectOne('/api/admin/comments/c1').flush({}, { status: 404, statusText: 'Not Found' });
+    tick();
+    expect(item('Anouk').querySelector('[role="alert"]')?.textContent).toContain(
+      'This comment is no longer available.',
+    );
+
+    button('Cancel', item('Anouk'))!.click();
+    await settle();
+    expect(item('Anouk').querySelector('form')).toBeNull();
   });
 
   it('edits your comment starting from its text', async () => {

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth-guard';
+import { adminGuard, authGuard } from './core/auth-guard';
 
 // loadComponent = lazy route: the page's code is downloaded only when someone visits it
 // (like Spring's @Lazy, but at the browser/bundle level).
@@ -8,6 +8,37 @@ export const routes: Routes = [
     path: 'holding',
     title: 'Loc is under change',
     loadComponent: () => import('./features/holding/holding-page').then((m) => m.HoldingPage),
+  },
+  {
+    // The admin panel has its own layout instead of the member header and footer.
+    path: 'admin',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/admin-shell').then((m) => m.AdminShell),
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        title: 'Overview – Admin – Loc',
+        loadComponent: () => import('./features/admin/admin-overview').then((m) => m.AdminOverview),
+      },
+      {
+        path: 'reports',
+        title: 'Reports – Admin – Loc',
+        loadComponent: () => import('./features/admin/admin-reports').then((m) => m.AdminReports),
+      },
+      {
+        path: 'hidden-events',
+        title: 'Hidden events – Admin – Loc',
+        loadComponent: () =>
+          import('./features/admin/admin-hidden-events').then((m) => m.AdminHiddenEvents),
+      },
+      {
+        path: 'feedback',
+        title: 'Feedback – Admin – Loc',
+        loadComponent: () => import('./features/admin/admin-feedback').then((m) => m.AdminFeedback),
+      },
+      { path: '**', redirectTo: '' },
+    ],
   },
   {
     // Layout route: renders Shell (header + footer) and puts the matching child inside it.
@@ -70,6 +101,12 @@ export const routes: Routes = [
       // The Saved page became the first tab of My Loc; keep old links working.
       { path: 'saved', redirectTo: 'me' },
       {
+        path: 'feedback',
+        title: 'Send feedback – Loc',
+        loadComponent: () =>
+          import('./features/feedback/feedback-page').then((m) => m.FeedbackPage),
+      },
+      {
         path: 'register',
         title: 'Create account – Loc',
         loadComponent: () =>
@@ -85,6 +122,22 @@ export const routes: Routes = [
         title: 'Verify email – Loc',
         loadComponent: () =>
           import('./features/auth/verify-email/verify-email-page').then((m) => m.VerifyEmailPage),
+      },
+      {
+        path: 'forgot-password',
+        title: 'Forgot password – Loc',
+        loadComponent: () =>
+          import('./features/auth/forgot-password/forgot-password-page').then(
+            (m) => m.ForgotPasswordPage,
+          ),
+      },
+      {
+        path: 'reset-password',
+        title: 'Choose a new password – Loc',
+        loadComponent: () =>
+          import('./features/auth/reset-password/reset-password-page').then(
+            (m) => m.ResetPasswordPage,
+          ),
       },
       {
         path: '**',

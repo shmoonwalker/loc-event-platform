@@ -15,5 +15,7 @@ public record HiddenEventResponse(
         @Schema(description = "When the event was hidden, UTC.", requiredMode = Schema.RequiredMode.REQUIRED)
         Instant hiddenAt,
         @Schema(description = "Why the event was hidden.", requiredMode = Schema.RequiredMode.REQUIRED)
-        String reason) {
+        String reason,
+        @Schema(description = "Event title. Absent when the show is no longer published.")
+        String eventTitle) {
 }

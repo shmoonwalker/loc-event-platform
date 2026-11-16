@@ -1,0 +1,108 @@
+<a
+  href=""
+  class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-20 focus:rounded focus:bg-admin-surface focus:px-4 focus:py-2"
+  (click)="$event.preventDefault(); main.focus()"
+>
+  Skip to content
+</a>
+<div
+  class="min-h-dvh bg-admin-bg font-admin text-admin-ink md:grid md:grid-cols-[15rem_minmax(0,1fr)]"
+>
+  <aside
+    class="admin-side bg-admin-side text-admin-side-ink md:sticky md:top-0 md:flex md:h-dvh md:flex-col"
+  >
+    <div class="flex items-center gap-2 px-4 py-3 md:px-5 md:py-5">
+      <a routerLink="/admin" class="text-2xl font-extrabold tracking-tight" aria-label="Loc admin">
+        loc
+      </a>
+      <span
+        class="rounded bg-admin-fill px-1.5 py-0.5 text-[11px] font-bold tracking-wider text-admin-on-fill uppercase"
+      >
+        Admin
+      </span>
+      <button
+        type="button"
+        class="ml-auto min-h-11 rounded px-3 font-semibold hover:bg-admin-side-active md:hidden"
+        aria-controls="admin-nav"
+        [attr.aria-expanded]="navOpen()"
+        (click)="navOpen.update((open) => !open)"
+      >
+        Sections
+      </button>
+    </div>
+
+    <nav
+      id="admin-nav"
+      aria-label="Admin sections"
+      class="flex-col px-3 pb-4 md:flex md:flex-1"
+      [class.hidden]="!navOpen()"
+      [class.flex]="navOpen()"
+    >
+      <ul role="list" class="flex flex-col gap-0.5">
+        <li>
+          <a
+            routerLink="/admin"
+            routerLinkActive
+            [routerLinkActiveOptions]="{ exact: true }"
+            ariaCurrentWhenActive="page"
+            class="flex min-h-11 items-center rounded px-3 font-medium text-admin-side-muted hover:text-admin-side-ink aria-[current=page]:bg-admin-side-active aria-[current=page]:text-admin-side-ink aria-[current=page]:shadow-[inset_3px_0_var(--admin-side-accent)]"
+            (click)="navOpen.set(false)"
+          >
+            Overview
+          </a>
+        </li>
+        @for (s of sections; track s.path) {
+          <li>
+            <a
+              [routerLink]="['/admin', s.path]"
+              routerLinkActive
+              ariaCurrentWhenActive="page"
+              class="flex min-h-11 items-center rounded px-3 font-medium text-admin-side-muted hover:text-admin-side-ink aria-[current=page]:bg-admin-side-active aria-[current=page]:text-admin-side-ink aria-[current=page]:shadow-[inset_3px_0_var(--admin-side-accent)]"
+              (click)="navOpen.set(false)"
+            >
+              {{ s.label }}
+            </a>
+          </li>
+        }
+      </ul>
+      <a
+        routerLink="/"
+        class="mt-4 flex min-h-11 items-center rounded px-3 font-medium text-admin-side-muted hover:text-admin-side-ink md:mt-auto"
+      >
+        ← Back to site
+      </a>
+    </nav>
+  </aside>
+
+  <div class="flex min-w-0 flex-col">
+    <div
+      class="flex items-center justify-end gap-3 border-b border-admin-line bg-admin-surface px-4 py-2 md:px-8"
+    >
+      <button
+        type="button"
+        class="flex min-h-11 items-center gap-2 rounded px-3 font-medium hover:bg-admin-bg"
+        (click)="theme.toggle()"
+        [attr.aria-label]="
+          theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'
+        "
+      >
+        <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
+      </button>
+      @if (session.currentUser(); as user) {
+        <span class="flex min-w-0 items-center gap-2 text-sm">
+          <img
+            [src]="user.avatarUrl"
+            alt=""
+            class="size-8 shrink-0 rounded-full border border-admin-line object-cover"
+            width="32"
+            height="32"
+          />
+          <span class="truncate font-medium">{{ user.displayName }}</span>
+        </span>
+      }
+    </div>
+    <main tabindex="-1" class="px-4 py-6 outline-none md:px-8 md:py-8" #main>
+      <router-outlet />
+    </main>
+  </div>
+</div>
