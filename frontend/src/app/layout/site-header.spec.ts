@@ -68,6 +68,7 @@ describe('SiteHeader', () => {
     expect(logoutButton()).toBeDefined();
     expect(loginLink()).toBeUndefined();
     expect(el.querySelector('a[href="/me"]')?.textContent).toContain('My Loc');
+    expect(el.querySelector('a[href="/account"]')?.textContent).toContain('Account');
   });
 
   it('logout ends the session on the server and in the UI, then opens the home page', async () => {

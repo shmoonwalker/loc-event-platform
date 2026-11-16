@@ -40,6 +40,7 @@
     <nav aria-label="Account" class="ml-auto flex flex-wrap items-center gap-3">
       @if (session.currentUser(); as user) {
         <a routerLink="/me" class="pill-btn min-h-11">My Loc</a>
+        <a routerLink="/account" class="pill-btn min-h-11">Account</a>
         <span class="min-w-0 text-sm">
           <span class="block max-w-40 truncate font-semibold" [title]="user.displayName">
             {{ user.displayName }}

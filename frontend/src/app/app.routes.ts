@@ -38,6 +38,12 @@ export const routes: Routes = [
         canActivate: [authGuard],
         loadComponent: () => import('./features/me/me-page').then((m) => m.MePage),
       },
+      {
+        path: 'account',
+        title: 'Account – Loc',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/account/account-page').then((m) => m.AccountPage),
+      },
       // The Saved page became the first tab of My Loc; keep old links working.
       { path: 'saved', redirectTo: 'me' },
       {
