@@ -34,7 +34,12 @@ Resolved reports are left out. What remains is grouped by `target_type` and
     "reportIds": [
       "22222222-2222-4222-8222-222222222222",
       "33333333-3333-4333-8333-333333333333"
-    ]
+    ],
+    "eventId": "11111111-1111-4111-8111-111111111111",
+    "eventTitle": "Late-night jazz session",
+    "eventHidden": false,
+    "commentBody": null,
+    "commentAuthorName": null
   }
 ]
 ```
@@ -43,6 +48,14 @@ Resolved reports are left out. What remains is grouped by `target_type` and
 - `reasons` are the distinct reasons, alphabetical:
   `WRONG_INFORMATION`, `SPAM`, `INAPPROPRIATE`, `OTHER`.
 - `reportIds` are the open report ids, oldest first. Dismiss one of them to close it.
+- `eventId` is the show id of the reported event, or of the event the comment is on.
+  It is null when the reported comment no longer exists.
+- `eventTitle` is read from `publication.event_snapshot`, so a hidden or expired event
+  still has one. It is null when the event is not in the catalog.
+- `eventHidden` is true when the event is in `app.hidden_event`; its public page then
+  answers `404`.
+- `commentBody` and `commentAuthorName` are set for a comment. The body is null once the
+  comment was deleted or removed; the name is null when the author's account was deleted.
 - An empty queue is `[]`.
 
 `POST /api/admin/reports/{reportId}/dismiss` sets `resolution` to `DISMISSED`,
@@ -81,6 +94,7 @@ The publication row is never updated. Admin does not edit catalog facts.
 [
   {
     "eventId": "11111111-1111-4111-8111-111111111111",
+    "title": "Late-night jazz session",
     "hiddenBy": "44444444-4444-4444-8444-444444444444",
     "hiddenByName": "Ada",
     "hiddenAt": "2026-11-16T20:00:00Z",
@@ -88,6 +102,9 @@ The publication row is never updated. Admin does not edit catalog facts.
   }
 ]
 ```
+
+`title` comes from `publication.event_snapshot`, because the public event API answers
+`404` for a hidden event. It is null when the event is not in the catalog.
 
 A missing, blank, or over-long reason answers `400`. The reason is stored trimmed.
 

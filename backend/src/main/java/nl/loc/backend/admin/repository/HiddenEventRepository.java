@@ -18,6 +18,13 @@ public class HiddenEventRepository {
         this.jdbc = jdbc;
     }
 
+    /** SQL for the catalog title of a show; read straight from the publication, so hidden shows have one too. */
+    public static String titleOf(String showIdColumn) {
+        return """
+                (SELECT t.payload->>'title' FROM publication.event_snapshot t
+                 WHERE t.loc_group_id = %s ORDER BY t.loc_occurrence_id LIMIT 1)""".formatted(showIdColumn);
+    }
+
     /** Show id for a path id, which may be a show id or an older {@code loc_event_id}. */
     public Optional<UUID> findShowId(UUID id) {
         return jdbc.sql("""
@@ -54,13 +61,15 @@ public class HiddenEventRepository {
     /** Most recently hidden first. */
     public List<HiddenEventResponse> list() {
         return jdbc.sql("""
-                SELECT h.event_id, h.hidden_by, u.display_name AS hidden_by_name, h.hidden_at, h.reason
+                SELECT h.event_id, %s AS title, h.hidden_by, u.display_name AS hidden_by_name, h.hidden_at,
+                       h.reason
                 FROM app.hidden_event h
                 LEFT JOIN app.app_user u ON u.id = h.hidden_by
                 ORDER BY h.hidden_at DESC, h.event_id
-                """)
+                """.formatted(titleOf("h.event_id")))
                 .query((rs, row) -> new HiddenEventResponse(
                         rs.getObject("event_id", UUID.class),
+                        rs.getString("title"),
                         rs.getObject("hidden_by", UUID.class),
                         rs.getString("hidden_by_name"),
                         rs.getObject("hidden_at", OffsetDateTime.class).toInstant(),

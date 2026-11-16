@@ -8,6 +8,8 @@ import java.util.UUID;
 public record HiddenEventResponse(
         @Schema(description = "Show id (loc_group_id).", requiredMode = Schema.RequiredMode.REQUIRED)
         UUID eventId,
+        @Schema(description = "Title of the hidden event. Absent when the event is not in the catalog.")
+        String title,
         @Schema(description = "Admin who hid the event. Absent after that account is deleted.")
         UUID hiddenBy,
         @Schema(description = "Display name of the admin who hid the event. Absent after that account is deleted.")

@@ -7,6 +7,7 @@ import { AdminHiddenEvents } from './admin-hidden-events';
 const HIDDEN: HiddenEvent[] = [
   {
     eventId: 'e1',
+    title: 'Jazz night',
     hiddenBy: 'a1',
     hiddenByName: 'Shadi',
     hiddenAt: '2026-11-16T20:00:00Z',
@@ -14,6 +15,7 @@ const HIDDEN: HiddenEvent[] = [
   },
   {
     eventId: 'e2',
+    title: null,
     hiddenBy: null,
     hiddenByName: null,
     hiddenAt: '2026-11-01T09:30:00Z',
@@ -47,15 +49,17 @@ describe('AdminHiddenEvents', () => {
   it('shows who hid each event, when and why', async () => {
     const { row } = await render();
 
-    expect(row('e1').textContent).toContain('Hidden by Shadi');
-    expect(row('e1').textContent).toContain('Mon, 16 Nov 2026, 21:00');
-    expect(row('e1').textContent).toContain('Duplicate listing');
+    expect(row('Jazz night').textContent).toContain('Hidden by Shadi');
+    expect(row('Jazz night').querySelector('a')).toBeNull();
+    expect(row('e2').textContent).toContain('Event e2');
+    expect(row('Jazz night').textContent).toContain('Mon, 16 Nov 2026, 21:00');
+    expect(row('Jazz night').textContent).toContain('Duplicate listing');
     expect(row('e2').textContent).toContain('Hidden by a deleted admin');
   });
 
   it('unhides an event and loads the list again', async () => {
     const { fixture, el, http, unhide } = await render();
-    unhide('e1').click();
+    unhide('Jazz night').click();
 
     const req = http.expectOne('/api/admin/events/e1/hide');
     expect(req.request.method).toBe('DELETE');

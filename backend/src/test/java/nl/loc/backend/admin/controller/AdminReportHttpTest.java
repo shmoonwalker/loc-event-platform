@@ -107,6 +107,41 @@ class AdminReportHttpTest {
     }
 
     @Test
+    void groupsCarryTheEventTitleAndTheReportedCommentWithItsAuthorAndEvent() throws Exception {
+        UUID showId = UUID.randomUUID();
+        publish(showId, showId);
+        hideDirectly(showId);
+        UUID live = comment(showId, alice, "Buy cheap tickets here", false);
+        UUID removed = comment(showId, bob, "Rude words", true);
+        UUID missing = UUID.randomUUID();
+        report("EVENT", showId, alice, "SPAM", DAY_THREE);
+        report("COMMENT", live, bob, "SPAM", DAY_TWO);
+        report("COMMENT", removed, alice, "INAPPROPRIATE", DAY_ONE);
+        report("COMMENT", missing, bob, "OTHER", DAY_ONE.minusDays(1));
+
+        perform(get("/api/admin/reports"), adminToken())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[0].eventId").value(showId.toString()))
+                .andExpect(jsonPath("$[0].eventTitle").value("Reported"))
+                .andExpect(jsonPath("$[0].eventHidden").value(true))
+                .andExpect(jsonPath("$[0].commentBody").doesNotExist())
+                .andExpect(jsonPath("$[0].commentAuthorName").doesNotExist())
+                .andExpect(jsonPath("$[1].targetId").value(live.toString()))
+                .andExpect(jsonPath("$[1].commentBody").value("Buy cheap tickets here"))
+                .andExpect(jsonPath("$[1].commentAuthorName").value("Alice"))
+                .andExpect(jsonPath("$[1].eventId").value(showId.toString()))
+                .andExpect(jsonPath("$[1].eventTitle").value("Reported"))
+                .andExpect(jsonPath("$[2].targetId").value(removed.toString()))
+                .andExpect(jsonPath("$[2].commentBody").doesNotExist())
+                .andExpect(jsonPath("$[2].commentAuthorName").value("Bob"))
+                .andExpect(jsonPath("$[3].targetId").value(missing.toString()))
+                .andExpect(jsonPath("$[3].eventId").doesNotExist())
+                .andExpect(jsonPath("$[3].eventTitle").doesNotExist())
+                .andExpect(jsonPath("$[3].eventHidden").value(false));
+    }
+
+    @Test
     void anEmptyQueueIsAnEmptyList() throws Exception {
         perform(get("/api/admin/reports"), adminToken())
                 .andExpect(status().isOk())
@@ -287,6 +322,35 @@ class AdminReportHttpTest {
                 .param("id", id)
                 .query(Boolean.class)
                 .single();
+    }
+
+    private UUID comment(UUID showId, UserAccount author, String body, boolean removed) {
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO app.comment (id, event_id, user_id, body, deleted_at, deleted_by, delete_reason)
+                VALUES (:id, :eventId, :userId, :body,
+                        CASE WHEN :removed THEN now() END,
+                        CASE WHEN :removed THEN CAST(:adminId AS uuid) END,
+                        CASE WHEN :removed THEN 'Abuse' END)
+                """)
+                .param("id", id)
+                .param("eventId", showId)
+                .param("userId", author.getId())
+                .param("body", body)
+                .param("removed", removed)
+                .param("adminId", admin.getId())
+                .update();
+        return id;
+    }
+
+    private void hideDirectly(UUID showId) {
+        jdbc.sql("""
+                INSERT INTO app.hidden_event (event_id, hidden_by, reason, hidden_at)
+                VALUES (:eventId, :adminId, 'Duplicate', now())
+                """)
+                .param("eventId", showId)
+                .param("adminId", admin.getId())
+                .update();
     }
 
     private void publish(UUID showId, UUID eventId) {
