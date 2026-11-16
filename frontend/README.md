@@ -84,7 +84,10 @@ carry an "Official" badge. API errors, such as text that is too long or posting 
 often, show under the form. Members can report the event (next to the save button) or
 someone else's comment: a dialog asks for one of the fixed reasons and optional text,
 then says thanks. Errors, such as reporting too often, show in the dialog. Visitors and
-admins do not see Report. The endpoints are in the [Member API](../backend/docs/member.md).
+admins do not see Report. An admin sees Official reply instead of Reply, which posts a
+reply with the "Official" badge, and Remove on every comment and reply instead of
+Delete. Remove asks for a reason, which only admins see, and takes the comment away
+for everyone; the admin endpoints are in [Admin comments](../backend/docs/admin-comments.md). The endpoints are in the [Member API](../backend/docs/member.md).
 
 ### Account settings
 
