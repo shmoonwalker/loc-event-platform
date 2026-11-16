@@ -38,6 +38,24 @@ async function open(url = '/admin') {
   // The overview counts what waits in each section.
   http.match('/api/admin/reports').forEach((req) => req.flush([REPORT, REPORT_2]));
   http.match('/api/admin/hidden-events').forEach((req) => req.flush([]));
+  http.match('/api/admin/feedback?page=0').forEach((req) =>
+    req.flush({
+      page: 0,
+      size: 20,
+      totalElements: 3,
+      totalPages: 1,
+      items: [
+        { id: 'f1', message: 'Hi', createdAt: '2026-11-16T20:00:00Z' },
+        { id: 'f2', message: 'Hey', createdAt: '2026-11-15T20:00:00Z' },
+        {
+          id: 'f3',
+          message: 'Old',
+          createdAt: '2026-11-14T20:00:00Z',
+          handledAt: '2026-11-15T08:00:00Z',
+        },
+      ],
+    }),
+  );
   await harness.fixture.whenStable();
   const el = harness.routeNativeElement!;
   const nav = () => el.querySelector<HTMLElement>('#admin-nav')!;
@@ -76,6 +94,8 @@ describe('AdminShell', () => {
     expect(card('Reports').textContent).toContain('2');
     expect(card('Hidden events').getAttribute('href')).toBe('/admin/hidden-events');
     expect(card('Hidden events').textContent).not.toMatch(/\d/);
+    expect(link('Feedback').getAttribute('href')).toBe('/admin/feedback');
+    expect(card('Feedback').textContent).toContain('2');
   });
 
   it('marks the open section in the navigation', async () => {

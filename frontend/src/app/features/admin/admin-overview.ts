@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { AdminApi } from '../../core/admin-api';
+import { AdminApi, FeedbackPage } from '../../core/admin-api';
 import { AuthSession } from '../../core/auth-session';
 import { valueOf } from '../../core/resource';
 import { ADMIN_SECTIONS } from './admin-sections';
@@ -50,10 +50,22 @@ export class AdminOverview {
 
   private readonly reports = rxResource({ stream: () => this.api.reports() });
   private readonly hidden = rxResource({ stream: () => this.api.hiddenEvents() });
+  private readonly feedback = rxResource({ stream: () => this.api.feedback(0) });
 
   /** Per section path; missing while loading or after an error, and zero shows no number. */
-  protected readonly counts = computed<Record<string, number | undefined>>(() => ({
+  protected readonly counts = computed<Record<string, number | string | undefined>>(() => ({
     reports: valueOf(this.reports)?.length,
     'hidden-events': valueOf(this.hidden)?.length,
+    feedback: openFeedback(valueOf(this.feedback)),
   }));
+}
+
+/**
+ * Open feedback comes first, so the open items on the first page are all of them, unless the whole
+ * first page is open and more follow. shortcut: shows "20+" then; a count from the API would be exact.
+ */
+function openFeedback(page: FeedbackPage | undefined): number | string | undefined {
+  if (!page) return undefined;
+  const open = page.items.filter((f) => !f.handledAt).length;
+  return open === page.items.length && page.totalPages > 1 ? `${open}+` : open;
 }

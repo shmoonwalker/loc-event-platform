@@ -70,8 +70,20 @@ An unknown page under `/admin` opens the overview.
   and closes its reports.
 - **Hidden events** (`/admin/hidden-events`) lists hidden events, most recent first, with
   its title, who hid it, when and why, and Unhide.
+- **Feedback** (`/admin/feedback`) lists website feedback, open items first and then the
+  newest, one page at a time, with the date, whether a member or a visitor sent it, and
+  the contact email. Mark handled closes an item. The overview counts the open items on
+  the first page and shows `20+` when that whole page is open.
 
 The endpoints are in the [admin moderation API](../backend/docs/admin-moderation.md).
+
+### Feedback
+
+`/feedback` is linked from the footer and open to everyone. Visitors can leave an email
+to be answered on; a member's feedback is linked to their account, so they are not asked
+for one. After sending, the page says thanks and offers to send more. Field errors show
+under their fields, and the rate limit shows with its wait time. The endpoint is in
+[Website feedback](../backend/docs/feedback.md).
 
 ### Comments
 

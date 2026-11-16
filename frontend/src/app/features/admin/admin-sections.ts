@@ -17,4 +17,9 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     label: 'Hidden events',
     description: 'Events taken out of public lists, who hid them and why.',
   },
+  {
+    path: 'feedback',
+    label: 'Feedback',
+    description: 'Website feedback from visitors and members: mark it handled.',
+  },
 ];

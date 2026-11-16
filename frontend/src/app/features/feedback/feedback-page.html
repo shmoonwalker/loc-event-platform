@@ -1,0 +1,61 @@
+<section class="wrap py-16" aria-labelledby="feedback-title">
+  <h1 class="display text-[clamp(36px,5vw,60px)]" id="feedback-title">Send feedback</h1>
+
+  @if (sent()) {
+    <div class="mt-8 max-w-xl" role="status">
+      <p class="text-lg font-semibold">Thanks for your feedback.</p>
+      <p class="mt-2 text-muted">We read every message.</p>
+    </div>
+    <div class="mt-6 flex flex-wrap items-center gap-5">
+      <a routerLink="/" class="btn-dark">Back to events</a>
+      <button type="button" class="link" (click)="sendMore()">Send more feedback</button>
+    </div>
+  } @else {
+    <p class="mt-4 max-w-xl text-muted">
+      Something wrong, missing or confusing on Loc? Tell us. This is not the place to report an
+      event or comment: use Report on its page.
+    </p>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="mt-8 flex max-w-xl flex-col gap-5">
+      <div class="flex flex-col gap-1.5">
+        <label for="feedback-message" class="font-semibold">Your feedback</label>
+        <textarea
+          id="feedback-message"
+          formControlName="message"
+          rows="6"
+          class="field-input py-2"
+          aria-describedby="feedback-message-error"
+          [attr.aria-invalid]="errorFor('message') ? true : null"
+        ></textarea>
+        <p id="feedback-message-error" class="text-sm text-danger">{{ errorFor('message') }}</p>
+      </div>
+
+      @if (!session.loggedIn()) {
+        <div class="flex flex-col gap-1.5">
+          <label for="feedback-email" class="font-semibold">
+            Email <span class="font-normal text-muted">(optional, if you want an answer)</span>
+          </label>
+          <input
+            id="feedback-email"
+            formControlName="contactEmail"
+            type="email"
+            autocomplete="email"
+            class="field-input"
+            aria-describedby="feedback-email-error"
+            [attr.aria-invalid]="errorFor('contactEmail') ? true : null"
+          />
+          <p id="feedback-email-error" class="text-sm text-danger">
+            {{ errorFor('contactEmail') }}
+          </p>
+        </div>
+      }
+
+      @if (formError(); as message) {
+        <p role="alert" class="text-sm text-danger">{{ message }}</p>
+      }
+      <button type="submit" class="btn-dark self-start" [disabled]="sending()">
+        {{ sending() ? 'Sending…' : 'Send feedback' }}
+      </button>
+    </form>
+  }
+</section>
