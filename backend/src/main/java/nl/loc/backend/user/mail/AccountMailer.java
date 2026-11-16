@@ -67,6 +67,31 @@ public class AccountMailer {
     }
 
     @Async
+    public void sendPasswordResetLink(UUID userId, String address, String rawToken) {
+        String link = UriComponentsBuilder
+                .fromUriString(properties.frontendUrl())
+                .path("/reset-password")
+                .queryParam("token", rawToken)
+                .build()
+                .encode()
+                .toUriString();
+
+        String text = """
+                Someone asked to reset the password of your Loc account.
+
+                Choose a new password using this link:
+                %s
+
+                This link is valid for 30 minutes and works once.
+
+                If you didn't ask for this, you can ignore this email.
+                Your password hasn't been changed.
+                """.formatted(link);
+
+        sendLimited(userId, address, "password reset", "Reset your Loc password", text);
+    }
+
+    @Async
     public void sendEmailChanged(UUID userId, String oldEmail) {
         // This security notice must still go out when the account has exhausted its link quota.
         send(userId, oldEmail, "email changed", "Your Loc email address has changed",

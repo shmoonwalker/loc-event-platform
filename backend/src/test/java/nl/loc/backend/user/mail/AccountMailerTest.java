@@ -82,6 +82,16 @@ class AccountMailerTest {
     }
 
     @Test
+    void resetMailLinksToTheFrontendResetPageAndCountsAgainstTheHourlyLimit() {
+        mailer.sendPasswordResetLink(USER_ID, "alice@example.com", "reset_token-1");
+
+        SimpleMailMessage message = sentMessage();
+        assertThat(message.getTo()).containsExactly("alice@example.com");
+        assertThat(message.getText()).contains("http://localhost:4200/reset-password?token=reset_token-1");
+        verify(rateLimiter).consume(RateLimitPolicy.ACCOUNT_MAIL, USER_ID.toString());
+    }
+
+    @Test
     void mailFailureIsLoggedNotThrown() {
         doThrow(new MailSendException("down")).when(mailSender).send(any(SimpleMailMessage.class));
 
