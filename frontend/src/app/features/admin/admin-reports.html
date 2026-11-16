@@ -22,27 +22,9 @@
                 <span class="admin-tag">{{ g.targetType === 'EVENT' ? 'Event' : 'Comment' }}</span>
                 <div class="mt-1 break-words">
                   @if (g.targetType === 'EVENT') {
-                    <app-admin-event-link
-                      [eventId]="g.targetId"
-                      [title]="g.eventTitle"
-                      [hidden]="g.eventHidden"
-                    />
-                  } @else if (g.eventId; as eventId) {
-                    @if (g.commentBody; as body) {
-                      <p class="line-clamp-3 whitespace-pre-line">“{{ body }}”</p>
-                    } @else {
-                      <p class="text-admin-muted italic">Comment deleted</p>
-                    }
-                    <p class="mt-1 text-sm text-admin-muted">
-                      by {{ g.commentAuthorName ?? 'a deleted account' }} on
-                      <app-admin-event-link
-                        [eventId]="eventId"
-                        [title]="g.eventTitle"
-                        [hidden]="g.eventHidden"
-                      />
-                    </p>
+                    <app-admin-event-link [eventId]="g.targetId" />
                   } @else {
-                    <p class="text-admin-muted">This comment no longer exists.</p>
+                    Comment <code class="text-xs text-admin-muted">{{ g.targetId }}</code>
                   }
                 </div>
               </div>
