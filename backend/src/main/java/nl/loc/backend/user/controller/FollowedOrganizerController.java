@@ -47,6 +47,10 @@ public class FollowedOrganizerController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public List<OrganizerInfo> followedOrganizers(@AuthenticationPrincipal Jwt jwt) {
@@ -68,6 +72,10 @@ public class FollowedOrganizerController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public EventPage followedEvents(@AuthenticationPrincipal Jwt jwt,
@@ -96,6 +104,10 @@ public class FollowedOrganizerController {
                     description = "Missing, invalid or expired access token, or the account no longer exists.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
                     responseCode = "404",
                     description = "The organizer is unknown.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -120,6 +132,10 @@ public class FollowedOrganizerController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public void unfollow(@AuthenticationPrincipal Jwt jwt,
