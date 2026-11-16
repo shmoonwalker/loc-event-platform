@@ -10,6 +10,7 @@ This Angular application is Loc's user interface. It has these pages:
 | `/register` | Create an account with name, email and password, then "check your email" |
 | `/verify-email` | Opened from the verification email; verifies the account or offers a new link |
 | `/login` | Log in with email and password, or resend verification for an unverified account |
+| `/me/profile` | Signed-in members: change the display name, pick a preset avatar, or upload a picture (preview first) and remove it again |
 | `/holding` | Holding page from the earlier version of the site |
 
 Filters live in the URL query string, so every filtered view is a shareable link. The
@@ -28,13 +29,16 @@ Styling uses Tailwind CSS v4. The design tokens (light and dark) are CSS variabl
 
 `AuthSession.start(accessToken)` loads `/api/auth/me`; sign-in callers subscribe before
 opening the app. `refresh()` uses the same path on startup and after an expired token.
-The header reads `currentUser` for the display name and role, and logout clears both
-the token and account. Neither is persisted in browser storage.
+The header reads `currentUser` for the avatar, display name and role, and logout clears
+both the token and account. Neither is persisted in browser storage. The profile page
+hands each account the profile API returns to `AuthSession.update()`, so the header
+shows a new name or avatar without a reload. Preset avatars are served from
+`public/avatars/`; uploaded pictures come from the image bucket's own domain.
 
 Use `isAdmin()` for admin-only actions and `adminGuard` for admin routes. The backend
-still authorizes every request. Account and admin navigation will be added with their
-pages (#104, #108, #113); the header currently offers logout to members and admins,
-and login/registration to visitors. Google sign-in (#74) is separate work and must use
+still authorizes every request. The header links a member's avatar and name to the
+profile page and offers logout to members and admins, and login/registration to
+visitors. Google sign-in (#74) is separate work and must use
 this same session path on return.
 
 ### Deployment
