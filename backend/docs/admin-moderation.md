@@ -107,13 +107,14 @@ A hidden show is left out of:
   discoverable show of theirs is hidden)
 - `GET /api/me/followed-organizers/events`
 - `GET /api/events/{id}`, which answers `404` for the show id and for an older event id
+- `GET /api/me/saved-events` (items and counts) and `GET /api/me/saved-events/{eventId}`,
+  which answers `404`; `PUT /api/me/saved-events/{eventId}` answers `404` too
 
 There is no similar-events query yet (the event page says "Coming soon"). A later
 one has to use the same `NOT EXISTS` filter.
 
-A member who saved the show still sees it on `GET /api/me/saved-events` and
-`GET /api/me/saved-events/{eventId}`. Unhiding brings the show back on the public
-surfaces above.
+Saved rows are kept. Unhiding brings the show back on every surface above,
+including the saved lists of members who saved it.
 
 ## Tests
 

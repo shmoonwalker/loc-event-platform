@@ -76,12 +76,16 @@ A limited request returns `429` with a `Retry-After` header.
   unsaving removes every saved performance of the show.
 - Saving and unsaving are idempotent: saving a saved event, or unsaving one that is not
   saved, changes nothing and still answers `204`.
-- Only an event in `publication.discoverable_events` (published and not over) can be
-  saved. An unknown, withdrawn or ended event gets `404`. Unsaving always works, also for withdrawn or ended events.
+- Only an event in `publication.discoverable_events` (published and not over) that an
+  admin has not hidden can be saved. An unknown, withdrawn, ended or hidden event gets
+  `404`. Unsaving always works, also for withdrawn, ended or hidden events.
 - `PUT` answers `401` when the account of the token no longer exists.
 - Saved events stay in the list after they are withdrawn or end; they then have
   `available: false`. The card shows the next upcoming date, or the last date when
   none is left.
+- A show an admin has hidden is left out of the list and its count, and
+  `GET /api/me/saved-events/{eventId}` answers `404` for it. The saved row is kept, so
+  the show comes back when it is unhidden.
 - `GET /api/me/saved-events/{eventId}` has the same shape as `GET /api/events/{id}`.
   For an unavailable event `occurrences` holds all its dates. `404` when the member did
   not save the event.
