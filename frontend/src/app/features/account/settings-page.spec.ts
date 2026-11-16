@@ -211,6 +211,24 @@ describe('SettingsPage', () => {
   });
 
   describe('email', () => {
+    it('shows the current address', async () => {
+      const { section } = await open();
+      expect(section('Email').textContent).toContain('You log in with shadi@example.com.');
+    });
+
+    it('refuses the current address, also with other case and spaces', async () => {
+      const { http, el, type, submit } = await open();
+      type('#email-new', '  Shadi@Example.COM ');
+      type('#email-password', 'old-password-123');
+      await submit('Email');
+
+      http.expectNone('/api/me/email');
+      expect(el.querySelector('#email-new-error')?.textContent).toContain(
+        'This is already your email.',
+      );
+      expect(el.querySelector('#email-new')?.getAttribute('aria-invalid')).toBe('true');
+    });
+
     it('checks the new address before sending anything', async () => {
       const { http, el, type, submit } = await open();
       type('#email-new', 'not-an-email');
