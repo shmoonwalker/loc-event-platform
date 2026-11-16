@@ -25,6 +25,27 @@ export interface HiddenEvent {
   reason: string;
 }
 
+/** Website feedback; null fields are left out of the JSON. */
+export interface Feedback {
+  id: string;
+  /** Absent for a visitor, or after that account was deleted. */
+  userId?: string;
+  message: string;
+  contactEmail?: string;
+  createdAt: string;
+  handledAt?: string;
+  handledBy?: string;
+}
+
+/** Open feedback first, then the newest. */
+export interface FeedbackPage {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  items: Feedback[];
+}
+
 /** The admin API; the backend answers 403 to anyone who is not an admin. */
 @Injectable({ providedIn: 'root' })
 export class AdminApi {
@@ -62,6 +83,17 @@ export class AdminApi {
     return this.http.post<EventComment>(
       `/api/admin/comments/${encodeURIComponent(commentId)}/official-replies`,
       { body },
+    );
+  }
+
+  feedback(page: number): Observable<FeedbackPage> {
+    return this.http.get<FeedbackPage>('/api/admin/feedback', { params: { page } });
+  }
+
+  markFeedbackHandled(feedbackId: string): Observable<Feedback> {
+    return this.http.post<Feedback>(
+      `/api/admin/feedback/${encodeURIComponent(feedbackId)}/handled`,
+      null,
     );
   }
 
