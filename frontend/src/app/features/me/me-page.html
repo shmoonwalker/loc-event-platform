@@ -3,7 +3,7 @@
   @if (session.currentUser(); as user) {
     <p class="mt-2 text-muted">
       Hi {{ user.displayName }}, here is what you keep track of.
-      <a routerLink="/me/profile" class="link">Edit profile</a>
+      <a routerLink="/me/settings/profile" class="link">Edit profile</a>
     </p>
   }
 

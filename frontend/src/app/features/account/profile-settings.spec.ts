@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { CurrentUser } from '../../core/auth-api';
 import { AuthSession } from '../../core/auth-session';
-import { ProfilePage } from './profile-page';
+import { ProfileSettings } from './profile-settings';
 
 const USER: CurrentUser = {
   id: 'member-id',
@@ -22,7 +22,7 @@ async function open(user: CurrentUser = USER) {
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
-      provideRouter([{ path: 'me/profile', component: ProfilePage }]),
+      provideRouter([{ path: 'me/settings/profile', component: ProfileSettings }]),
     ],
   });
   const session = TestBed.inject(AuthSession);
@@ -30,7 +30,7 @@ async function open(user: CurrentUser = USER) {
   session.start('token').subscribe();
   http.expectOne('/api/auth/me').flush(user);
 
-  const harness = await RouterTestingHarness.create('/me/profile');
+  const harness = await RouterTestingHarness.create('/me/settings/profile');
   const el = harness.routeNativeElement!;
   const nameInput = () => el.querySelector<HTMLInputElement>('#displayName')!;
   const typeName = (value: string) => {
@@ -73,7 +73,7 @@ async function open(user: CurrentUser = USER) {
 const image = (type = 'image/png', size = 1000) =>
   new File([new Uint8Array(size)], 'me.png', { type });
 
-describe('ProfilePage', () => {
+describe('ProfileSettings', () => {
   beforeEach(() => {
     URL.createObjectURL = vi.fn(() => 'blob:preview');
     URL.revokeObjectURL = vi.fn();

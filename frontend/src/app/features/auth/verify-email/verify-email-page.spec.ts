@@ -73,7 +73,7 @@ describe('VerifyEmailPage', () => {
     await harness.fixture.whenStable();
 
     expect(el.textContent).toContain('Your new email address is confirmed.');
-    expect(el.querySelector('a[href="/me/account"]')).toBeTruthy();
+    expect(el.querySelector('a[href="/me/settings/security"]')).toBeTruthy();
     expect(el.querySelector('a[href="/login"]')).toBeNull();
   });
 
@@ -85,7 +85,7 @@ describe('VerifyEmailPage', () => {
     await harness.fixture.whenStable();
 
     expect(el.querySelector('h1')?.textContent).toContain('invalid or has expired');
-    expect(el.querySelector('a[href="/me/account"]')).toBeTruthy();
+    expect(el.querySelector('a[href="/me/settings/security"]')).toBeTruthy();
     expect(el.querySelector('#resend-email')).toBeNull();
   });
 });

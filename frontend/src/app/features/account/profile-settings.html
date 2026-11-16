@@ -1,15 +1,14 @@
-<section class="wrap pt-14 pb-16" aria-labelledby="profile-title">
-  <a routerLink="/me" class="link">My Loc</a>
-  <h1 class="display mt-4 text-[clamp(36px,5vw,60px)]" id="profile-title">Profile</h1>
-  <p class="mt-2 text-muted">How others see you on Loc.</p>
-
+<div class="flex flex-col gap-12">
   <form
     [formGroup]="form"
     (ngSubmit)="saveName()"
-    class="mt-10 flex max-w-md flex-col gap-5"
+    class="flex max-w-md flex-col gap-5"
     aria-labelledby="name-title"
   >
-    <h2 id="name-title" class="text-xl font-semibold">Name</h2>
+    <div>
+      <h2 id="name-title" class="display text-3xl">Name</h2>
+      <p class="mt-1 text-muted">How others see you on Loc.</p>
+    </div>
     <div class="flex flex-col gap-1.5">
       <label for="displayName" class="font-semibold">Display name</label>
       <input
@@ -42,8 +41,8 @@
   </form>
 
   @if (session.currentUser(); as user) {
-    <section class="mt-14 flex max-w-xl flex-col gap-5" aria-labelledby="avatar-title">
-      <h2 id="avatar-title" class="text-xl font-semibold">Avatar</h2>
+    <section class="flex max-w-xl flex-col gap-5" aria-labelledby="avatar-title">
+      <h2 id="avatar-title" class="display text-3xl">Avatar</h2>
 
       <div class="flex flex-wrap items-center gap-5">
         <img
@@ -116,4 +115,4 @@
       </div>
     </section>
   }
-</section>
+</div>

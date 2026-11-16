@@ -1,7 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 import { AVATAR_PRESETS, AvatarPreset, CurrentUser } from '../../core/auth-api';
 import { AuthSession } from '../../core/auth-session';
@@ -16,15 +15,15 @@ const UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 export const presetUrl = (preset: AvatarPreset) => `/avatars/${preset.toLowerCase()}.svg`;
 
 /**
- * Profile settings: the display name and the avatar (a preset, or an uploaded picture).
+ * The "Profile" section of the account settings: the display name and the avatar (a preset, or an uploaded picture).
  * Every change hands the returned account to AuthSession, so the header updates at once.
  */
 @Component({
-  selector: 'app-profile-page',
-  imports: [RouterLink, ReactiveFormsModule],
-  templateUrl: './profile-page.html',
+  selector: 'app-profile-settings',
+  imports: [ReactiveFormsModule],
+  templateUrl: './profile-settings.html',
 })
-export class ProfilePage {
+export class ProfileSettings {
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly api = inject(ProfileApi);
   protected readonly session = inject(AuthSession);
