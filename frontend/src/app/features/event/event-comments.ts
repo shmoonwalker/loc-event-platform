@@ -9,6 +9,7 @@ import { valueOf } from '../../core/resource';
 import { formatWhen } from '../../core/time';
 import { ErrorState } from '../../shared/error-state/error-state';
 import { Pagination } from '../../shared/pagination/pagination';
+import { ReportButton } from '../../shared/report-button/report-button';
 import { CommentForm } from './comment-form';
 
 /**
@@ -18,7 +19,7 @@ import { CommentForm } from './comment-form';
  */
 @Component({
   selector: 'app-event-comments',
-  imports: [NgTemplateOutlet, RouterLink, ErrorState, Pagination, CommentForm],
+  imports: [NgTemplateOutlet, RouterLink, ErrorState, Pagination, CommentForm, ReportButton],
   templateUrl: './event-comments.html',
 })
 export class EventComments {
