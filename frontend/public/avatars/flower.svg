@@ -1,1 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="flower avatar"><defs><clipPath id="c"><circle cx="64" cy="64" r="64"/></clipPath></defs><g clip-path="url(#c)"><circle cx="64" cy="64" r="64" fill="#db2777"/><g fill="#fce7f3"><circle cx="64" cy="40" r="16"/><circle cx="88" cy="64" r="16"/><circle cx="64" cy="88" r="16"/><circle cx="40" cy="64" r="16"/></g><circle cx="64" cy="64" r="12" fill="#facc15"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="flower avatar">
+<defs>
+<clipPath id="flower-clip"><circle cx="64" cy="64" r="64"/></clipPath>
+<linearGradient id="flower-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dff4ff"/><stop offset="1" stop-color="#fbe3f0"/></linearGradient>
+<radialGradient id="flower-petal" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#ffc2dc"/><stop offset="1" stop-color="#ff6fa8"/></radialGradient>
+<radialGradient id="flower-face" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff2a0"/><stop offset="1" stop-color="#ffc23d"/></radialGradient>
+</defs>
+<g clip-path="url(#flower-clip)">
+<rect width="128" height="128" fill="url(#flower-bg)"/>
+<path d="M0 116 Q64 102 128 116 V128 H0Z" fill="#8edb7c"/>
+<path d="M64 84 V130" stroke="#2b2140" stroke-width="9" stroke-linecap="round"/><path d="M64 84 V130" stroke="#4fb35a" stroke-width="3"/>
+<path d="M64 106 C54 92 38 90 28 96 C36 108 52 110 64 106Z M64 106 C74 92 90 90 100 96 C92 108 76 110 64 106Z" fill="#6fcf5f" stroke="#2b2140" stroke-width="3" stroke-linejoin="round"/>
+<g fill="url(#flower-petal)" stroke="#2b2140" stroke-width="3">
+<circle cx="64" cy="29" r="15"/><circle cx="87" cy="42" r="15"/><circle cx="87" cy="68" r="15"/><circle cx="64" cy="81" r="15"/><circle cx="41" cy="68" r="15"/><circle cx="41" cy="42" r="15"/>
+</g>
+<circle cx="64" cy="55" r="22" fill="url(#flower-face)" stroke="#2b2140" stroke-width="3"/>
+<ellipse cx="56" cy="53" rx="4.5" ry="5.5" fill="#2b2140"/><circle cx="57.6" cy="50.8" r="1.8" fill="#fff"/>
+<ellipse cx="72" cy="53" rx="4.5" ry="5.5" fill="#2b2140"/><circle cx="73.6" cy="50.8" r="1.8" fill="#fff"/>
+<ellipse cx="50" cy="62" rx="4.5" ry="3" fill="#ff6f7d" opacity=".6"/><ellipse cx="78" cy="62" rx="4.5" ry="3" fill="#ff6f7d" opacity=".6"/>
+<path d="M58 62 Q64 69 70 62" fill="none" stroke="#2b2140" stroke-width="3" stroke-linecap="round"/>
+</g>
+</svg>
