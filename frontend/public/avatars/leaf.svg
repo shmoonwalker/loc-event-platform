@@ -1,1 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="leaf avatar"><defs><clipPath id="c"><circle cx="64" cy="64" r="64"/></clipPath></defs><g clip-path="url(#c)"><circle cx="64" cy="64" r="64" fill="#15803d"/><path d="M34 94C34 52 58 32 96 32c0 40-22 62-62 62z" fill="#dcfce7"/><path d="M38 90L82 46" stroke="#15803d" stroke-width="5" stroke-linecap="round"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="leaf avatar">
+<defs>
+<clipPath id="leaf-clip"><circle cx="64" cy="64" r="64"/></clipPath>
+<linearGradient id="leaf-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6d8"/><stop offset="1" stop-color="#ffd59e"/></linearGradient>
+<linearGradient id="leaf-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9be86f"/><stop offset="1" stop-color="#2e9e57"/></linearGradient>
+</defs>
+<g clip-path="url(#leaf-clip)">
+<rect width="128" height="128" fill="url(#leaf-bg)"/>
+<circle cx="100" cy="100" r="30" fill="#ffc77a" opacity=".5"/>
+<path d="M32 102 L20 116" stroke="#2b2140" stroke-width="7" stroke-linecap="round"/><path d="M32 102 L20 116" stroke="#3f9e4a" stroke-width="2" stroke-linecap="round"/>
+<path d="M32 102 C22 60 54 26 106 20 C112 72 82 106 32 102Z" fill="url(#leaf-body)" stroke="#2b2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M36 98 L46 88 M88 42 L100 28" stroke="#23804a" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="54" cy="52" rx="9" ry="5" fill="#fff" opacity=".45" transform="rotate(-40 54 52)"/>
+<ellipse cx="60" cy="64" rx="4.5" ry="5.5" fill="#2b2140"/><circle cx="61.6" cy="61.8" r="1.8" fill="#fff"/>
+<ellipse cx="80" cy="64" rx="4.5" ry="5.5" fill="#2b2140"/><circle cx="81.6" cy="61.8" r="1.8" fill="#fff"/>
+<ellipse cx="52" cy="74" rx="5.5" ry="3.5" fill="#ff6f7d" opacity=".6"/><ellipse cx="88" cy="74" rx="5.5" ry="3.5" fill="#ff6f7d" opacity=".6"/>
+<path d="M63 74 Q70 81 77 74" fill="none" stroke="#2b2140" stroke-width="3" stroke-linecap="round"/>
+<path d="M104 34 C104 34 98 42 98 46 a6 6 0 0 0 12 0 C110 42 104 34 104 34Z" fill="#9fe3ff" stroke="#2b2140" stroke-width="2.5" stroke-linejoin="round"/><circle cx="102" cy="46" r="1.6" fill="#fff"/>
+</g>
+</svg>
