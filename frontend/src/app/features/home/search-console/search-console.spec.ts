@@ -99,6 +99,25 @@ describe('SearchConsole', () => {
     expect(select('Date').value).toBe('custom');
   });
 
+  it('highlights the Date box only once a date filter is applied', async () => {
+    const { el, settle, select, choose } = await open();
+    const box = select('Date').closest('label')!;
+    expect(box.getAttribute('data-active')).toBe('false');
+
+    await choose(select('Date'), 'custom');
+    expect(box.getAttribute('data-active')).toBe('false');
+    const [from, to] = [...el.querySelectorAll<HTMLInputElement>('input[type="date"]')];
+    from.value = '2026-12-01';
+    from.dispatchEvent(new Event('change'));
+    await settle();
+    expect(box.getAttribute('data-active')).toBe('false');
+
+    to.value = '2026-12-03';
+    to.dispatchEvent(new Event('change'));
+    await settle();
+    expect(box.getAttribute('data-active')).toBe('true');
+  });
+
   it('offers only the fixed time ranges and no typed time', async () => {
     const { el, router, select, choose } = await open();
     const time = select('Time');
