@@ -1,0 +1,71 @@
+@if (session.currentUser(); as user) {
+  <button
+    type="button"
+    class="grid size-11 place-items-center rounded-full"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="open() ? 'account-menu' : null"
+    (click)="open.update((o) => !o)"
+    #menuButton
+  >
+    <img
+      [src]="user.avatarUrl"
+      alt=""
+      class="size-10 rounded-full border border-line bg-panel object-cover"
+      width="40"
+      height="40"
+    />
+    <span class="sr-only">Account menu</span>
+  </button>
+
+  @if (open()) {
+    <div
+      id="account-menu"
+      class="absolute top-full right-0 z-20 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-panel p-2 shadow-card"
+    >
+      <div class="flex items-center gap-3 border-b border-line px-3 pt-2 pb-3">
+        <img
+          [src]="user.avatarUrl"
+          alt=""
+          class="size-10 shrink-0 rounded-full border border-line bg-bg object-cover"
+          width="40"
+          height="40"
+        />
+        <span class="min-w-0">
+          <span class="block truncate font-semibold" [title]="user.displayName">
+            {{ user.displayName }}
+          </span>
+          <span class="text-xs text-muted">{{ session.isAdmin() ? 'Admin' : 'Member' }}</span>
+        </span>
+      </div>
+      <ul role="list" class="mt-2 flex flex-col">
+        <li>
+          <a
+            routerLink="/me/settings"
+            class="flex min-h-11 items-center rounded-xl px-3 font-semibold hover:bg-bg"
+            (click)="open.set(false)"
+          >
+            Account settings
+          </a>
+        </li>
+        <li>
+          <a
+            routerLink="/me"
+            class="flex min-h-11 items-center rounded-xl px-3 font-semibold hover:bg-bg"
+            (click)="open.set(false)"
+          >
+            Dashboard
+          </a>
+        </li>
+        <li>
+          <button
+            type="button"
+            class="flex min-h-11 w-full items-center rounded-xl px-3 text-left font-semibold hover:bg-bg"
+            (click)="logout()"
+          >
+            Log out
+          </button>
+        </li>
+      </ul>
+    </div>
+  }
+}

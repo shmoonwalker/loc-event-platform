@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { authGuard } from './auth-guard';
+import { authGuard, needsAccount } from './auth-guard';
 import { AuthSession } from './auth-session';
 
 @Component({ template: 'Members only' })
@@ -37,5 +37,33 @@ describe('authGuard', () => {
 
     expect(TestBed.inject(Router).url).toBe('/account');
     expect(harness.routeNativeElement?.textContent).toContain('Members only');
+  });
+});
+
+describe('needsAccount', () => {
+  async function pageAt(url: string) {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'events', component: LoginStub },
+          {
+            path: 'settings',
+            canActivate: [authGuard],
+            children: [{ path: 'profile', component: MemberPageStub }],
+          },
+        ]),
+      ],
+    });
+    TestBed.inject(AuthSession).start('token');
+    await RouterTestingHarness.create(url);
+    return needsAccount(TestBed.inject(Router).routerState.snapshot.root);
+  }
+
+  it('is false on a public page', async () => {
+    expect(await pageAt('/events')).toBe(false);
+  });
+
+  it('is true on a page inside a guarded route', async () => {
+    expect(await pageAt('/settings/profile')).toBe(true);
   });
 });
