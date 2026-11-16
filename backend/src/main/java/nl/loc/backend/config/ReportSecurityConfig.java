@@ -12,7 +12,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Member report routes only; admin tokens get 403. The rest of the API stays on {@link SecurityConfig}.
+ * Member report routes only, including reports of an approved photo. Admin tokens get 403.
+ * The rest of the API stays on {@link SecurityConfig}.
  */
 @Configuration
 public class ReportSecurityConfig {
@@ -23,9 +24,10 @@ public class ReportSecurityConfig {
             throws Exception {
         http
                 .securityMatchers(matchers -> matchers.requestMatchers(HttpMethod.POST,
-                        "/api/events/*/reports", "/api/comments/*/reports"))
+                        "/api/events/*/reports", "/api/comments/*/reports", "/api/events/*/photos/*/reports"))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/events/*/reports", "/api/comments/*/reports")
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/events/*/reports", "/api/comments/*/reports", "/api/events/*/photos/*/reports")
                         .hasRole("USER")
                         .anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)

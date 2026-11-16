@@ -26,8 +26,9 @@ spring:
   servlet:
     multipart:
       # keep in step with client_max_body_size in frontend/nginx.conf.template
-      max-file-size: 5MB
-      max-request-size: 6MB
+      # profile pictures still reject anything over 5 MB in ProfileController
+      max-file-size: 10MB
+      max-request-size: 11MB
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
@@ -86,6 +87,10 @@ app:
       avatar-upload:
         capacity: 5
         period: 1h
+      # per member
+      photo-upload:
+        capacity: 10
+        period: 1h
       # per IP, anonymous visitors can send this
       feedback:
         capacity: 3
@@ -100,6 +105,17 @@ app:
       secret-key: ${AVATAR_R2_SECRET_KEY:}
       bucket: ${AVATAR_R2_BUCKET:}
       public-url: ${AVATAR_PUBLIC_URL:}
+
+  event-photo:
+    # public Cloudflare R2 bucket; shares the endpoint and region with avatars.
+    # an unset key or bucket falls back to the avatar credentials and bucket.
+    storage:
+      endpoint: ${R2_ENDPOINT:}
+      region: ${R2_REGION:auto}
+      access-key: ${EVENT_PHOTO_R2_ACCESS_KEY:}
+      secret-key: ${EVENT_PHOTO_R2_SECRET_KEY:}
+      bucket: ${EVENT_PHOTO_R2_BUCKET:}
+      public-url: ${EVENT_PHOTO_PUBLIC_URL:}
 
 server:
   port: 8080

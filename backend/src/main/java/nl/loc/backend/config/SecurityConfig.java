@@ -34,9 +34,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/home", "/api/events", "/api/events/filter-options", "/api/cities",
                                 "/api/events/*", "/api/organizers/*", "/api/categories", "/api/tags").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/events/*/comments").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events/*/photos", "/api/events/*/photos/*/file").permitAll()
                         // member actions; the admin account manages the platform and does not act as a member
                         .requestMatchers(HttpMethod.POST, "/api/events/*/comments", "/api/comments/*/replies").hasRole("USER")
-                        .requestMatchers("/api/me/saved-events/**", "/api/me/followed-organizers/**", "/api/me/comments/**")
+                        .requestMatchers(HttpMethod.POST, "/api/events/*/photos").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/events/*/photos/*").hasRole("USER")
+                        .requestMatchers("/api/me/saved-events/**", "/api/me/followed-organizers/**", "/api/me/comments/**",
+                                "/api/me/events/*/photos")
                         .hasRole("USER")
                         // auth routes are opened one by one; never /api/auth/**
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/verify-email",
