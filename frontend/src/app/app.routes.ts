@@ -124,6 +124,22 @@ export const routes: Routes = [
           import('./features/auth/verify-email/verify-email-page').then((m) => m.VerifyEmailPage),
       },
       {
+        path: 'forgot-password',
+        title: 'Forgot password – Loc',
+        loadComponent: () =>
+          import('./features/auth/forgot-password/forgot-password-page').then(
+            (m) => m.ForgotPasswordPage,
+          ),
+      },
+      {
+        path: 'reset-password',
+        title: 'Choose a new password – Loc',
+        loadComponent: () =>
+          import('./features/auth/reset-password/reset-password-page').then(
+            (m) => m.ResetPasswordPage,
+          ),
+      },
+      {
         path: '**',
         title: 'Page not found – Loc',
         loadComponent: () =>

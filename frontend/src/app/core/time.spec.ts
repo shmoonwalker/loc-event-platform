@@ -1,4 +1,4 @@
-import { addDays, amsterdamDate, dayParts, formatTime, formatWhen } from './time';
+import { addDays, amsterdamDate, dayParts, formatDay, formatTime, formatWhen } from './time';
 
 describe('time (Europe/Amsterdam)', () => {
   it('formats a UTC instant as Amsterdam wall-clock time (summer, UTC+2)', () => {
@@ -20,6 +20,11 @@ describe('time (Europe/Amsterdam)', () => {
 
   it('splits the date badge parts', () => {
     expect(dayParts('2026-10-10T08:00:00Z')).toEqual({ dow: 'Sat', day: '10', mon: 'Oct' });
+  });
+
+  it('formats a calendar day, with the year only when it is not this year', () => {
+    expect(formatDay('2026-11-20', '2026-11-16')).toBe('20 Nov');
+    expect(formatDay('2027-01-03', '2026-11-16')).toBe('3 Jan 2027');
   });
 
   it('adds days across month and year ends', () => {
