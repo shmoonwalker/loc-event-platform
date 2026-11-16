@@ -57,7 +57,7 @@ An id that is not a UUID answers `400`.
 | Column | Meaning |
 | --- | --- |
 | `event_id` | Show id (`publication.event_snapshot.loc_group_id`). Primary key. |
-| `hidden_by` | Admin who hid it. |
+| `hidden_by` | Admin who hid it. Cleared when that account is deleted; the show stays hidden. |
 | `reason` | Required, trimmed, at most 1000 characters. |
 | `hidden_at` | When it was hidden. |
 

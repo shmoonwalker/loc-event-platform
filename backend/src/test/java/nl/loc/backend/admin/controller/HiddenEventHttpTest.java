@@ -261,6 +261,29 @@ class HiddenEventHttpTest {
     }
 
     @Test
+    void deletingTheAdminWhoHidAnEventKeepsItHidden() throws Exception {
+        UUID showId = UUID.randomUUID();
+        publish(showId, showId, "Secret concert", "ONLINE", null);
+        String token = adminToken();
+        perform(hide(showId, "Spam"), token).andExpect(status().isNoContent());
+
+        userRepository.delete(admin);
+
+        assertThat(jdbc.sql("SELECT hidden_by IS NULL FROM app.hidden_event WHERE event_id = :id")
+                .param("id", showId)
+                .query(Boolean.class)
+                .single()).isTrue();
+        assertThat(hiddenShowIds()).containsExactly(showId);
+        mockMvc.perform(get("/api/events/{id}", showId)).andExpect(status().isNotFound());
+        perform(get("/api/admin/hidden-events"), token)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].eventId").value(showId.toString()))
+                .andExpect(jsonPath("$[0].hiddenBy").doesNotExist())
+                .andExpect(jsonPath("$[0].hiddenByName").doesNotExist())
+                .andExpect(jsonPath("$[0].reason").value("Spam"));
+    }
+
+    @Test
     void hidingAfterTheAccountWasDeletedAnswersUnauthorized() throws Exception {
         UUID showId = UUID.randomUUID();
         publish(showId, showId, "Secret concert", "ONLINE", null);

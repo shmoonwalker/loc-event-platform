@@ -56,7 +56,7 @@ public class HiddenEventRepository {
         return jdbc.sql("""
                 SELECT h.event_id, h.hidden_by, u.display_name AS hidden_by_name, h.hidden_at, h.reason
                 FROM app.hidden_event h
-                JOIN app.app_user u ON u.id = h.hidden_by
+                LEFT JOIN app.app_user u ON u.id = h.hidden_by
                 ORDER BY h.hidden_at DESC, h.event_id
                 """)
                 .query((rs, row) -> new HiddenEventResponse(
