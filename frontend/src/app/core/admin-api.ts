@@ -13,10 +13,22 @@ export interface ReportGroup {
   reasons: ReportReason[];
   /** Oldest first. */
   reportIds: string[];
+  /** The reported event, or the event the comment is on; null when the comment no longer exists. */
+  eventId: string | null;
+  /** From the catalog, so also for a hidden event; null when the event is not in the catalog. */
+  eventTitle: string | null;
+  /** A hidden event's public page answers 404. */
+  eventHidden: boolean;
+  /** Null for an event, and once the comment was deleted or removed. */
+  commentBody: string | null;
+  /** Null for an event, and when the author's account was deleted. */
+  commentAuthorName: string | null;
 }
 
 export interface HiddenEvent {
   eventId: string;
+  /** Null when the event is not in the catalog. */
+  title: string | null;
   /** Null after that admin's account was deleted. */
   hiddenBy: string | null;
   hiddenByName: string | null;
