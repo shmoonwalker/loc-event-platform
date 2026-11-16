@@ -7,14 +7,14 @@
   </h2>
 
   <div class="mt-4">
-    @if (session.loggedIn()) {
+    @if (member()) {
       <app-comment-form
         label="Write a comment"
         submitLabel="Post"
         [save]="post"
         (saved)="posted()"
       />
-    } @else {
+    } @else if (!session.loggedIn()) {
       <p class="text-muted">
         <a class="link" routerLink="/login" [queryParams]="{ returnUrl: router.url }">Log in</a>
         to write a comment or reply.
@@ -131,7 +131,7 @@
         } @else {
           <p class="mt-1 wrap-break-word whitespace-pre-line">{{ c.body }}</p>
 
-          @if (session.loggedIn()) {
+          @if (member()) {
             @if (confirmingDelete() === c.id) {
               <div class="mt-2 flex flex-wrap items-center gap-4 text-sm" role="group">
                 <span class="font-semibold">Delete this comment for everyone?</span>

@@ -9,22 +9,25 @@ import { IconComponent } from '../icon/icon';
 @Component({
   selector: 'app-save-button',
   imports: [IconComponent],
+  // the admin account does not save events, so it gets no heart
   template: `
-    <button
-      type="button"
-      class="grid size-11 place-items-center rounded-full bg-panel text-blush-ink shadow-card"
-      aria-label="Save event"
-      [attr.aria-pressed]="saved()"
-      [attr.aria-busy]="pending()"
-      (click)="toggle()"
-    >
-      <app-icon [name]="saved() ? 'heart-filled' : 'heart'" />
-    </button>
+    @if (!session.isAdmin()) {
+      <button
+        type="button"
+        class="grid size-11 place-items-center rounded-full bg-panel text-blush-ink shadow-card"
+        aria-label="Save event"
+        [attr.aria-pressed]="saved()"
+        [attr.aria-busy]="pending()"
+        (click)="toggle()"
+      >
+        <app-icon [name]="saved() ? 'heart-filled' : 'heart'" />
+      </button>
+    }
   `,
 })
 export class SaveButton {
   private readonly api = inject(SavedEventsApi);
-  private readonly session = inject(AuthSession);
+  protected readonly session = inject(AuthSession);
   private readonly router = inject(Router);
 
   readonly eventId = input.required<string>();

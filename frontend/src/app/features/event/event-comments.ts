@@ -13,7 +13,7 @@ import { CommentForm } from './comment-form';
 
 /**
  * The event's comments, newest first, each with its replies. Anyone can read them; members write,
- * reply to top-level comments, and edit or delete their own. After every change the page is fetched again,
+ * reply to top-level comments, and edit or delete their own; the admin account only reads them. After every change the page is fetched again,
  * so what shows is what the API stored.
  */
 @Component({
@@ -36,6 +36,8 @@ export class EventComments {
     stream: ({ params }) => this.api.list(params.id, params.page),
   });
   protected readonly result = computed(() => valueOf(this.comments));
+  /** Signed in and not the admin account, which does not comment as a member. */
+  protected readonly member = computed(() => this.session.loggedIn() && !this.session.isAdmin());
 
   /** The one comment with an open reply form, edit form or delete question. */
   protected readonly replyingTo = signal<string | null>(null);

@@ -106,6 +106,8 @@ describe('SiteHeader', () => {
     const { menu, toggleMenu } = await open('ADMIN');
     toggleMenu();
     expect(menu()?.textContent).toContain('Admin');
+    expect(menu()?.textContent).not.toContain('Dashboard');
+    expect(menu()?.querySelector('a[href="/me"]')).toBeNull();
   });
 
   it('closes on Escape and gives the focus back to the avatar', async () => {

@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { CurrentUser } from '../../core/auth-api';
 import { AuthSession } from '../../core/auth-session';
 import { CommentPage, EventComment } from '../../core/models';
 import { EventComments } from './event-comments';
@@ -53,11 +54,27 @@ const thread = pageOf([
 
 const LIST = '/api/events/e1/comments?page=0';
 
-async function render(signedIn: boolean, list: CommentPage = thread) {
+/** Signs in an admin account, whose session knows its role once /api/auth/me answered. */
+function signInAdmin() {
+  TestBed.inject(AuthSession).start('token').subscribe();
+  TestBed.inject(HttpTestingController)
+    .expectOne('/api/auth/me')
+    .flush({
+      id: 'admin-id',
+      email: 'admin@example.com',
+      displayName: 'Admin',
+      role: 'ADMIN',
+      avatarUrl: '/avatars/sun.svg',
+      avatarPreset: 'SUN',
+    } satisfies CurrentUser);
+}
+
+async function render(signedIn: boolean | 'admin', list: CommentPage = thread) {
   TestBed.configureTestingModule({
     providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
   });
-  if (signedIn) TestBed.inject(AuthSession).start('token');
+  if (signedIn === 'admin') signInAdmin();
+  else if (signedIn) TestBed.inject(AuthSession).start('token');
   const fixture = TestBed.createComponent(EventComments);
   fixture.componentRef.setInput('eventId', 'e1');
   const http = TestBed.inject(HttpTestingController);
@@ -110,6 +127,16 @@ describe('EventComments', () => {
     expect(el.querySelector('form')).toBeNull();
     expect(button('Reply')).toBeUndefined();
     expect(button('Edit')).toBeUndefined();
+  });
+
+  it('offers the admin account no forms or actions, and no login prompt', async () => {
+    const { el, button } = await render('admin', pageOf([comment({ mine: true })]));
+
+    expect(el.querySelector('form')).toBeNull();
+    expect(el.querySelector('a[href^="/login"]')).toBeNull();
+    expect(button('Reply')).toBeUndefined();
+    expect(button('Edit')).toBeUndefined();
+    expect(button('Delete')).toBeUndefined();
   });
 
   it('says so when there are no comments yet', async () => {
