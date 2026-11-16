@@ -45,7 +45,7 @@ A limited request returns `429` with a `Retry-After` header.
 - Email changes also take `newEmail`. The old address remains active until the verification
   link is used. A successful verification sends a notice to the old address. An address
   already in use receives the same empty `202` response.
-- Deletion removes the account, refresh and verification tokens, saved events and follows.
+- Deletion removes the account, refresh, verification and password reset tokens, saved events and follows.
   Existing comments and replies keep their text and show the author as `Deleted user`.
 - Deletion also removes the uploaded profile picture from R2.
 

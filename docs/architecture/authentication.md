@@ -1,6 +1,6 @@
 # Authentication
 
-How users register with Loc, verify their email, log in, stay logged in and log out, how passwords and tokens are stored, how requests are authorized, and how the authentication endpoints are protected against abuse.
+How users register with Loc, verify their email, log in, stay logged in, log out and reset a forgotten password, how passwords and tokens are stored, how requests are authorized, and how the authentication endpoints are protected against abuse.
 
 ---
 
@@ -119,6 +119,62 @@ The verification email links to the frontend page `FRONTEND_URL/verify-email?tok
 | `user/repository/EmailVerificationTokenRepository` | Spring Data JPA repository for `email_verification_token` |
 | `user/model/EmailVerificationToken` | JPA entity |
 | `user/mail/AccountMailer` | Builds the links and sends the emails |
+
+---
+
+## Password reset
+
+### Requesting a link
+
+`POST /api/auth/forgot-password`
+
+```json
+{ "email": "anouk.devries@example.com" }
+```
+
+1. The body is validated with the same email rules as registration. Invalid input or malformed JSON returns `400`.
+2. The client IP and normalised email are checked against the `FORGOT_PASSWORD` rate limit. Over the limit returns `429`.
+3. If the email belongs to an account, verified or not, the user's older unused reset tokens are marked used, a new token is issued and a link is emailed. Unknown emails get no email and no token.
+4. The response is always `202 Accepted` with an empty body, so it never reveals which emails have an account.
+
+The email links to the frontend page `FRONTEND_URL/reset-password?token=…`, which posts the token with the new password to the endpoint below. The email is sent after the token is committed and counts against the `ACCOUNT_MAIL` limit like every other account email.
+
+### Setting the new password
+
+`POST /api/auth/reset-password`
+
+```json
+{ "token": "<token from the link>", "newPassword": "correct-horse-battery" }
+```
+
+1. The body is validated: `token` is required and at most 64 characters; `newPassword` follows the password rules of registration. Invalid input or malformed JSON returns `400`, and the token stays usable.
+2. The token is hashed and looked up. The account and the token are locked, so two parallel requests cannot both use it.
+3. A token that is unknown, expired or already used returns `400` with the title `Invalid token`. All three cases get the same response.
+4. Otherwise, in one transaction:
+   - the token is marked used;
+   - the new password is hashed with BCrypt and stored;
+   - an unverified account is marked verified, because the link proves the user controls the inbox;
+   - every refresh token of the account is revoked, so every session must log in again.
+5. The response is `204 No Content`. No session is started; the user logs in with the new password.
+
+Access tokens issued before the reset stay valid until they expire, at most `JWT_ACCESS_TOKEN_TTL`.
+
+### Tokens
+
+The same design as verification tokens: 32 random bytes, URL-safe Base64, only the SHA-256 hash stored. A reset token is single use, valid for 30 minutes, and only the latest one of an account works.
+
+### Code
+
+| Class | Role |
+|---|---|
+| `user/controller/AuthController` | HTTP endpoints for forgot-password and reset-password; applies the `FORGOT_PASSWORD` rate limit |
+| `user/dto/request/ForgotPasswordRequest` | Forgot-password request body and its validation rules |
+| `user/dto/request/ResetPasswordRequest` | Reset-password request body and its validation rules |
+| `user/service/PasswordResetService` | Issues reset tokens, sends the link after commit, and resets the password |
+| `user/service/InvalidTokenException` | Unknown, expired or used token; becomes `400` |
+| `user/repository/PasswordResetTokenRepository` | Spring Data JPA repository for `password_reset_token` |
+| `user/model/PasswordResetToken` | JPA entity |
+| `user/mail/AccountMailer` | Builds the reset link and sends the email |
 
 ---
 
@@ -255,7 +311,7 @@ Every request passes Spring Security's filter chain (`config/SecurityConfig`):
 | Routes | Access |
 |---|---|
 | Public discovery `GET` routes, `/api/docs/**` | Everyone |
-| `POST /api/auth/register`, `/verify-email`, `/resend-verification`, `/login`, `/refresh`, `/logout` | Everyone; refresh and logout are authorised by the refresh cookie |
+| `POST /api/auth/register`, `/verify-email`, `/resend-verification`, `/login`, `/refresh`, `/logout`, `/forgot-password`, `/reset-password` | Everyone; refresh and logout are authorised by the refresh cookie |
 | `GET /api/auth/me`, `/api/me/**` | Any valid access token |
 | `/api/admin/**` | Role `ADMIN` |
 | Anything else | Denied |
@@ -304,6 +360,17 @@ Administrators are promoted manually in SQL. Registration never accepts a role.
 | `used_at` | Set when the token is used or replaced by a newer one |
 | `created_at` | Set by the database |
 
+### `app.password_reset_token`
+
+| Column | Notes |
+|---|---|
+| `id` | UUIDv7 |
+| `user_id` | The account; tokens are deleted with it |
+| `token_hash` | Unique SHA-256 hash, exactly 32 bytes |
+| `expires_at` | 30 minutes after issue |
+| `used_at` | Set when the token is used or replaced by a newer one |
+| `created_at` | Set by the application |
+
 ### `app.refresh_token`
 
 | Column | Notes |
@@ -336,6 +403,7 @@ Public auth endpoints are rate limited with a token bucket per key.
 |---|---|---|
 | `REGISTER` | 3 per minute | Client IP |
 | `RESEND_VERIFICATION` | 3 per minute | Client IP |
+| `FORGOT_PASSWORD` | 5 per minute | Client IP and normalised email |
 | `ACCOUNT_MAIL` | 3 per hour | User id |
 | `LOGIN` | 5 per minute | Client IP and normalised email |
 | `LOGIN_EMAIL` | 20 per hour | Normalised email |
@@ -369,9 +437,9 @@ The backend never sees the browser's connection, so `request.getRemoteAddr()` wo
 | Status | When |
 |---|---|
 | `200` | Logged in, session refreshed, or the current user |
-| `202` | Registration or resend accepted, whatever the account state |
-| `204` | Email verified, or logged out |
-| `400` | Invalid input, malformed JSON, an unknown, expired or used verification token, or an invalid refresh cookie |
+| `202` | Registration, resend or password reset request accepted, whatever the account state |
+| `204` | Email verified, password reset, or logged out |
+| `400` | Invalid input, malformed JSON, an unknown, expired or used verification or reset token, or an invalid refresh cookie |
 | `401` | Wrong email or password, or a missing, invalid or expired access token |
 | `403` | Correct password on an unverified account, or an access token without the required role |
 | `409` | The refresh cookie was rotated by another request less than 10 seconds ago |
