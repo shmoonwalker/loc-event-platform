@@ -2,7 +2,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, inject, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
-import { ReportReason, ReportTarget, ReportsApi } from '../../core/reports-api';
+import {
+  REPORT_REASON_LABELS,
+  ReportReason,
+  ReportTarget,
+  ReportsApi,
+} from '../../core/reports-api';
 
 let nextId = 0;
 
@@ -24,12 +29,10 @@ export class ReportButton {
   readonly buttonClass = input('link');
 
   protected readonly id = `report-${nextId++}`;
-  protected readonly reasons: { value: ReportReason; label: string }[] = [
-    { value: 'WRONG_INFORMATION', label: 'Wrong information' },
-    { value: 'SPAM', label: 'Spam' },
-    { value: 'INAPPROPRIATE', label: 'Inappropriate' },
-    { value: 'OTHER', label: 'Something else' },
-  ];
+  protected readonly reasons = Object.entries(REPORT_REASON_LABELS).map(([value, label]) => ({
+    value: value as ReportReason,
+    label,
+  }));
   // Same limits as the backend's ReportRequest.
   protected readonly form = new FormGroup({
     reason: new FormControl<ReportReason | null>(null, Validators.required),
