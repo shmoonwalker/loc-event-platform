@@ -62,10 +62,10 @@ public class EventDetailRepository {
                 SELECT s.loc_group_id, s.payload::text AS payload, %1$s AS start_at, %2$s AS end_at, true AS saved,
                        %3$s AND %2$s > :now AS available
                 FROM publication.event_snapshot s
-                WHERE s.loc_group_id = %5$s AND %1$s IS NOT NULL AND %4$s
+                WHERE s.loc_group_id = %5$s AND %1$s IS NOT NULL AND %4$s AND %6$s
                 ORDER BY start_at, s.loc_occurrence_id
                 """.formatted(STARTS, ENDS, PublicEventRepository.AVAILABLE, PublicEventRepository.SAVED,
-                        PublicEventRepository.SHOW_OF),
+                        PublicEventRepository.SHOW_OF, PublicEventRepository.NOT_HIDDEN),
                 id, now, viewerId);
         if (rows.isEmpty()) {
             return Optional.empty();
