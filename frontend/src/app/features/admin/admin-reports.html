@@ -1,0 +1,104 @@
+<h1 class="text-2xl font-bold">Reports</h1>
+<p class="mt-1 text-admin-muted">
+  Open reports from members, one row per event or comment, newest activity first.
+</p>
+
+<div class="mt-6">
+  @if (reports.error()) {
+    <app-admin-error
+      message="We couldn't load the reports. Check your connection and try again."
+      (retry)="reports.reload()"
+    />
+  } @else if (groups(); as list) {
+    @if (list.length) {
+      <ul
+        role="list"
+        class="divide-y divide-admin-line rounded-md border border-admin-line bg-admin-surface"
+      >
+        @for (g of list; track g.targetId) {
+          <li class="flex flex-col gap-3 p-4">
+            <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_11rem_13rem] lg:items-start">
+              <div class="min-w-0">
+                <span class="admin-tag">{{ g.targetType === 'EVENT' ? 'Event' : 'Comment' }}</span>
+                <div class="mt-1 break-words">
+                  @if (g.targetType === 'EVENT') {
+                    <app-admin-event-link [eventId]="g.targetId" />
+                  } @else {
+                    Comment <code class="text-xs text-admin-muted">{{ g.targetId }}</code>
+                  }
+                </div>
+              </div>
+              <div class="text-sm">
+                <span class="font-semibold">
+                  {{ g.openCount }} {{ g.openCount === 1 ? 'report' : 'reports' }}
+                </span>
+                <span class="block text-admin-muted">{{ reasonsText(g) }}</span>
+              </div>
+              <div class="flex flex-wrap gap-2 lg:justify-end">
+                @if (g.targetType === 'EVENT' && hiding() !== g.targetId) {
+                  <button type="button" class="admin-btn" [disabled]="busy()" (click)="openHide(g)">
+                    Hide event
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="admin-btn-quiet"
+                  [disabled]="busy()"
+                  (click)="dismiss(g)"
+                >
+                  {{
+                    busy()?.id === g.targetId && busy()?.action === 'dismiss'
+                      ? 'Dismissing…'
+                      : 'Dismiss'
+                  }}
+                </button>
+              </div>
+            </div>
+
+            @if (hiding() === g.targetId) {
+              <form
+                class="flex max-w-xl flex-col gap-1.5"
+                (submit)="$event.preventDefault(); hide(g)"
+              >
+                <label for="hide-reason" class="text-sm font-semibold">
+                  Why hide this event? Only admins see the reason.
+                </label>
+                <textarea
+                  id="hide-reason"
+                  rows="2"
+                  class="admin-input"
+                  [formControl]="reason"
+                  aria-describedby="hide-reason-error"
+                  [attr.aria-invalid]="reasonError() ? true : null"
+                ></textarea>
+                <p id="hide-reason-error" class="text-sm text-danger">{{ reasonError() }}</p>
+                <div class="flex gap-2">
+                  <button type="submit" class="admin-btn" [disabled]="busy()">
+                    {{
+                      busy()?.id === g.targetId && busy()?.action === 'hide'
+                        ? 'Hiding…'
+                        : 'Hide event'
+                    }}
+                  </button>
+                  <button type="button" class="admin-btn-quiet" (click)="hiding.set(null)">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            }
+
+            @if (failed()?.id === g.targetId) {
+              <p role="alert" class="text-sm text-danger">{{ failed()?.message }}</p>
+            }
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="rounded-md border border-dashed border-admin-line p-6 text-admin-muted">
+        No open reports. Members' reports show here.
+      </p>
+    }
+  } @else {
+    <p class="text-admin-muted" role="status">Loading reports…</p>
+  }
+</div>
