@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { EventComment } from './models';
 import { ReportReason } from './reports-api';
 
 /** Open reports of one event or comment. */
@@ -47,6 +48,21 @@ export class AdminApi {
 
   unhideEvent(eventId: string): Observable<void> {
     return this.http.delete<void>(`/api/admin/events/${encodeURIComponent(eventId)}/hide`);
+  }
+
+  /** Removes any comment or reply for everyone and closes its open reports. */
+  removeComment(commentId: string, reason: string): Observable<void> {
+    return this.http.delete<void>(`/api/admin/comments/${encodeURIComponent(commentId)}`, {
+      body: { reason },
+    });
+  }
+
+  /** Only top-level comments take replies. */
+  officialReply(commentId: string, body: string): Observable<EventComment> {
+    return this.http.post<EventComment>(
+      `/api/admin/comments/${encodeURIComponent(commentId)}/official-replies`,
+      { body },
+    );
   }
 
   /** Most recently hidden first. */
