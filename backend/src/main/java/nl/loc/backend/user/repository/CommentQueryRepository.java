@@ -27,7 +27,7 @@ public class CommentQueryRepository {
             c.id, c.parent_id, c.official, c.created_at, c.edited_at,
             c.deleted_at IS NOT NULL AS deleted,
             CASE WHEN c.deleted_at IS NULL THEN c.body END AS body,
-            CASE WHEN c.deleted_at IS NULL THEN u.display_name END AS display_name,
+            CASE WHEN c.deleted_at IS NULL THEN COALESCE(u.display_name, 'Deleted user') END AS display_name,
             u.avatar_preset, u.avatar_key,
             COALESCE(c.deleted_at IS NULL AND c.user_id = :viewerId, false) AS mine""";
 
@@ -103,9 +103,12 @@ public class CommentQueryRepository {
 
     private Row row(ResultSet rs, int rowNum) throws SQLException {
         String displayName = rs.getString("display_name");
-        // a deleted comment has no display name, so its author is null as well
-        CommentAuthor author = displayName == null ? null : new CommentAuthor(displayName, avatarStorage.avatarUrl(
-                rs.getString("avatar_key"), AvatarPreset.valueOf(rs.getString("avatar_preset"))));
+        // a deleted comment has no display name, so its author is null as well;
+        // a deleted account has no preset, so "Deleted user" gets no picture
+        String preset = rs.getString("avatar_preset");
+        String avatarUrl = preset == null ? null
+                : avatarStorage.avatarUrl(rs.getString("avatar_key"), AvatarPreset.valueOf(preset));
+        CommentAuthor author = displayName == null ? null : new CommentAuthor(displayName, avatarUrl);
         OffsetDateTime editedAt = rs.getObject("edited_at", OffsetDateTime.class);
         return new Row(
                 rs.getObject("id", UUID.class),

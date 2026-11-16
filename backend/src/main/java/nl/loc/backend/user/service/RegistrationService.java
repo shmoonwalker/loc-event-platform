@@ -69,7 +69,7 @@ public class RegistrationService {
                 });
     }
 
-    private static boolean isDuplicateEmail(DataIntegrityViolationException ex) {
+    static boolean isDuplicateEmail(DataIntegrityViolationException ex) {
         return ex.getCause() instanceof ConstraintViolationException cve
                 && EMAIL_UNIQUE_CONSTRAINT.equals(cve.getConstraintName());
     }

@@ -62,8 +62,17 @@ public class UserAccount {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
+    public void changePassword(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
+    }
+
     public boolean isEmailVerified() {
         return emailVerifiedAt != null;
+    }
+
+    public void changeVerifiedEmail(String newEmail, Instant now) {
+        this.email = normalizeEmail(newEmail);
+        emailVerifiedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 
     public void markEmailVerified(Instant now) {

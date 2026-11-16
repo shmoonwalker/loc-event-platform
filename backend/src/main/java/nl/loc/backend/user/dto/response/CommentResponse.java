@@ -8,7 +8,7 @@ import java.util.UUID;
 @Schema(description = "A comment with its replies. Replies have an empty reply list.")
 public record CommentResponse(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
-        @Schema(description = "Null when the comment is deleted or the account was deleted.") CommentAuthor author,
+        @Schema(description = "Null when the comment is deleted.") CommentAuthor author,
         @Schema(description = "Plain text. Null when the comment is deleted.") String body,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean official,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean deleted,

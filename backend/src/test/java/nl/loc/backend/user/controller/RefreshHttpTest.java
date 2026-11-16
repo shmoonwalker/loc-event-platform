@@ -150,16 +150,53 @@ class RefreshHttpTest {
         mockMvc.perform(post("/api/auth/refresh")).andExpect(status().isBadRequest());
     }
 
+    @Test
+    void changingPasswordKeepsThisBrowserSignedInAndRevokesOtherDevices() throws Exception {
+        Cookie otherDevice = login();
+        MvcResult current = loginWith(PASSWORD).andExpect(status().isOk()).andReturn();
+        Cookie replacement = changePassword(current, PASSWORD, "replacement-password")
+                .andExpect(status().isNoContent())
+                .andReturn().getResponse().getCookie(RefreshTokenCookie.NAME);
+
+        refresh(otherDevice).andExpect(status().isBadRequest());
+        refresh(replacement).andExpect(status().isOk());
+        loginWith(PASSWORD).andExpect(status().isUnauthorized());
+        loginWith("replacement-password").andExpect(status().isOk());
+    }
+
+    @Test
+    void rejectedPasswordChangesLeavePasswordAndSessionsUntouched() throws Exception {
+        Cookie otherDevice = login();
+        MvcResult current = loginWith(PASSWORD).andExpect(status().isOk()).andReturn();
+        changePassword(current, "wrong-password", "replacement-password").andExpect(status().isUnauthorized());
+        changePassword(current, PASSWORD, "too short").andExpect(status().isBadRequest());
+        changePassword(current, PASSWORD, "é".repeat(37)).andExpect(status().isBadRequest());
+        refresh(otherDevice).andExpect(status().isOk());
+        loginWith(PASSWORD).andExpect(status().isOk());
+    }
+
+    private ResultActions changePassword(MvcResult session, String current, String replacement) throws Exception {
+        String accessToken = JsonMapper.shared().readTree(session.getResponse().getContentAsString())
+                .get("accessToken").asString();
+        return mockMvc.perform(post("/api/me/password").header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(JsonMapper.shared().writeValueAsString(
+                        Map.of("currentPassword", current, "newPassword", replacement))));
+    }
+
     private void moveRotationOutOfTheGraceWindow() {
         jdbc.update("update app.refresh_token set created_at = created_at - interval '1 minute'");
     }
 
     private Cookie login() throws Exception {
+        return loginWith(PASSWORD).andExpect(status().isOk())
+                .andReturn().getResponse().getCookie(RefreshTokenCookie.NAME);
+    }
+
+    private ResultActions loginWith(String password) throws Exception {
         return mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(JsonMapper.shared().writeValueAsString(
-                                Map.of("email", "alice@example.com", "password", PASSWORD))))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getCookie(RefreshTokenCookie.NAME);
+                                Map.of("email", "alice@example.com", "password", password))));
     }
 
     private ResultActions refresh(Cookie cookie) throws Exception {

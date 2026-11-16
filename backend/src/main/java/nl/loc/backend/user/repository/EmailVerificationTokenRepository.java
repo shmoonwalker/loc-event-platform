@@ -14,12 +14,15 @@ import java.util.UUID;
 
 public interface EmailVerificationTokenRepository extends JpaRepository<EmailVerificationToken, UUID> {
 
+    @Query("select t.user.id from EmailVerificationToken t where t.tokenHash = :tokenHash")
+    Optional<UUID> findOwnerByTokenHash(byte[] tokenHash);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<EmailVerificationToken> findByTokenHash(byte[] tokenHash);
 
     @Modifying
     @Query("""
-        update EmailVerificationToken t set t.usedAt = :now
+        update EmailVerificationToken t set t.usedAt = :now, t.newEmail = null
         where t.user = :user and t.usedAt is null
         """)
     int invalidateUnused(UserAccount user, Instant now);

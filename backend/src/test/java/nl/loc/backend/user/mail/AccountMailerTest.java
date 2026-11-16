@@ -50,6 +50,27 @@ class AccountMailerTest {
     }
 
     @Test
+    void changeLinkGoesToTheNewAddress() {
+        mailer.sendEmailChangeLink(USER_ID, "new@example.com", "change-token");
+
+        SimpleMailMessage message = sentMessage();
+        assertThat(message.getTo()).containsExactly("new@example.com");
+        assertThat(message.getText()).contains("http://localhost:4200/verify-email?token=change-token");
+    }
+
+    @Test
+    void changeNoticeGoesToThePreviousAddressEvenWhenLinkQuotaIsExhausted() {
+        doThrow(new RateLimitExceededException(60)).when(rateLimiter)
+                .consume(RateLimitPolicy.ACCOUNT_MAIL, USER_ID.toString());
+
+        mailer.sendEmailChanged(USER_ID, "old@example.com");
+
+        SimpleMailMessage message = sentMessage();
+        assertThat(message.getTo()).containsExactly("old@example.com");
+        assertThat(message.getSubject()).contains("has changed");
+    }
+
+    @Test
     void signUpAttemptMailLinksToPasswordResetAndHasNoVerifyLink() {
         mailer.sendSignUpAttempt(user);
 

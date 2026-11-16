@@ -47,9 +47,11 @@ public class RefreshTokenService {
     // commit the family revoke on reuse; the default rollback on a RuntimeException would undo it
     @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public RefreshRotationResult rotate(String rawToken) {
+        byte[] tokenHash = SecureTokens.hash(rawToken);
+        refreshTokenRepository.lockOwnerByTokenHash(tokenHash);
         Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         RefreshToken existing = refreshTokenRepository
-                .findByTokenHash(SecureTokens.hash(rawToken))
+                .findByTokenHash(tokenHash)
                 .orElseThrow(InvalidRefreshTokenException::new);
 
         if (existing.getRevokedAt() != null) {
@@ -106,9 +108,11 @@ public class RefreshTokenService {
         if (rawToken == null || rawToken.isBlank()) {
             return;
         }
+        byte[] tokenHash = SecureTokens.hash(rawToken);
+        refreshTokenRepository.lockOwnerByTokenHash(tokenHash);
         Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         refreshTokenRepository
-                .findByTokenHash(SecureTokens.hash(rawToken))
+                .findByTokenHash(tokenHash)
                 .ifPresent(token -> refreshTokenRepository.revokeActiveByFamilyId(token.getFamilyId(), now));
     }
 }
