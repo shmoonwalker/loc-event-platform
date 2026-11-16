@@ -40,12 +40,22 @@
     <nav aria-label="Account" class="ml-auto flex flex-wrap items-center gap-3">
       @if (session.currentUser(); as user) {
         <a routerLink="/me" class="pill-btn min-h-11">My Loc</a>
-        <span class="min-w-0 text-sm">
-          <span class="block max-w-40 truncate font-semibold" [title]="user.displayName">
-            {{ user.displayName }}
+        <a routerLink="/me/profile" class="flex min-w-0 items-center gap-2 text-sm">
+          <img
+            [src]="user.avatarUrl"
+            alt=""
+            class="size-9 shrink-0 rounded-full border border-line bg-panel object-cover"
+            width="36"
+            height="36"
+          />
+          <span class="min-w-0">
+            <span class="sr-only">Profile: </span>
+            <span class="block max-w-40 truncate font-semibold" [title]="user.displayName">
+              {{ user.displayName }}
+            </span>
+            <span class="text-xs text-muted">{{ session.isAdmin() ? 'Admin' : 'Member' }}</span>
           </span>
-          <span class="text-xs text-muted">{{ session.isAdmin() ? 'Admin' : 'Member' }}</span>
-        </span>
+        </a>
         <button type="button" class="btn-dark min-h-11" (click)="logout()">Log out</button>
       } @else {
         <a routerLink="/register" class="pill-btn min-h-11">Sign up</a>

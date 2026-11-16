@@ -1,7 +1,10 @@
 <section class="wrap pt-14 pb-10" aria-labelledby="me-title">
   <h1 class="display text-[clamp(36px,5vw,60px)]" id="me-title">My Loc</h1>
   @if (session.currentUser(); as user) {
-    <p class="mt-2 text-muted">Hi {{ user.displayName }}, here is what you keep track of.</p>
+    <p class="mt-2 text-muted">
+      Hi {{ user.displayName }}, here is what you keep track of.
+      <a routerLink="/me/profile" class="link">Edit profile</a>
+    </p>
   }
 
   <nav aria-label="My Loc sections" class="mt-8 flex gap-2 border-b border-line">
