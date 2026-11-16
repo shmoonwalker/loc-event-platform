@@ -10,5 +10,6 @@ public enum RateLimitPolicy {
     COMMENT,
     REPORT,
     AVATAR_UPLOAD,
-    ACCOUNT_SECURITY
+    ACCOUNT_SECURITY,
+    FEEDBACK
 }

@@ -82,6 +82,10 @@ app:
       avatar-upload:
         capacity: 5
         period: 1h
+      # per IP, anonymous visitors can send this
+      feedback:
+        capacity: 3
+        period: 1h
 
   avatar:
     # public Cloudflare R2 bucket for uploaded profile pictures; uploads are off while unset
