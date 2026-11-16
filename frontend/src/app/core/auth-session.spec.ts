@@ -1,9 +1,17 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { CurrentUser } from './auth-api';
 import { AuthSession } from './auth-session';
 
-const USER = { id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role: 'USER' };
+const USER: CurrentUser = {
+  id: 'member-id',
+  email: 'shadi@example.com',
+  displayName: 'Shadi',
+  role: 'USER',
+  avatarUrl: '/avatars/sun.svg',
+  avatarPreset: 'SUN',
+};
 const TOKEN = { accessToken: 'new-token', tokenType: 'Bearer', expiresIn: 900 };
 
 function setup() {
@@ -181,5 +189,26 @@ describe('AuthSession', () => {
     expect(session.currentUser()).toBeNull();
     expect(session.loggedIn()).toBe(false);
     expect(session.isAdmin()).toBe(false);
+  });
+
+  it('update shows the changed account of the same member', () => {
+    const { session, http } = setup();
+    session.start('token').subscribe();
+    http.expectOne('/api/auth/me').flush(USER);
+
+    session.update({ ...USER, displayName: 'Shadi B' });
+
+    expect(session.currentUser()?.displayName).toBe('Shadi B');
+  });
+
+  it('update does not bring back an account after the session ended', () => {
+    const { session, http } = setup();
+    session.start('token').subscribe();
+    http.expectOne('/api/auth/me').flush(USER);
+    session.end();
+
+    session.update(USER);
+
+    expect(session.currentUser()).toBeNull();
   });
 });

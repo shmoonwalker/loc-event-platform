@@ -49,6 +49,11 @@ export class AuthSession {
       );
   }
 
+  /** Shows an account the server just returned (after a profile change) everywhere, without reloading it. */
+  update(user: CurrentUser): void {
+    if (this.user()?.id === user.id) this.user.set(user);
+  }
+
   end(): void {
     this.accountChanged.next();
     this.ended.next();

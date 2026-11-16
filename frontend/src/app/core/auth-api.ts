@@ -23,12 +23,28 @@ export interface LoginResponse {
   expiresIn: number;
 }
 
-/** The signed-in account returned by GET /api/auth/me. */
+/** The preset avatars; each one is an image at /avatars/<lower-case name>.svg. */
+export const AVATAR_PRESETS = [
+  'SUN',
+  'MOON',
+  'LEAF',
+  'WAVE',
+  'MOUNTAIN',
+  'STAR',
+  'FLOWER',
+  'CLOUD',
+] as const;
+export type AvatarPreset = (typeof AVATAR_PRESETS)[number];
+
+/** The signed-in account returned by GET /api/auth/me and the profile routes. */
 export interface CurrentUser {
   id: string;
   email: string;
   displayName: string;
   role: 'USER' | 'ADMIN';
+  /** The uploaded picture, or else the preset's image. */
+  avatarUrl: string;
+  avatarPreset: AvatarPreset;
 }
 
 /** Loading the account is part of sign-in/refresh; a 401 here must not start another refresh. */
