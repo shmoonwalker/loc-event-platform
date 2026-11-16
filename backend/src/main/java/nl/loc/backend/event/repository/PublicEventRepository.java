@@ -42,6 +42,9 @@ public class PublicEventRepository {
     // same rule as the publication.discoverable_events view
     public static final String AVAILABLE =
             "(s.discoverable AND (s.payload->>'validUntil')::timestamptz > CURRENT_TIMESTAMP)";
+    // admin hide is app data; the publication row stays as the data app published it
+    public static final String NOT_HIDDEN =
+            "NOT EXISTS (SELECT 1 FROM app.hidden_event h WHERE h.event_id = s.loc_group_id)";
     private static final String DOCUMENT = """
             to_tsvector('simple', concat_ws(' ',
                 s.payload->>'title',
@@ -76,10 +79,11 @@ public class PublicEventRepository {
                 FROM publication.discoverable_events s
                 WHERE %s = :slug
                   AND coalesce(trim(s.payload->'location'->>'city'), '') <> ''
+                  AND %s
                 GROUP BY 1
                 ORDER BY count(*) DESC, city_name
                 LIMIT 1
-                """.formatted(CITY_SLUG);
+                """.formatted(CITY_SLUG, NOT_HIDDEN);
         return jdbc.sql(sql)
                 .param("slug", slug)
                 .query((rs, row) -> new City(slug, rs.getString("city_name")))
@@ -123,7 +127,12 @@ public class PublicEventRepository {
                 SELECT count(DISTINCT s.loc_group_id) FROM publication.discoverable_events s
                 WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
                   AND %1$s IS NOT NULL AND %2$s > :now
-                """.formatted(STARTS, ENDS)).param("match", match).param("now", at).query(Long.class).single();
+                  AND %3$s
+                """.formatted(STARTS, ENDS, NOT_HIDDEN))
+                .param("match", match)
+                .param("now", at)
+                .query(Long.class)
+                .single();
         if (total == null || total == 0) {
             return new EventPage(page, size, 0, 0, List.of());
         }
@@ -143,11 +152,12 @@ public class PublicEventRepository {
                     FROM publication.discoverable_events s
                     WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
                       AND %1$s IS NOT NULL AND %2$s > :now
+                      AND %5$s
                     ORDER BY s.loc_group_id, %1$s, s.loc_occurrence_id
                 ) e
                 ORDER BY start_at, loc_group_id
                 LIMIT :limit OFFSET :offset
-                """.formatted(STARTS, ENDS, CITY_SLUG, SAVED);
+                """.formatted(STARTS, ENDS, CITY_SLUG, SAVED, NOT_HIDDEN);
         List<EventCard> items = jdbc.sql(sql)
                 .param("match", match)
                 .param("now", at)
@@ -251,6 +261,8 @@ public class PublicEventRepository {
             filter.append(" AND jsonb_exists_all(coalesce(s.payload->'tags', '[]'::jsonb), ");
             filter.append("CAST(:tags AS text[]))");
         }
+        filter.append(" AND ");
+        filter.append(NOT_HIDDEN);
         return filter.toString();
     }
 

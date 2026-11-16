@@ -74,6 +74,10 @@ app:
       comment:
         capacity: 5
         period: 1m
+      # per member
+      report:
+        capacity: 5
+        period: 1h
       # per member across operations that check the current password
       account-security:
         capacity: 5
@@ -81,6 +85,10 @@ app:
       # per member
       avatar-upload:
         capacity: 5
+        period: 1h
+      # per IP, anonymous visitors can send this
+      feedback:
+        capacity: 3
         period: 1h
 
   avatar:

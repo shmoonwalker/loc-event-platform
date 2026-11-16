@@ -171,7 +171,7 @@
       shadow-[0_8px_20px_var(--glow)] hover:brightness-95;
   }
   .btn-dark {
-    @apply inline-flex min-h-12 items-center rounded-[14px] bg-ink px-5.5 font-semibold text-panel hover:brightness-95;
+    @apply inline-flex min-h-12 items-center justify-center rounded-[14px] bg-ink px-5.5 font-semibold text-panel hover:brightness-95;
   }
   .pill-btn {
     @apply flex h-11 items-center gap-2 rounded-full border border-line bg-panel px-3.5 font-semibold;

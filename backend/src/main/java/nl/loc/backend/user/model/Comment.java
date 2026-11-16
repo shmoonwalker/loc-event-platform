@@ -53,21 +53,30 @@ public class Comment {
     @Column(name = "delete_reason")
     private String deleteReason;
 
-    private Comment(UUID eventId, UUID parentId, UUID userId, String body, Instant now) {
+    private Comment(UUID eventId, UUID parentId, UUID userId, String body, boolean official, Instant now) {
         this.eventId = eventId;
         this.parentId = parentId;
         this.userId = userId;
         this.body = body.trim();
-        this.official = false;
+        this.official = official;
         // Postgres stores microseconds; truncating keeps the in-memory value equal to the stored one
         this.createdAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 
     public static Comment topLevel(UUID eventId, UUID userId, String body, Instant now) {
-        return new Comment(eventId, null, userId, body, now);
+        return new Comment(eventId, null, userId, body, false, now);
     }
 
     public Comment reply(UUID replierId, String replyBody, Instant now) {
+        return newReply(replierId, replyBody, false, now);
+    }
+
+    /** A staff reply, shown with an official badge. Same one-level rule as {@link #reply}. */
+    public Comment officialReply(UUID replierId, String replyBody, Instant now) {
+        return newReply(replierId, replyBody, true, now);
+    }
+
+    private Comment newReply(UUID replierId, String replyBody, boolean markOfficial, Instant now) {
         // without an id the reply would silently be stored as a top-level comment
         if (id == null) {
             throw new IllegalStateException("Save the comment before replying to it");
@@ -75,7 +84,7 @@ public class Comment {
         if (isReply()) {
             throw new IllegalStateException("A reply can't be replied to");
         }
-        return new Comment(eventId, id, replierId, replyBody, now);
+        return new Comment(eventId, id, replierId, replyBody, markOfficial, now);
     }
 
     public boolean isReply() {

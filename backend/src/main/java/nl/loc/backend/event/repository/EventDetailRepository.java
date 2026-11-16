@@ -44,8 +44,10 @@ public class EventDetailRepository {
                        %s AS saved, true AS available
                 FROM publication.discoverable_events s
                 WHERE s.loc_group_id = %s AND %s IS NOT NULL AND %s > :now
+                  AND %s
                 ORDER BY start_at, s.loc_occurrence_id
-                """.formatted(STARTS, ENDS, PublicEventRepository.SAVED, PublicEventRepository.SHOW_OF, STARTS, ENDS),
+                """.formatted(STARTS, ENDS, PublicEventRepository.SAVED, PublicEventRepository.SHOW_OF, STARTS, ENDS,
+                        PublicEventRepository.NOT_HIDDEN),
                 id, now, viewerId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(detail(rows.getFirst(), rows, true));
     }
@@ -121,8 +123,9 @@ public class EventDetailRepository {
         List<String> payloads = jdbc.sql("""
                 SELECT s.payload::text FROM publication.discoverable_events s
                 WHERE s.payload->'organizers' @> CAST(:match AS jsonb)
+                  AND %s
                 ORDER BY s.updated_at DESC LIMIT 1
-                """).param("match", match).query(String.class).list();
+                """.formatted(PublicEventRepository.NOT_HIDDEN)).param("match", match).query(String.class).list();
         if (payloads.isEmpty()) {
             return Optional.empty();
         }
