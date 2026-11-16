@@ -137,3 +137,32 @@ export interface SavedEventPage {
   totalPages: number;
   items: SavedEvent[];
 }
+
+/** Who wrote a comment. A deleted account shows as "Deleted user" with a null avatarUrl. */
+export interface CommentAuthor {
+  displayName: string;
+  /** An uploaded picture's absolute URL, or a preset path on this site such as /avatars/sun.svg. */
+  avatarUrl: string | null;
+}
+
+/** A comment with its replies (one level: replies have no replies). */
+export interface EventComment {
+  id: string;
+  author: CommentAuthor | null; // null when deleted
+  body: string | null; // plain text; null when deleted
+  official: boolean;
+  deleted: boolean; // a deleted comment stays only to keep its replies in place
+  mine: boolean; // always false when signed out
+  createdAt: string; // ISO instant, UTC
+  editedAt: string | null;
+  replies: EventComment[]; // oldest first
+}
+
+/** One page of GET /api/events/{id}/comments: top-level comments, newest first. */
+export interface CommentPage {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  items: EventComment[];
+}
