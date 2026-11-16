@@ -39,6 +39,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/me/me-page').then((m) => m.MePage),
       },
       {
+        path: 'me/profile',
+        title: 'Profile – Loc',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/me/profile-page').then((m) => m.ProfilePage),
+      },
+      {
         path: 'account',
         title: 'Account – Loc',
         canActivate: [authGuard],

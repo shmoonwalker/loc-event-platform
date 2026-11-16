@@ -1,1 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="mountain avatar"><defs><clipPath id="c"><circle cx="64" cy="64" r="64"/></clipPath></defs><g clip-path="url(#c)"><circle cx="64" cy="64" r="64" fill="#7c3aed"/><path d="M14 96l34-48 18 26 12-16 36 38z" fill="#ede9fe"/><path d="M48 48l9 13-9-4-9 4z" fill="#7c3aed"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="mountain avatar">
+<defs>
+<clipPath id="mountain-clip"><circle cx="64" cy="64" r="64"/></clipPath>
+<linearGradient id="mountain-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4e6ff"/><stop offset="1" stop-color="#eaf7ff"/></linearGradient>
+<linearGradient id="mountain-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9aa8e6"/><stop offset="1" stop-color="#5a62b8"/></linearGradient>
+</defs>
+<g clip-path="url(#mountain-clip)">
+<rect width="128" height="128" fill="url(#mountain-bg)"/>
+<circle cx="26" cy="32" r="10" fill="#ffd45c"/><ellipse cx="102" cy="34" rx="14" ry="6" fill="#fff"/>
+<path d="M4 132 L52 34 Q64 16 76 34 L124 132Z" fill="url(#mountain-body)" stroke="#2b2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M41 57 L52 34 Q64 16 76 34 L87 57 Q81 50 75 57 Q69 63 64 55 Q59 63 53 57 Q47 50 41 57Z" fill="#fff" stroke="#2b2140" stroke-width="3" stroke-linejoin="round"/>
+<ellipse cx="54" cy="74" rx="4.5" ry="5.5" fill="#2b2140"/><circle cx="55.6" cy="71.8" r="1.8" fill="#fff"/>
+<ellipse cx="74" cy="74" rx="4.5" ry="5.5" fill="#2b2140"/><circle cx="75.6" cy="71.8" r="1.8" fill="#fff"/>
+<ellipse cx="46" cy="83" rx="5.5" ry="3.5" fill="#ff6f7d" opacity=".6"/><ellipse cx="82" cy="83" rx="5.5" ry="3.5" fill="#ff6f7d" opacity=".6"/>
+<path d="M58 83 Q64 89 70 83" fill="none" stroke="#2b2140" stroke-width="3" stroke-linecap="round"/>
+<path d="M84 102 L88 124 L99 121 L94 101Z" fill="#ff5a5f" stroke="#2b2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M22 94 Q64 106 106 94 L110 104 Q64 118 18 104Z" fill="#ff5a5f" stroke="#2b2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M36 101 L39 108 M56 104 L58 111 M76 104 L74 111 M94 101 L91 108" stroke="#ffd1d2" stroke-width="3" stroke-linecap="round"/>
+</g>
+</svg>

@@ -27,9 +27,14 @@ async function open(role: CurrentUser['role'] | null) {
   const http = TestBed.inject(HttpTestingController);
   if (role) {
     session.start('token').subscribe();
-    http
-      .expectOne('/api/auth/me')
-      .flush({ id: 'member-id', email: 'shadi@example.com', displayName: 'Shadi', role });
+    http.expectOne('/api/auth/me').flush({
+      id: 'member-id',
+      email: 'shadi@example.com',
+      displayName: 'Shadi',
+      role,
+      avatarUrl: '/avatars/sun.svg',
+      avatarPreset: 'SUN',
+    } satisfies CurrentUser);
   }
   const harness = await RouterTestingHarness.create('/events/1');
   http.expectOne((req) => req.url === '/api/cities').flush([]);
@@ -69,6 +74,24 @@ describe('SiteHeader', () => {
     expect(loginLink()).toBeUndefined();
     expect(el.querySelector('a[href="/me"]')?.textContent).toContain('My Loc');
     expect(el.querySelector('a[href="/account"]')?.textContent).toContain('Account');
+  });
+
+  it('links the avatar and name to the profile and follows changes without a reload', async () => {
+    const { harness, session, el } = await open('USER');
+    const profile = () => el.querySelector('a[href="/me/profile"]');
+    expect(profile()?.textContent).toContain('Shadi');
+    expect(profile()?.querySelector('img')?.getAttribute('src')).toBe('/avatars/sun.svg');
+
+    session.update({
+      ...session.currentUser()!,
+      displayName: 'Shadi B',
+      avatarUrl: '/avatars/moon.svg',
+      avatarPreset: 'MOON',
+    });
+    harness.detectChanges();
+
+    expect(profile()?.textContent).toContain('Shadi B');
+    expect(profile()?.querySelector('img')?.getAttribute('src')).toBe('/avatars/moon.svg');
   });
 
   it('logout ends the session on the server and in the UI, then opens the home page', async () => {

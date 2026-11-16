@@ -1,1 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="moon avatar"><defs><clipPath id="c"><circle cx="64" cy="64" r="64"/></clipPath></defs><g clip-path="url(#c)"><circle cx="64" cy="64" r="64" fill="#312e81"/><path d="M74 30a34 34 0 1 0 24 58A28 28 0 0 1 74 30z" fill="#e0e7ff"/><circle cx="40" cy="38" r="3" fill="#e0e7ff"/><circle cx="96" cy="44" r="2" fill="#e0e7ff"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="moon avatar">
+<defs>
+<clipPath id="moon-clip"><circle cx="64" cy="64" r="64"/></clipPath>
+<linearGradient id="moon-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f2463"/><stop offset="1" stop-color="#5145a8"/></linearGradient>
+<radialGradient id="moon-body" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fffbe0"/><stop offset="1" stop-color="#f5cf5e"/></radialGradient>
+</defs>
+<g clip-path="url(#moon-clip)">
+<rect width="128" height="128" fill="url(#moon-bg)"/>
+<g fill="#fff3b8"><circle cx="20" cy="70" r="2"/><circle cx="108" cy="92" r="2.5"/><circle cx="30" cy="104" r="1.6"/><circle cx="112" cy="62" r="1.6"/><path d="M106 14 l2.5 6 6 2.5 -6 2.5 -2.5 6 -2.5 -6 -6 -2.5 6 -2.5Z"/></g>
+<circle cx="64" cy="76" r="32" fill="url(#moon-body)" stroke="#2b2140" stroke-width="3"/>
+<circle cx="86" cy="92" r="5" fill="#e8b94a" opacity=".6"/><circle cx="44" cy="96" r="3.5" fill="#e8b94a" opacity=".6"/>
+<path d="M48 74 Q54 79 60 74 M68 74 Q74 79 80 74" fill="none" stroke="#2b2140" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="46" cy="84" rx="5.5" ry="3.5" fill="#ff6f7d" opacity=".6"/><ellipse cx="82" cy="84" rx="5.5" ry="3.5" fill="#ff6f7d" opacity=".6"/>
+<path d="M59 86 Q64 91 69 86" fill="none" stroke="#2b2140" stroke-width="3" stroke-linecap="round"/>
+<path d="M34 60 Q64 42 96 58 Q90 30 62 24 Q38 20 22 34 Q36 40 34 60Z" fill="#4f8df5" stroke="#2b2140" stroke-width="3" stroke-linejoin="round"/>
+<path d="M33 61 Q64 43 97 59" fill="none" stroke="#2b2140" stroke-width="11" stroke-linecap="round"/>
+<path d="M33 61 Q64 43 97 59" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+<circle cx="22" cy="34" r="7" fill="#fff" stroke="#2b2140" stroke-width="3"/>
+<path d="M92 30 h9 l-9 10 h9" fill="none" stroke="#fff3b8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

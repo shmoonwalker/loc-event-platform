@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthApi } from '../../../core/auth-api';
+import { DISPLAY_NAME_MESSAGES, displayNameValidators } from '../../../core/display-name';
 import { newPasswordValidators } from '../../../core/password-rules';
 import { HttpErrorResponse } from '@angular/common/http';
 
@@ -17,7 +18,7 @@ export class RegisterPage {
 
   // Same rules as the backend's RegisterRequest, so most mistakes are caught before a request.
   protected readonly form = this.fb.group({
-    displayName: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(100)]],
+    displayName: ['', displayNameValidators],
     email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
     password: ['', newPasswordValidators],
   });
@@ -85,11 +86,7 @@ export class RegisterPage {
 }
 
 const MESSAGES: Record<string, Record<string, string>> = {
-  displayName: {
-    required: 'Enter your name.',
-    pattern: 'Enter your name.',
-    maxlength: 'Use at most 100 characters.',
-  },
+  displayName: DISPLAY_NAME_MESSAGES,
   email: {
     required: 'Enter your email.',
     email: 'Enter a valid email.',

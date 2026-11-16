@@ -14,6 +14,8 @@ describe('AuthApi', () => {
       email: 'shadi@example.com',
       displayName: 'Shadi',
       role: 'USER',
+      avatarUrl: '/avatars/sun.svg',
+      avatarPreset: 'SUN',
     };
     let current: CurrentUser | undefined;
     TestBed.inject(AuthApi)
