@@ -3,8 +3,12 @@ import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthApi } from '../../../core/auth-api';
+import { AuthSession } from '../../../core/auth-session';
 
-/** Opened from the verification email; posts the link's token so the account becomes verified. */
+/**
+ * Opened from the verification email or the email-change email (both links come here); posts the
+ * link's token so the account, or its new address, becomes verified.
+ */
 @Component({
   selector: 'app-verify-email-page',
   imports: [ReactiveFormsModule, RouterLink],
@@ -13,6 +17,8 @@ import { AuthApi } from '../../../core/auth-api';
 export class VerifyEmailPage implements OnInit {
   private readonly authApi = inject(AuthApi);
   private readonly fb = inject(NonNullableFormBuilder);
+  /** Signed in means the link confirms a new address: an unverified account cannot log in. */
+  protected readonly session = inject(AuthSession);
 
   /** The ?token= query parameter from the email link. */
   readonly token = input<string>();

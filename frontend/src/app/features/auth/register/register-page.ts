@@ -1,13 +1,9 @@
 import { Component, inject, signal } from '@angular/core';
-import {
-  NonNullableFormBuilder,
-  ReactiveFormsModule,
-  ValidatorFn,
-  Validators,
-} from '@angular/forms';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthApi } from '../../../core/auth-api';
 import { DISPLAY_NAME_MESSAGES, displayNameValidators } from '../../../core/display-name';
+import { newPasswordValidators } from '../../../core/password-rules';
 import { HttpErrorResponse } from '@angular/common/http';
 
 /** Sign-up page: email, password and display name. */
@@ -24,7 +20,7 @@ export class RegisterPage {
   protected readonly form = this.fb.group({
     displayName: ['', displayNameValidators],
     email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
-    password: ['', [Validators.required, Validators.minLength(10), maxBytes(72)]],
+    password: ['', newPasswordValidators],
   });
 
   protected readonly showPassword = signal(false);
@@ -102,9 +98,3 @@ const MESSAGES: Record<string, Record<string, string>> = {
     maxBytes: 'This password is too long.',
   },
 };
-
-/** BCrypt uses only 72 bytes, so the backend limits passwords in bytes; emoji and accents count extra. */
-function maxBytes(max: number): ValidatorFn {
-  return (control) =>
-    new TextEncoder().encode(control.value).length > max ? { maxBytes: true } : null;
-}

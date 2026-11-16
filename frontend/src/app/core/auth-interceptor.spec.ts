@@ -138,6 +138,20 @@ describe('authInterceptor', () => {
     expect(status).toBe(401);
   });
 
+  it('does not refresh when a signed-in call is refused for a wrong current password', () => {
+    const { client, http, navigate } = setup('access-token');
+    let status: number | undefined;
+    client.post('/api/me/password', {}).subscribe({ error: (err) => (status = err.status) });
+
+    http
+      .expectOne('/api/me/password')
+      .flush({ title: 'Invalid credentials' }, { status: 401, statusText: 'Unauthorized' });
+
+    http.expectNone('/api/auth/refresh');
+    expect(status).toBe(401);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it('passes other errors through without a refresh', () => {
     const { client, http } = setup('access-token');
     let status: number | undefined;

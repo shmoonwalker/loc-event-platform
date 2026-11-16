@@ -73,6 +73,7 @@ describe('SiteHeader', () => {
     expect(logoutButton()).toBeDefined();
     expect(loginLink()).toBeUndefined();
     expect(el.querySelector('a[href="/me"]')?.textContent).toContain('My Loc');
+    expect(el.querySelector('a[href="/account"]')?.textContent).toContain('Account');
   });
 
   it('links the avatar and name to the profile and follows changes without a reload', async () => {
