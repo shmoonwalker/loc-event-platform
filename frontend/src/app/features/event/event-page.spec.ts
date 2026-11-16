@@ -9,6 +9,7 @@ import { of } from 'rxjs';
 import { AuthSession } from '../../core/auth-session';
 import { CommentsApi } from '../../core/comments-api';
 import { EventDetail } from '../../core/models';
+import { PhotosApi } from '../../core/photos-api';
 import { EventPage } from './event-page';
 
 const event: EventDetail = {
@@ -69,6 +70,12 @@ const noComments = {
   useValue: { list: () => of({ page: 0, size: 20, totalElements: 0, totalPages: 0, items: [] }) },
 };
 
+// The album has its own spec; here it only needs an empty answer so the page can settle.
+const noPhotos = {
+  provide: PhotosApi,
+  useValue: { list: () => of([]), mine: () => of([]) },
+};
+
 /** Re-render after a change made outside the template (an event, a sign-in). */
 const settle = () => TestBed.inject(ApplicationRef).whenStable();
 
@@ -84,6 +91,7 @@ async function open(
       provideHttpClient(),
       provideHttpClientTesting(),
       noComments,
+      noPhotos,
       provideRouter([{ path: 'events/:id', component: EventPage }], withComponentInputBinding()),
     ],
   });
@@ -234,6 +242,35 @@ describe('EventPage', () => {
     expect(bare.textContent).not.toContain('For more info');
   });
 
+  it('shows photos after the organizers, including when the event is online', async () => {
+    const el = await open((req) => req.flush(event));
+    expect(el.querySelector('#photos-title')?.textContent).toContain('Photos');
+    expect(before(el.querySelector('#organizers-title'), el.querySelector('#photos-title'))).toBe(
+      true,
+    );
+    expect(before(el.querySelector('#map-title'), el.querySelector('#photos-title'))).toBe(true);
+    expect(el.textContent).toContain('There are no photos yet.');
+
+    TestBed.resetTestingModule();
+    const online = await open((req) =>
+      req.flush({
+        ...event,
+        place: 'ONLINE' as const,
+        venueName: null,
+        address: null,
+        postalCode: null,
+        cityName: null,
+        latitude: null,
+        longitude: null,
+        weather: null,
+        organizers: [],
+      }),
+    );
+    expect(online.querySelector('#weather-title')).toBeNull();
+    expect(online.querySelector('#photos-title')).toBeTruthy();
+    expect(online.textContent).toContain('There are no photos yet.');
+  });
+
   it('shows "Online" and no location or weather block for online events', async () => {
     const online = {
       ...event,
@@ -299,6 +336,7 @@ describe('EventPage', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         noComments,
+        noPhotos,
         provideRouter([{ path: 'events/:id', component: EventPage }], withComponentInputBinding()),
       ],
     });
