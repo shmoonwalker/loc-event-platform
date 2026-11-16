@@ -53,14 +53,18 @@ const thread = pageOf([
 
 const LIST = '/api/events/e1/comments?page=0';
 
-async function render(signedIn: boolean, list: CommentPage = thread) {
+/** true signs in a member whose account is not loaded; 'ADMIN' signs in an admin. */
+async function render(signedIn: boolean | 'ADMIN', list: CommentPage = thread) {
   TestBed.configureTestingModule({
     providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
   });
-  if (signedIn) TestBed.inject(AuthSession).start('token');
+  const http = TestBed.inject(HttpTestingController);
+  if (signedIn === 'ADMIN') {
+    TestBed.inject(AuthSession).start('token').subscribe();
+    http.expectOne('/api/auth/me').flush({ id: 'a1', displayName: 'Loc team', role: 'ADMIN' });
+  } else if (signedIn) TestBed.inject(AuthSession).start('token');
   const fixture = TestBed.createComponent(EventComments);
   fixture.componentRef.setInput('eventId', 'e1');
-  const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
   http.expectOne(LIST).flush(list);
   await fixture.whenStable();
@@ -110,6 +114,7 @@ describe('EventComments', () => {
     expect(el.querySelector('form')).toBeNull();
     expect(button('Reply')).toBeUndefined();
     expect(button('Edit')).toBeUndefined();
+    expect(button('Report')).toBeUndefined();
   });
 
   it('says so when there are no comments yet', async () => {
@@ -201,6 +206,19 @@ describe('EventComments', () => {
     expect(button('Delete', item('Anouk'))).toBeTruthy();
     expect(button('Edit', item('Loc team'))).toBeUndefined();
     expect(button('Delete', item('Deleted user'))).toBeUndefined();
+  });
+
+  it("offers Report on other members' comments, not on your own or deleted ones", async () => {
+    const { button, item } = await render(true);
+    expect(button('Report', item('Loc team'))).toBeTruthy();
+    expect(button('Report', item('Deleted user'))).toBeTruthy();
+    expect(button('Report', item('Anouk'))).toBeUndefined();
+    expect(button('Report', item('Comment deleted'))).toBeUndefined();
+  });
+
+  it('offers no Report to an admin', async () => {
+    const { button } = await render('ADMIN');
+    expect(button('Report')).toBeUndefined();
   });
 
   it('edits your comment starting from its text', async () => {

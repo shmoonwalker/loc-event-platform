@@ -1,0 +1,59 @@
+<button type="button" [class]="buttonClass()" (click)="open()">Report</button>
+
+<dialog
+  class="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-line bg-panel p-6 text-ink backdrop:bg-ink/60"
+  [attr.aria-labelledby]="id + '-title'"
+  #dialog
+>
+  <h2 [id]="id + '-title'" class="text-xl font-semibold">Report this {{ target() }}</h2>
+
+  @if (sent()) {
+    <p class="mt-3" role="status">Thanks for letting us know. An admin will take a look.</p>
+    <button type="button" class="btn-dark mt-5" (click)="close()">Close</button>
+  } @else {
+    <form [formGroup]="form" class="mt-4 flex flex-col gap-4" (ngSubmit)="submit()">
+      <fieldset
+        [attr.aria-describedby]="id + '-reason-error'"
+        [attr.aria-invalid]="fieldError('reason') ? true : null"
+      >
+        <legend class="font-semibold">What's wrong with it?</legend>
+        <div class="mt-2 flex flex-col gap-1">
+          @for (r of reasons; track r.value) {
+            <label class="option">
+              <input type="radio" formControlName="reason" [value]="r.value" />
+              {{ r.label }}
+            </label>
+          }
+        </div>
+        <p [id]="id + '-reason-error'" class="text-sm text-danger">{{ fieldError('reason') }}</p>
+      </fieldset>
+
+      <div class="flex flex-col gap-1.5">
+        <label [for]="id + '-details'" class="font-semibold">
+          Anything to add? <span class="font-normal text-muted">(optional)</span>
+        </label>
+        <textarea
+          [id]="id + '-details'"
+          formControlName="details"
+          rows="3"
+          class="field-input py-2"
+          [attr.aria-describedby]="id + '-details-error'"
+          [attr.aria-invalid]="fieldError('details') ? true : null"
+        ></textarea>
+        <p [id]="id + '-details-error'" class="text-sm text-danger">
+          {{ fieldError('details') }}
+        </p>
+      </div>
+
+      @if (error(); as message) {
+        <p role="alert" class="text-sm text-danger">{{ message }}</p>
+      }
+      <div class="flex items-center gap-4">
+        <button type="submit" class="btn-dark" [disabled]="sending()">
+          {{ sending() ? 'Sending…' : 'Send report' }}
+        </button>
+        <button type="button" class="link" (click)="close()">Cancel</button>
+      </div>
+    </form>
+  }
+</dialog>

@@ -69,7 +69,10 @@ and edit or delete their own; deleting asks to confirm first. Visitors get a lin
 in instead of the form. A deleted comment that still has replies shows as "Comment
 deleted", authors of deleted accounts show as the API names them, and official replies
 carry an "Official" badge. API errors, such as text that is too long or posting too
-often, show under the form. The endpoints are in the [Member API](../backend/docs/member.md).
+often, show under the form. Members can report the event (next to the save button) or
+someone else's comment: a dialog asks for one of the fixed reasons and optional text,
+then says thanks. Errors, such as reporting too often, show in the dialog. Visitors and
+admins do not see Report. The endpoints are in the [Member API](../backend/docs/member.md).
 
 ### Account settings
 

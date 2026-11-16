@@ -156,6 +156,8 @@
                 @if (c.mine) {
                   <button type="button" class="link" (click)="openEdit(c.id)">Edit</button>
                   <button type="button" class="link" (click)="askDelete(c.id)">Delete</button>
+                } @else if (!session.isAdmin()) {
+                  <app-report-button target="comment" [targetId]="c.id" />
                 }
               </div>
             }
