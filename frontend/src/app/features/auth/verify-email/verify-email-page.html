@@ -5,13 +5,25 @@
     }
     @case ('verified') {
       <h1 class="display text-[clamp(36px,5vw,60px)]">Email verified</h1>
-      <p class="mt-4 text-muted">Your account is ready. You can log in now.</p>
-      <a routerLink="/login" class="btn-dark mt-6">Log in</a>
+      @if (session.loggedIn()) {
+        <p class="mt-4 text-muted">
+          Your new email address is confirmed. Use it to log in from now on.
+        </p>
+        <a routerLink="/account" class="btn-dark mt-6">Back to account</a>
+      } @else {
+        <p class="mt-4 text-muted">Your account is ready. You can log in now.</p>
+        <a routerLink="/login" class="btn-dark mt-6">Log in</a>
+      }
     }
     @case ('invalid') {
       <h1 class="display text-[clamp(36px,5vw,60px)]">This link is invalid or has expired</h1>
       <p class="mt-4 text-muted">Verification links work once and expire after 24 hours.</p>
-      @if (resendStatus() === 'sent') {
+      @if (session.loggedIn()) {
+        <p class="mt-4 text-muted">
+          To change your email, request a new link from your
+          <a routerLink="/account" class="link">account settings</a>.
+        </p>
+      } @else if (resendStatus() === 'sent') {
         <p class="mt-6 font-semibold" role="status">
           If this email still needs verifying, we've sent a new link. Check your inbox.
         </p>
