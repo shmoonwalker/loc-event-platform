@@ -207,4 +207,70 @@ describe('AccountPage', () => {
       );
     });
   });
+
+  describe('deletion', () => {
+    const button = (el: HTMLElement, label: string) =>
+      [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === label);
+
+    it('explains what is removed and needs the password before asking to confirm', async () => {
+      const { http, el, section, submit } = await open();
+      expect(section('Delete account').textContent).toContain('saved events');
+      expect(section('Delete account').textContent).toContain('Deleted user');
+      await submit('Delete account');
+
+      http.expectNone('/api/me');
+      expect(el.querySelector('#delete-password-error')?.textContent).toContain(
+        'Enter your current password.',
+      );
+      expect(button(el, 'Yes, delete my account')).toBeUndefined();
+    });
+
+    it('asks to confirm, deletes, signs the member out and opens the home page', async () => {
+      const { http, el, session, type, submit, settle } = await open();
+      type('#delete-password', 'old-password-123');
+      await submit('Delete account');
+      http.expectNone('/api/me');
+      expect(button(el, 'Yes, delete my account')).toBeDefined();
+
+      await submit('Delete account');
+      const req = http.expectOne('/api/me');
+      expect(req.request.method).toBe('DELETE');
+      expect(req.request.body).toEqual({ currentPassword: 'old-password-123' });
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+
+      expect(session.loggedIn()).toBe(false);
+      expect(session.currentUser()).toBeNull();
+      expect(TestBed.inject(Router).url).toBe('/');
+    });
+
+    it('cancelling the confirmation sends nothing', async () => {
+      const { harness, http, el, type, submit } = await open();
+      type('#delete-password', 'old-password-123');
+      await submit('Delete account');
+      button(el, 'Cancel')!.click();
+      harness.detectChanges();
+
+      http.expectNone('/api/me');
+      expect(button(el, 'Yes, delete my account')).toBeUndefined();
+      expect(button(el, 'Delete account')).toBeDefined();
+    });
+
+    it('keeps the member signed in when the password is wrong', async () => {
+      const { http, el, session, type, submit, settle } = await open();
+      type('#delete-password', 'wrong-password');
+      await submit('Delete account');
+      await submit('Delete account');
+
+      http.expectOne('/api/me').flush(WRONG_PASSWORD, { status: 401, statusText: 'Unauthorized' });
+      await settle();
+
+      http.expectNone('/api/auth/refresh');
+      expect(session.loggedIn()).toBe(true);
+      expect(el.querySelector('#delete-password-error')?.textContent).toContain(
+        'Your current password is incorrect.',
+      );
+      expect(TestBed.inject(Router).url).toBe('/account');
+    });
+  });
 });
