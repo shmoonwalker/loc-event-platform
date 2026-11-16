@@ -42,7 +42,8 @@ public class HiddenEventController {
     @Operation(
             summary = "Hide an event",
             description = "Hides the show from public discovery. eventId is a show id or an older event id. "
-                    + "The publication row is not changed. Hiding a show that is already hidden changes nothing.")
+                    + "The publication row is not changed. Hiding a show that is already hidden keeps the first row "
+                    + "and still closes any new open reports of that event. Those reports are resolved as HIDDEN.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "The event is hidden."),
             @ApiResponse(

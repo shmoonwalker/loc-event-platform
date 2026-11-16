@@ -6,6 +6,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import nl.loc.backend.admin.dto.HiddenEventResponse;
+import nl.loc.backend.admin.repository.AdminReportRepository;
 import nl.loc.backend.admin.repository.HiddenEventRepository;
 import nl.loc.backend.user.repository.UserAccountRepository;
 import nl.loc.backend.user.service.AccountNotFoundException;
@@ -18,20 +19,26 @@ import org.springframework.web.server.ResponseStatusException;
 public class HiddenEventService {
 
     private final HiddenEventRepository hiddenEventRepository;
+    private final AdminReportRepository adminReportRepository;
     private final UserAccountRepository userAccountRepository;
     private final Clock clock;
 
-    public HiddenEventService(HiddenEventRepository hiddenEventRepository,
+    public HiddenEventService(HiddenEventRepository hiddenEventRepository, AdminReportRepository adminReportRepository,
                               UserAccountRepository userAccountRepository, Clock clock) {
         this.hiddenEventRepository = hiddenEventRepository;
+        this.adminReportRepository = adminReportRepository;
         this.userAccountRepository = userAccountRepository;
         this.clock = clock;
     }
 
+    /** Also closes open EVENT reports of the show. Hiding again keeps the first row and closes any new ones. */
     @Transactional
     public void hide(UUID adminId, UUID eventId, String reason) {
         requireAccount(adminId);
-        hiddenEventRepository.hide(showId(eventId), adminId, reason.trim(), now());
+        UUID showId = showId(eventId);
+        OffsetDateTime hiddenAt = now();
+        hiddenEventRepository.hide(showId, adminId, reason.trim(), hiddenAt);
+        adminReportRepository.resolveOpenEventReports(showId, adminId, hiddenAt);
     }
 
     /** Does not reopen reports closed when the event was hidden. */
