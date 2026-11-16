@@ -95,6 +95,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'reset-password',
+        title: 'Choose a new password – Loc',
+        loadComponent: () =>
+          import('./features/auth/reset-password/reset-password-page').then(
+            (m) => m.ResetPasswordPage,
+          ),
+      },
+      {
         path: '**',
         title: 'Page not found – Loc',
         loadComponent: () =>
