@@ -9,15 +9,17 @@ import org.springframework.stereotype.Service;
 public class CurrentUserService {
 
     private final UserAccountRepository userAccountRepository;
+    private final AvatarStorage avatarStorage;
 
-    public CurrentUserService(UserAccountRepository userAccountRepository) {
+    public CurrentUserService(UserAccountRepository userAccountRepository, AvatarStorage avatarStorage) {
         this.userAccountRepository = userAccountRepository;
+        this.avatarStorage = avatarStorage;
     }
 
     // the token stays valid until it expires, even if the account was deleted in the meantime
     public UserResponse currentUser(UUID accountId) {
         return userAccountRepository.findById(accountId)
-                .map(UserResponse::from)
+                .map(account -> UserResponse.from(account, avatarStorage.avatarUrl(account)))
                 .orElseThrow(AccountNotFoundException::new);
     }
 }

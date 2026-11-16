@@ -27,14 +27,17 @@ public class CommentService {
     private final UserAccountRepository userAccountRepository;
     private final RateLimiter rateLimiter;
     private final Clock clock;
+    private final AvatarStorage avatarStorage;
 
     public CommentService(CommentQueryRepository commentQueryRepository, CommentRepository commentRepository,
-                          UserAccountRepository userAccountRepository, RateLimiter rateLimiter, Clock clock) {
+                          UserAccountRepository userAccountRepository, RateLimiter rateLimiter, Clock clock,
+                          AvatarStorage avatarStorage) {
         this.commentQueryRepository = commentQueryRepository;
         this.commentRepository = commentRepository;
         this.userAccountRepository = userAccountRepository;
         this.rateLimiter = rateLimiter;
         this.clock = clock;
+        this.avatarStorage = avatarStorage;
     }
 
     /** viewerId is null for visitors. */
@@ -103,8 +106,9 @@ public class CommentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found."));
     }
 
-    private static CommentResponse response(Comment comment, UserAccount author) {
-        return new CommentResponse(comment.getId(), new CommentAuthor(author.getDisplayName()), comment.getBody(),
+    private CommentResponse response(Comment comment, UserAccount author) {
+        CommentAuthor commentAuthor = new CommentAuthor(author.getDisplayName(), avatarStorage.avatarUrl(author));
+        return new CommentResponse(comment.getId(), commentAuthor, comment.getBody(),
                 comment.isOfficial(), false, true, comment.getCreatedAt(), comment.getEditedAt(), List.of());
     }
 }

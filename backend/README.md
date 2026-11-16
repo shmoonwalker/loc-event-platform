@@ -23,6 +23,7 @@ The frontend communicates only with the backend API.
 | Saved events | `GET /api/me/saved-events`, `GET`/`PUT`/`DELETE /api/me/saved-events/{eventId}` | [Member API](docs/member.md) |
 | Followed organizers | `GET /api/me/followed-organizers`, `/api/me/followed-organizers/events`, `PUT`/`DELETE /api/me/followed-organizers/{organizerId}` | [Member API](docs/member.md) |
 | Comments | `GET`/`POST /api/events/{eventId}/comments`, `POST /api/comments/{commentId}/replies`, `PATCH`/`DELETE /api/me/comments/{commentId}` | [Member API](docs/member.md#comments) |
+| Profile | `PATCH /api/me/profile`, `PUT /api/me/avatar/preset`, `POST`/`DELETE /api/me/avatar` | [Member API](docs/member.md) |
 
 Interactive API documentation (Scalar) is served at `/api/docs`, and the OpenAPI document at `/api/docs/openapi.yaml`.
 
@@ -76,6 +77,12 @@ Redis is only needed for rate limiting. Without it the backend still starts and 
 | `JWT_SECRET` | none, required | Base64 key of at least 32 bytes that signs access tokens |
 | `JWT_ACCESS_TOKEN_TTL` | `15m` | Lifetime of an access token |
 | `JWT_REFRESH_TOKEN_TTL` | `14d` | Session lifetime after login |
+| `R2_ENDPOINT`, `R2_REGION` | empty, `auto` | Cloudflare R2 S3 endpoint (`https://<account-id>.r2.cloudflarestorage.com`) |
+| `AVATAR_R2_ACCESS_KEY`, `AVATAR_R2_SECRET_KEY` | empty | R2 API token for the avatar bucket |
+| `AVATAR_R2_BUCKET` | empty | Public bucket for profile pictures |
+| `AVATAR_PUBLIC_URL` | empty | Public domain of that bucket; avatar URLs start with it |
+
+Without the R2 settings the backend starts with picture uploads turned off: `POST /api/me/avatar` answers `503`, and preset avatars keep working.
 
 Rate limits are set under `app.rate-limit.policies` in `src/main/resources/application.yaml`.
 
@@ -91,7 +98,7 @@ nl.loc.backend
 │   ├── jwt/       access-token signing key and JWT encoder/decoder
 │   └── ratelimit/ Redis-backed rate limiter
 ├── event/         public discovery: events, organizers, cities, categories, tags
-└── user/          user accounts, registration, login, account emails, saved events, followed organizers, comments
+└── user/          user accounts, registration, login, account emails, profile and avatars, saved events, followed organizers, comments
 ```
 
 Within a feature:

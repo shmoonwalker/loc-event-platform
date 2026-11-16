@@ -23,6 +23,11 @@ spring:
       url: ${REDIS_URL:redis://localhost:6379}
       repositories:
         enabled: false
+  servlet:
+    multipart:
+      # keep in step with client_max_body_size in frontend/nginx.conf.template
+      max-file-size: 5MB
+      max-request-size: 6MB
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
@@ -69,6 +74,20 @@ app:
       account-security:
         capacity: 5
         period: 15m
+      # per member
+      avatar-upload:
+        capacity: 5
+        period: 1h
+
+  avatar:
+    # public Cloudflare R2 bucket for uploaded profile pictures; uploads are off while unset
+    storage:
+      endpoint: ${R2_ENDPOINT:}
+      region: ${R2_REGION:auto}
+      access-key: ${AVATAR_R2_ACCESS_KEY:}
+      secret-key: ${AVATAR_R2_SECRET_KEY:}
+      bucket: ${AVATAR_R2_BUCKET:}
+      public-url: ${AVATAR_PUBLIC_URL:}
 
 server:
   port: 8080

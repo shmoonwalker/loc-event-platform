@@ -4,7 +4,9 @@ import nl.loc.backend.config.ratelimit.RateLimitExceededException;
 import nl.loc.backend.event.controller.InvalidBrowseQueryException;
 import nl.loc.backend.user.controller.RefreshTokenCookie;
 import nl.loc.backend.user.service.AccountNotFoundException;
+import nl.loc.backend.user.service.AvatarStorageUnavailableException;
 import nl.loc.backend.user.service.EmailNotVerifiedException;
+import nl.loc.backend.user.service.InvalidImageException;
 import nl.loc.backend.user.service.InvalidRefreshTokenException;
 import nl.loc.backend.user.service.InvalidTokenException;
 import nl.loc.backend.user.service.RefreshTokenAlreadyRotatedException;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -124,6 +127,30 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
         problem.setTitle("Email not verified");
         problem.setDetail("Please verify your email address before logging in");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidImageException.class)
+    public ProblemDetail handleInvalidImage(InvalidImageException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Invalid image");
+        problem.setDetail(ex.getMessage());
+        return problem;
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONTENT_TOO_LARGE);
+        problem.setTitle("File too large");
+        problem.setDetail("The file must not exceed 5 MB");
+        return problem;
+    }
+
+    @ExceptionHandler(AvatarStorageUnavailableException.class)
+    public ProblemDetail handleAvatarStorageUnavailable(AvatarStorageUnavailableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
+        problem.setTitle("Uploads unavailable");
+        problem.setDetail("Picture uploads are not available right now");
         return problem;
     }
 
