@@ -75,6 +75,7 @@ class AdminReportHttpTest {
     void setUp() {
         jdbc.sql("DELETE FROM app.report").update();
         jdbc.sql("DELETE FROM app.hidden_event").update();
+        jdbc.sql("DELETE FROM app.comment").update();
         userRepository.deleteAll();
         jdbc.sql("DELETE FROM publication.event_snapshot").update();
         admin = userRepository.save(new UserAccount("ada@example.com", "Ada", "hash", Instant.now()));
@@ -103,7 +104,54 @@ class AdminReportHttpTest {
                 .andExpect(jsonPath("$[1].targetId").value(commentId.toString()))
                 .andExpect(jsonPath("$[1].openCount").value(1))
                 .andExpect(jsonPath("$[1].reasons", contains("OTHER")))
-                .andExpect(jsonPath("$[1].reportIds", contains(comment.toString())));
+                .andExpect(jsonPath("$[1].reportIds", contains(comment.toString())))
+                .andExpect(jsonPath("$[0].eventId").value(showId.toString()))
+                .andExpect(jsonPath("$[0].eventTitle").doesNotExist())
+                .andExpect(jsonPath("$[1].eventId").doesNotExist())
+                .andExpect(jsonPath("$[1].commentBody").doesNotExist());
+    }
+
+    @Test
+    void groupsCarryTheShowTitleAndTheCommentWithItsAuthor() throws Exception {
+        UUID showId = UUID.randomUUID();
+        UUID oldEventId = UUID.randomUUID();
+        publish(showId, oldEventId);
+        UUID commentId = comment(showId, "Buy cheap tickets here");
+        report("EVENT", oldEventId, alice, "SPAM", DAY_ONE);
+        report("COMMENT", commentId, bob, "SPAM", DAY_TWO);
+
+        perform(get("/api/admin/reports"), adminToken())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].targetType").value("COMMENT"))
+                .andExpect(jsonPath("$[0].targetId").value(commentId.toString()))
+                .andExpect(jsonPath("$[0].eventId").value(showId.toString()))
+                .andExpect(jsonPath("$[0].eventTitle").value("Reported"))
+                .andExpect(jsonPath("$[0].commentBody").value("Buy cheap tickets here"))
+                .andExpect(jsonPath("$[0].commentAuthorName").value("Alice"))
+                .andExpect(jsonPath("$[1].targetType").value("EVENT"))
+                .andExpect(jsonPath("$[1].targetId").value(oldEventId.toString()))
+                .andExpect(jsonPath("$[1].eventId").value(showId.toString()))
+                .andExpect(jsonPath("$[1].eventTitle").value("Reported"))
+                .andExpect(jsonPath("$[1].commentBody").doesNotExist())
+                .andExpect(jsonPath("$[1].commentAuthorName").doesNotExist());
+    }
+
+    @Test
+    void aRemovedCommentKeepsItsEventButNotItsBody() throws Exception {
+        UUID showId = UUID.randomUUID();
+        publish(showId, showId);
+        UUID commentId = comment(showId, "Removed text");
+        jdbc.sql("UPDATE app.comment SET deleted_at = now(), deleted_by = :admin, delete_reason = 'Spam'")
+                .param("admin", admin.getId())
+                .update();
+        report("COMMENT", commentId, bob, "SPAM", DAY_ONE);
+
+        perform(get("/api/admin/reports"), adminToken())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].eventId").value(showId.toString()))
+                .andExpect(jsonPath("$[0].eventTitle").value("Reported"))
+                .andExpect(jsonPath("$[0].commentBody").doesNotExist())
+                .andExpect(jsonPath("$[0].commentAuthorName").value("Alice"));
     }
 
     @Test
@@ -266,6 +314,17 @@ class AdminReportHttpTest {
                 .param("resolution", resolution)
                 .update();
         return id;
+    }
+
+    private UUID comment(UUID showId, String body) {
+        return jdbc.sql("""
+                INSERT INTO app.comment (event_id, user_id, body) VALUES (:eventId, :userId, :body) RETURNING id
+                """)
+                .param("eventId", showId)
+                .param("userId", alice.getId())
+                .param("body", body)
+                .query(UUID.class)
+                .single();
     }
 
     private String resolution(UUID id) {

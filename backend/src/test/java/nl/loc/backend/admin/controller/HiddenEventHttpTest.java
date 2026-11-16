@@ -100,6 +100,7 @@ class HiddenEventHttpTest {
                 .andExpect(jsonPath("$[0].hiddenBy").value(admin.getId().toString()))
                 .andExpect(jsonPath("$[0].hiddenByName").value("Ada"))
                 .andExpect(jsonPath("$[0].reason").value("Duplicate listing"))
+                .andExpect(jsonPath("$[0].eventTitle").value("Secret concert"))
                 .andExpect(jsonPath("$[0].hiddenAt").isNotEmpty());
     }
 
