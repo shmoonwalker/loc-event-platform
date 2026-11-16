@@ -8,7 +8,7 @@ import { AdminError } from './admin-error';
 
 /**
  * Events an admin took out of public lists: who, when and why, most recent first, with Unhide.
- * The title is plain text: a hidden event's public page answers 404.
+ * The public event API answers 404 for a hidden event, so the list shows the event id, not its title.
  */
 @Component({
   selector: 'app-admin-hidden-events',
