@@ -294,7 +294,10 @@ describe('EventPage', () => {
     await harness.fixture.whenStable();
     const el = harness.routeNativeElement!;
     expect(el.querySelector('h1')?.textContent).toContain('Late-night jazz session');
-    expect(el.textContent).toContain('This event is no longer available');
+    expect(el.querySelector('[role="status"]')?.textContent?.trim()).toBe(
+      'This event is no longer available.',
+    );
+    expect(el.querySelector('#weather-title')).toBeNull();
   });
 
   it('shows the retryable error state on other failures', async () => {
