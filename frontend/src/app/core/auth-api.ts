@@ -77,6 +77,16 @@ export class AuthApi {
     return this.http.post<void>('/api/auth/resend-verification', { email });
   }
 
+  /** Always 202, so the answer never reveals whether the email has an account. */
+  forgotPassword(email: string): Observable<void> {
+    return this.http.post<void>('/api/auth/forgot-password', { email });
+  }
+
+  /** 204 when changed, which also signs out every session of the account; 400 for an unknown, expired or used token (same answer for all three). */
+  resetPassword(token: string, newPassword: string): Observable<void> {
+    return this.http.post<void>('/api/auth/reset-password', { token, newPassword });
+  }
+
   /** 200 with an access token and a refresh cookie; 401 for a wrong email or password (same answer for both); 403 when the email is not verified. */
   login(body: LoginRequest): Observable<LoginResponse> {
     return this.http.post<LoginResponse>('/api/auth/login', body);
