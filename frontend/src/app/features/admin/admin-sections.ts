@@ -6,4 +6,15 @@ export interface AdminSection {
   description: string;
 }
 
-export const ADMIN_SECTIONS: readonly AdminSection[] = [];
+export const ADMIN_SECTIONS: readonly AdminSection[] = [
+  {
+    path: 'reports',
+    label: 'Reports',
+    description: 'Open reports from members: hide the event or dismiss the reports.',
+  },
+  {
+    path: 'hidden-events',
+    label: 'Hidden events',
+    description: 'Events taken out of public lists, who hid them and why.',
+  },
+];

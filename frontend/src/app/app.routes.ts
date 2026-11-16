@@ -21,6 +21,17 @@ export const routes: Routes = [
         title: 'Overview – Admin – Loc',
         loadComponent: () => import('./features/admin/admin-overview').then((m) => m.AdminOverview),
       },
+      {
+        path: 'reports',
+        title: 'Reports – Admin – Loc',
+        loadComponent: () => import('./features/admin/admin-reports').then((m) => m.AdminReports),
+      },
+      {
+        path: 'hidden-events',
+        title: 'Hidden events – Admin – Loc',
+        loadComponent: () =>
+          import('./features/admin/admin-hidden-events').then((m) => m.AdminHiddenEvents),
+      },
       { path: '**', redirectTo: '' },
     ],
   },

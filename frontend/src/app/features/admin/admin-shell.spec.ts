@@ -17,6 +17,15 @@ const ADMIN: CurrentUser = {
   avatarPreset: 'SUN',
 };
 
+const REPORT = {
+  targetType: 'EVENT',
+  targetId: 'e1',
+  openCount: 2,
+  reasons: ['SPAM'],
+  reportIds: ['r1', 'r2'],
+};
+const REPORT_2 = { ...REPORT, targetType: 'COMMENT', targetId: 'c1' };
+
 /** Signed in as admin, with the app's real routes. */
 async function open(url = '/admin') {
   TestBed.configureTestingModule({
@@ -26,6 +35,9 @@ async function open(url = '/admin') {
   TestBed.inject(AuthSession).start('token').subscribe();
   http.expectOne('/api/auth/me').flush(ADMIN);
   const harness = await RouterTestingHarness.create(url);
+  // The overview counts what waits in each section.
+  http.match('/api/admin/reports').forEach((req) => req.flush([REPORT, REPORT_2]));
+  http.match('/api/admin/hidden-events').forEach((req) => req.flush([]));
   await harness.fixture.whenStable();
   const el = harness.routeNativeElement!;
   const nav = () => el.querySelector<HTMLElement>('#admin-nav')!;
@@ -51,6 +63,25 @@ describe('AdminShell', () => {
     expect(link('← Back to site').getAttribute('href')).toBe('/');
     expect(el.querySelector('app-site-header')).toBeNull();
     expect(el.textContent).toContain('Admin');
+  });
+
+  it('lists every section in the navigation and as an overview card with its count', async () => {
+    const { el, link } = await open();
+
+    expect(link('Reports').getAttribute('href')).toBe('/admin/reports');
+    expect(link('Hidden events').getAttribute('href')).toBe('/admin/hidden-events');
+    const card = (label: string) =>
+      [...el.querySelectorAll('main a')].find((a) => a.textContent?.includes(label))!;
+    expect(card('Reports').getAttribute('href')).toBe('/admin/reports');
+    expect(card('Reports').textContent).toContain('2');
+    expect(card('Hidden events').getAttribute('href')).toBe('/admin/hidden-events');
+    expect(card('Hidden events').textContent).not.toMatch(/\d/);
+  });
+
+  it('marks the open section in the navigation', async () => {
+    const { link } = await open('/admin/hidden-events');
+    expect(link('Hidden events').getAttribute('aria-current')).toBe('page');
+    expect(link('Overview').getAttribute('aria-current')).toBeNull();
   });
 
   it('opens the overview for an unknown admin page', async () => {
