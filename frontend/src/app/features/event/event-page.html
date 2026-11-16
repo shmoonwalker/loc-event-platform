@@ -55,6 +55,9 @@
       </h1>
       <div class="mt-4 flex items-center gap-3">
         <app-save-button [eventId]="e.id" [initiallySaved]="e.saved" />
+        @if (session.loggedIn() && !session.isAdmin()) {
+          <app-report-button target="event" [targetId]="e.id" buttonClass="pill-btn" />
+        }
       </div>
       @if (!e.available) {
         <p class="mt-4 rounded-xl border border-line bg-panel p-4 text-muted" role="status">

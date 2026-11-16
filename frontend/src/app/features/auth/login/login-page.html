@@ -51,6 +51,12 @@
           {{ message }}
         }
       </p>
+      <a
+        routerLink="/forgot-password"
+        [state]="{ email: form.controls.email.value }"
+        class="link self-start text-sm"
+        >Forgot password?</a
+      >
     </div>
 
     @if (formError(); as message) {

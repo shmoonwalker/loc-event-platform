@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { FilterOptions } from '../../../core/models';
+import { addDays, amsterdamDate } from '../../../core/time';
 import { ListFilters } from '../list-filters';
 import { SearchConsole } from './search-console';
 
@@ -27,6 +28,9 @@ const options: FilterOptions = {
   ],
   maxQueryLength: 100,
 } as FilterOptions;
+
+/** A day from now (Amsterdam), so the date range tests never pick a past day. */
+const day = (n: number) => addDays(amsterdamDate(), n);
 
 async function open(url = '/') {
   TestBed.configureTestingModule({
@@ -89,14 +93,104 @@ describe('SearchConsole', () => {
     await choose(select('Date'), 'custom');
     expect(router.url).toBe('/');
     const [from, to] = [...el.querySelectorAll<HTMLInputElement>('input[type="date"]')];
-    from.value = '2026-12-01';
+    from.value = day(15);
     from.dispatchEvent(new Event('change'));
-    to.value = '2026-12-03';
+    to.value = day(17);
     to.dispatchEvent(new Event('change'));
     await settle();
 
-    expect(router.url).toBe('/?dateFrom=2026-12-01&dateTo=2026-12-03');
+    expect(router.url).toBe(`/?dateFrom=${day(15)}&dateTo=${day(17)}`);
     expect(select('Date').value).toBe('custom');
+  });
+
+  it('highlights the Date box only once a date filter is applied', async () => {
+    const { el, settle, select, choose } = await open();
+    const box = select('Date').closest('label')!;
+    expect(box.getAttribute('data-active')).toBe('false');
+
+    await choose(select('Date'), 'custom');
+    expect(box.getAttribute('data-active')).toBe('false');
+    const [from, to] = [...el.querySelectorAll<HTMLInputElement>('input[type="date"]')];
+    from.value = day(15);
+    from.dispatchEvent(new Event('change'));
+    await settle();
+    expect(box.getAttribute('data-active')).toBe('false');
+
+    to.value = day(17);
+    to.dispatchEvent(new Event('change'));
+    await settle();
+    expect(box.getAttribute('data-active')).toBe('true');
+  });
+
+  it('goes back to any date when the visitor leaves an unfinished range', async () => {
+    const { el, router, settle, select, choose } = await open();
+    await choose(select('Date'), 'custom');
+    const from = el.querySelector<HTMLInputElement>('input[type="date"]')!;
+    from.value = day(15);
+    from.dispatchEvent(new Event('change'));
+    from.click(); // working inside the range keeps it open
+    await settle();
+    expect(el.querySelector('input[type="date"]')).not.toBeNull();
+
+    el.querySelector<HTMLElement>('input[type="search"]')!.click();
+    await settle();
+    expect(el.querySelector('input[type="date"]')).toBeNull();
+    expect(select('Date').value).toBe('any');
+    expect(select('Date').closest('label')!.getAttribute('data-active')).toBe('false');
+    expect(router.url).toBe('/');
+
+    await choose(select('Date'), 'custom');
+    expect(el.querySelector<HTMLInputElement>('input[type="date"]')!.value).toBe('');
+  });
+
+  it('keeps an applied range open when the visitor clicks elsewhere', async () => {
+    const { el, router, settle } = await open(`/?dateFrom=${day(15)}&dateTo=${day(17)}`);
+    el.querySelector<HTMLElement>('input[type="search"]')!.click();
+    await settle();
+    expect(el.querySelectorAll('input[type="date"]').length).toBe(2);
+    expect(router.url).toBe(`/?dateFrom=${day(15)}&dateTo=${day(17)}`);
+  });
+
+  it('starts the calendars at today and "To" at the chosen "From"', async () => {
+    const { el, router, settle, select, choose } = await open();
+    await choose(select('Date'), 'custom');
+    const [from, to] = [...el.querySelectorAll<HTMLInputElement>('input[type="date"]')];
+    expect(from.min).toBe(day(0));
+    expect(to.min).toBe(day(0));
+
+    from.value = day(15);
+    from.dispatchEvent(new Event('change'));
+    await settle();
+    expect(to.min).toBe(day(15));
+
+    to.value = day(10); // typed: the calendar would not offer it
+    to.dispatchEvent(new Event('change'));
+    await settle();
+    expect(router.url).toBe('/');
+    expect(el.textContent).toContain('“From” must not be after “To”.');
+  });
+
+  it('does not apply a typed range that starts in the past', async () => {
+    const { el, router, settle, select, choose } = await open();
+    await choose(select('Date'), 'custom');
+    const [from, to] = [...el.querySelectorAll<HTMLInputElement>('input[type="date"]')];
+    from.value = day(-3);
+    from.dispatchEvent(new Event('change'));
+    to.value = day(2);
+    to.dispatchEvent(new Event('change'));
+    await settle();
+
+    expect(router.url).toBe('/');
+    expect(el.textContent).toContain('Pick today or a later day.');
+  });
+
+  it('shows an applied range as readable days in the box and the chip', async () => {
+    const { el } = await open('/?dateFrom=2026-11-20&dateTo=2026-11-25');
+    const year = amsterdamDate().slice(0, 4);
+    const text = year === '2026' ? '20 Nov – 25 Nov' : '20 Nov 2026 – 25 Nov 2026';
+    const date = [...el.querySelectorAll('select')][0];
+    expect(date.selectedOptions[0].text.trim()).toBe(text);
+    expect(el.querySelector(`button[aria-label="Remove ${text}"]`)).not.toBeNull();
   });
 
   it('offers only the fixed time ranges and no typed time', async () => {

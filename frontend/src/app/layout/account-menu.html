@@ -56,6 +56,17 @@
             Dashboard
           </a>
         </li>
+        @if (session.isAdmin()) {
+          <li>
+            <a
+              routerLink="/admin"
+              class="flex min-h-11 items-center rounded-xl px-3 font-semibold hover:bg-bg"
+              (click)="open.set(false)"
+            >
+              Admin
+            </a>
+          </li>
+        }
         <li>
           <button
             type="button"

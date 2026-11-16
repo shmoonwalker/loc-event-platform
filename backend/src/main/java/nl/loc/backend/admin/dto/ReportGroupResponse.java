@@ -17,5 +17,15 @@ public record ReportGroupResponse(
         List<String> reasons,
         @Schema(description = "Open report ids, oldest first. Dismiss one of these to close it.",
                 requiredMode = Schema.RequiredMode.REQUIRED)
-        List<UUID> reportIds) {
+        List<UUID> reportIds,
+        @Schema(description = "Show the item belongs to. An event report filed on an older event id gives its show id. "
+                + "Absent for a comment that no longer exists.")
+        UUID eventId,
+        @Schema(description = "Event title. Absent when the show is no longer published.")
+        String eventTitle,
+        @Schema(description = "Text of the reported comment. Absent for an event and after the comment was removed.")
+        String commentBody,
+        @Schema(description = "Display name of the comment's author. Absent for an event and after that account "
+                + "is deleted.")
+        String commentAuthorName) {
 }

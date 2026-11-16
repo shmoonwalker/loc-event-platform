@@ -5,9 +5,15 @@ import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthSession } from './auth-session';
 import { SKIP_AUTH_REFRESH } from './auth-api';
 
-// These work with the refresh cookie or a password, not the access token. Spring answers 401 to an
-// expired Bearer token even on permitAll endpoints, so sending it here would break the refresh itself.
-const WITHOUT_TOKEN = ['/api/auth/login', '/api/auth/refresh', '/api/auth/logout'];
+// These work with the refresh cookie, a password or an emailed link, not the access token. Spring
+// answers 401 to an expired Bearer token even on permitAll endpoints, so sending it here would break them.
+const WITHOUT_TOKEN = [
+  '/api/auth/login',
+  '/api/auth/refresh',
+  '/api/auth/logout',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+];
 
 /**
  * Adds the in-memory access token to our own API calls. On a 401 it refreshes once and retries the call;

@@ -12,7 +12,7 @@ Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 | `POST /api/admin/reports/{reportId}/dismiss` | Close one open report without changing the item. `204`. |
 | `POST /api/admin/events/{eventId}/hide` | Hide a show. Body `{ "reason": "..." }`. `204`. |
 | `DELETE /api/admin/events/{eventId}/hide` | Unhide a show. `204`. |
-| `GET /api/admin/hidden-events` | Hidden shows, with who hid them, when, and why. |
+| `GET /api/admin/hidden-events` | Hidden shows, with their title, who hid them, when, and why. |
 
 ## Reports
 
@@ -34,7 +34,20 @@ Resolved reports are left out. What remains is grouped by `target_type` and
     "reportIds": [
       "22222222-2222-4222-8222-222222222222",
       "33333333-3333-4333-8333-333333333333"
-    ]
+    ],
+    "eventId": "11111111-1111-4111-8111-111111111111",
+    "eventTitle": "Jazz in the park"
+  },
+  {
+    "targetType": "COMMENT",
+    "targetId": "55555555-5555-4555-8555-555555555555",
+    "openCount": 1,
+    "reasons": ["SPAM"],
+    "reportIds": ["66666666-6666-4666-8666-666666666666"],
+    "eventId": "11111111-1111-4111-8111-111111111111",
+    "eventTitle": "Jazz in the park",
+    "commentBody": "Buy cheap tickets here",
+    "commentAuthorName": "Alice"
   }
 ]
 ```
@@ -43,6 +56,16 @@ Resolved reports are left out. What remains is grouped by `target_type` and
 - `reasons` are the distinct reasons, alphabetical:
   `WRONG_INFORMATION`, `SPAM`, `INAPPROPRIATE`, `OTHER`.
 - `reportIds` are the open report ids, oldest first. Dismiss one of them to close it.
+- `eventId` is the show the item belongs to: the reported show, or the show the
+  comment was posted on. An event report filed against an older `loc_event_id`
+  still gives the show id. Absent when a reported comment no longer exists.
+- `eventTitle` is the title of the show's latest publication snapshot. Absent when
+  the show is not in the publication view. Hidden shows keep their title here.
+- `commentBody` is the text of a reported comment. Absent for an event and once the
+  comment was removed; `eventId` and `eventTitle` stay, so the admin can still open
+  the event page.
+- `commentAuthorName` is the display name of the comment's author. Absent for an
+  event and once the author's account is deleted.
 - An empty queue is `[]`.
 
 `POST /api/admin/reports/{reportId}/dismiss` sets `resolution` to `DISMISSED`,
@@ -84,10 +107,15 @@ The publication row is never updated. Admin does not edit catalog facts.
     "hiddenBy": "44444444-4444-4444-8444-444444444444",
     "hiddenByName": "Ada",
     "hiddenAt": "2026-11-16T20:00:00Z",
-    "reason": "Duplicate listing"
+    "reason": "Duplicate listing",
+    "eventTitle": "Jazz in the park"
   }
 ]
 ```
+
+`eventTitle` is the title of the show's latest publication snapshot. The public
+`GET /api/events/{id}` answers `404` for a hidden show, so this list is where an
+admin sees the title. It is absent when the show is no longer in the publication view.
 
 A missing, blank, or over-long reason answers `400`. The reason is stored trimmed.
 

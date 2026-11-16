@@ -1,0 +1,78 @@
+<h1 class="text-2xl font-bold">Feedback</h1>
+<p class="mt-1 text-admin-muted">Website feedback from visitors and members, open items first.</p>
+
+<div class="mt-6">
+  @if (feedback.error()) {
+    <app-admin-error
+      message="We couldn't load the feedback. Check your connection and try again."
+      (retry)="feedback.reload()"
+    />
+  } @else if (result(); as p) {
+    @if (p.items.length) {
+      <ul
+        role="list"
+        class="divide-y divide-admin-line rounded-md border border-admin-line bg-admin-surface"
+      >
+        @for (f of p.items; track f.id) {
+          <li class="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_13rem] lg:items-start">
+            <div class="min-w-0">
+              <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-admin-muted">
+                <span class="admin-tag">{{ f.handledAt ? 'Handled' : 'Open' }}</span>
+                <time [attr.datetime]="f.createdAt">{{ when(f.createdAt) }}</time>
+                <span>· {{ f.userId ? 'From a member' : 'From a visitor' }}</span>
+              </p>
+              <p class="mt-2 break-words whitespace-pre-line">{{ f.message }}</p>
+              @if (f.contactEmail; as email) {
+                <p class="mt-2 text-sm">
+                  Answer at <a class="admin-link" [href]="'mailto:' + email">{{ email }}</a>
+                </p>
+              }
+              @if (failed() === f.id) {
+                <p role="alert" class="mt-2 text-sm text-danger">
+                  We couldn't mark this feedback handled. Check your connection and try again.
+                </p>
+              }
+            </div>
+            <div class="flex lg:justify-end">
+              @if (f.handledAt; as handled) {
+                <span class="text-sm text-admin-muted">Handled {{ when(handled) }}</span>
+              } @else {
+                <button
+                  type="button"
+                  class="admin-btn"
+                  [disabled]="busy()"
+                  (click)="markHandled(f.id)"
+                >
+                  {{ busy() === f.id ? 'Saving…' : 'Mark handled' }}
+                </button>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    } @else if (p.totalElements) {
+      <div class="rounded-md border border-dashed border-admin-line p-6 text-admin-muted">
+        <p>Nothing on this page.</p>
+        <button type="button" class="admin-btn-quiet mt-3" (click)="page.set(0)">
+          Back to the first page
+        </button>
+      </div>
+    } @else {
+      <p class="rounded-md border border-dashed border-admin-line p-6 text-admin-muted">
+        No feedback yet. What visitors send from the feedback page shows here.
+      </p>
+    }
+
+    @if (p.totalPages > 1) {
+      <div class="mt-6">
+        <app-pagination
+          [page]="p.page"
+          [totalPages]="p.totalPages"
+          (pageChange)="page.set($event)"
+        />
+      </div>
+    }
+  } @else {
+    <p class="text-admin-muted" role="status">Loading feedback…</p>
+  }
+</div>

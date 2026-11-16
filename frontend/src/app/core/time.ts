@@ -52,6 +52,14 @@ export function dayParts(iso: string): { dow: string; day: string; mon: string }
   return { dow: dowFmt.format(d), day: dayFmt.format(d), mon: monFmt.format(d) };
 }
 
+/** A YYYY-MM-DD calendar date as "20 Nov", with the year only when it is not this year ("3 Jan 2027"). */
+export function formatDay(ymd: string, today = amsterdamDate()): string {
+  const { day, mon } = dayParts(`${ymd}T12:00:00Z`); // midday UTC is the same day in Amsterdam
+  return ymd.slice(0, 4) === today.slice(0, 4)
+    ? `${day} ${mon}`
+    : `${day} ${mon} ${ymd.slice(0, 4)}`;
+}
+
 /** "Sat, 10 Oct 2026" in Amsterdam time. */
 export const formatDate = (iso: string): string => dateFmt.format(new Date(iso));
 

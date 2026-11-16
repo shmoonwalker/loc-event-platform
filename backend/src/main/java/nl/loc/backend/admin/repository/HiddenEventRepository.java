@@ -51,10 +51,13 @@ public class HiddenEventRepository {
                 .update();
     }
 
-    /** Most recently hidden first. */
+    /** Most recently hidden first, with the title of the show's latest snapshot. */
     public List<HiddenEventResponse> list() {
         return jdbc.sql("""
-                SELECT h.event_id, h.hidden_by, u.display_name AS hidden_by_name, h.hidden_at, h.reason
+                SELECT h.event_id, h.hidden_by, u.display_name AS hidden_by_name, h.hidden_at, h.reason,
+                       (SELECT s.payload->>'title' FROM publication.event_snapshot s
+                        WHERE s.loc_group_id = h.event_id
+                        ORDER BY s.updated_at DESC LIMIT 1) AS event_title
                 FROM app.hidden_event h
                 LEFT JOIN app.app_user u ON u.id = h.hidden_by
                 ORDER BY h.hidden_at DESC, h.event_id
@@ -64,7 +67,8 @@ public class HiddenEventRepository {
                         rs.getObject("hidden_by", UUID.class),
                         rs.getString("hidden_by_name"),
                         rs.getObject("hidden_at", OffsetDateTime.class).toInstant(),
-                        rs.getString("reason")))
+                        rs.getString("reason"),
+                        rs.getString("event_title")))
                 .list();
     }
 }

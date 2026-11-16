@@ -23,7 +23,8 @@
   <div class="relative flex flex-wrap items-stretch gap-2 px-3 pb-3">
     <label
       class="flex min-h-14 min-w-0 flex-col justify-center rounded-[14px] border border-line bg-panel py-1.5 pr-3 pl-4 focus-within:shadow-[0_0_0_4px_var(--glow)] hover:bg-bg data-[active=true]:border-blush data-[active=true]:bg-blush-soft max-sm:flex-[1_1_calc(50%-8px)]"
-      [attr.data-active]="dateChoice() !== 'any'"
+      [attr.data-active]="f().date !== 'any'"
+      data-date-area
     >
       <small class="text-[13px] leading-tight text-muted">Date</small>
       <select
@@ -34,7 +35,9 @@
         @for (p of datePresets; track p.value) {
           <option [value]="p.value" [selected]="dateChoice() === p.value">{{ p.label }}</option>
         }
-        <option value="custom" [selected]="dateChoice() === 'custom'">Choose dates</option>
+        <option value="custom" [selected]="dateChoice() === 'custom'">
+          {{ f().date === 'custom' ? dateText() : 'Choose dates' }}
+        </option>
       </select>
     </label>
 
@@ -209,13 +212,14 @@
   </div>
 
   @if (choosingDates()) {
-    <div class="drawer">
+    <div class="drawer" data-date-area>
       <div class="flex flex-wrap items-end gap-3">
         <label class="flex flex-col gap-1.5 text-sm text-muted">
           From
           <input
             type="date"
             class="field-input"
+            [min]="today"
             [value]="dateDraft().from"
             (change)="setDate('from', fromDate.value)"
             #fromDate
@@ -226,6 +230,7 @@
           <input
             type="date"
             class="field-input"
+            [min]="dateDraft().from || today"
             [value]="dateDraft().to"
             (change)="setDate('to', toDate.value)"
             #toDate
@@ -237,11 +242,7 @@
           [class.text-blush-ink]="dateError()"
           [attr.role]="dateError() ? 'alert' : null"
         >
-          {{
-            dateError()
-              ? '“From” must not be after “To”.'
-              : 'Pick both dates to set your own range.'
-          }}
+          {{ dateError() || 'Pick both dates to set your own range.' }}
         </p>
       </div>
     </div>
