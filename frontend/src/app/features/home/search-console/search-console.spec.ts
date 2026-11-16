@@ -184,6 +184,15 @@ describe('SearchConsole', () => {
     expect(el.textContent).toContain('Pick today or a later day.');
   });
 
+  it('shows an applied range as readable days in the box and the chip', async () => {
+    const { el } = await open('/?dateFrom=2026-11-20&dateTo=2026-11-25');
+    const year = amsterdamDate().slice(0, 4);
+    const text = year === '2026' ? '20 Nov – 25 Nov' : '20 Nov 2026 – 25 Nov 2026';
+    const date = [...el.querySelectorAll('select')][0];
+    expect(date.selectedOptions[0].text.trim()).toBe(text);
+    expect(el.querySelector(`button[aria-label="Remove ${text}"]`)).not.toBeNull();
+  });
+
   it('offers only the fixed time ranges and no typed time', async () => {
     const { el, router, select, choose } = await open();
     const time = select('Time');

@@ -35,7 +35,9 @@
         @for (p of datePresets; track p.value) {
           <option [value]="p.value" [selected]="dateChoice() === p.value">{{ p.label }}</option>
         }
-        <option value="custom" [selected]="dateChoice() === 'custom'">Choose dates</option>
+        <option value="custom" [selected]="dateChoice() === 'custom'">
+          {{ f().date === 'custom' ? dateText() : 'Choose dates' }}
+        </option>
       </select>
     </label>
 
