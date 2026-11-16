@@ -23,8 +23,24 @@
   --color-tint-b: var(--tint-b);
   --color-tint-c: var(--tint-c);
   --color-danger: var(--danger);
+  --color-admin-bg: var(--admin-bg);
+  --color-admin-surface: var(--admin-surface);
+  --color-admin-line: var(--admin-line);
+  --color-admin-ink: var(--admin-ink);
+  --color-admin-muted: var(--admin-muted);
+  --color-admin-side: var(--admin-side);
+  --color-admin-side-ink: var(--admin-side-ink);
+  --color-admin-side-muted: var(--admin-side-muted);
+  --color-admin-side-active: var(--admin-side-active);
+  --color-admin-side-accent: var(--admin-side-accent);
+  --color-admin-accent: var(--admin-accent);
+  --color-admin-fill: var(--admin-fill);
+  --color-admin-on-fill: var(--admin-on-fill);
+  --color-admin-tag: var(--admin-tag);
+  --color-admin-tag-ink: var(--admin-tag-ink);
   --font-display: 'Bricolage Grotesque', sans-serif;
   --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-admin: system-ui, sans-serif;
   --shadow-card: var(--shadow);
   --animate-drawer: drawer 0.18s ease-out;
 }
@@ -62,6 +78,22 @@
   --tint-b: #dde6f6;
   --tint-c: #e6def8;
   --danger: #b42318;
+  /* The admin panel: the LOC berry and plum, on its own neutral surfaces. */
+  --admin-bg: #eff0f4;
+  --admin-surface: #ffffff;
+  --admin-line: #dcdbe5;
+  --admin-ink: #1f1d29;
+  --admin-muted: #5b5870;
+  --admin-side: #2a1b33;
+  --admin-side-ink: #efe6f4;
+  --admin-side-muted: #c9b8d6;
+  --admin-side-active: #3d2a49;
+  --admin-side-accent: #f8a5c6;
+  --admin-accent: #a3134f;
+  --admin-fill: #c2185b;
+  --admin-on-fill: #ffffff;
+  --admin-tag: #ece5f8;
+  --admin-tag-ink: #4a2f7a;
   color-scheme: light;
 }
 
@@ -84,6 +116,21 @@
   --tint-b: #222d42;
   --tint-c: #2b2742;
   --danger: #ff8a80;
+  --admin-bg: #141319;
+  --admin-surface: #1d1b24;
+  --admin-line: #2e2b38;
+  --admin-ink: #ecebf2;
+  --admin-muted: #a19db3;
+  --admin-side: #0f0a14;
+  --admin-side-ink: #e9dff0;
+  --admin-side-muted: #b3a4c0;
+  --admin-side-active: #2a1d33;
+  --admin-side-accent: #f8a5c6;
+  --admin-accent: #f8a5c6;
+  --admin-fill: #f06292;
+  --admin-on-fill: #240814;
+  --admin-tag: #2f2445;
+  --admin-tag-ink: #cdb9f2;
   color-scheme: dark;
 }
 
@@ -124,6 +171,12 @@
   :focus-visible {
     outline: 2px solid var(--blush);
     outline-offset: 2px;
+  }
+  .admin :focus-visible {
+    outline-color: var(--admin-accent);
+  }
+  .admin-side :focus-visible {
+    outline-color: var(--admin-side-accent);
   }
 }
 

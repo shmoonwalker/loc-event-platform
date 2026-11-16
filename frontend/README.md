@@ -50,6 +50,17 @@ Logging out keeps the visitor on a public page and opens the home page from a pa
 that needs an account (`needsAccount()` checks the route's guards). Google sign-in
 must use this same session path on return.
 
+### Admin panel
+
+`/admin` is the admin panel, open only to admins (`adminGuard`); admins reach it from
+the Admin link in the avatar menu, which members do not see. It has its own layout
+instead of the member header and footer: a plum sidebar with an Admin badge, the
+section links and Back to site, and a top bar with the theme switch. On small screens
+the sidebar becomes a top bar whose Sections button opens the links. Its colours are
+the `--admin-*` tokens in `src/styles.css`. The start page is an overview with a card
+per section; sections are listed in `features/admin/admin-sections.ts`. An unknown
+page under `/admin` opens the overview.
+
 ### Comments
 
 The event page lists comments newest first, each with its replies, one page at a time.
