@@ -1,0 +1,54 @@
+<h1 class="text-2xl font-bold">Hidden events</h1>
+<p class="mt-1 text-admin-muted">
+  Hidden events are left out of every public list and page. Unhide brings one back.
+</p>
+
+<div class="mt-6">
+  @if (hidden.error()) {
+    <app-admin-error
+      message="We couldn't load the hidden events. Check your connection and try again."
+      (retry)="hidden.reload()"
+    />
+  } @else if (events(); as list) {
+    @if (list.length) {
+      <ul
+        role="list"
+        class="divide-y divide-admin-line rounded-md border border-admin-line bg-admin-surface"
+      >
+        @for (h of list; track h.eventId) {
+          <li class="flex flex-wrap items-start gap-x-6 gap-y-2 p-4">
+            <div class="min-w-0 flex-1 basis-64">
+              <p class="break-words">
+                Event <code class="text-xs text-admin-muted">{{ h.eventId }}</code>
+              </p>
+              <p class="mt-1 text-sm text-admin-muted">
+                Hidden by {{ h.hiddenByName ?? 'a deleted admin' }} ·
+                <time [attr.datetime]="h.hiddenAt">{{ when(h.hiddenAt) }}</time>
+              </p>
+              <p class="mt-2 break-words whitespace-pre-line">{{ h.reason }}</p>
+              @if (failed() === h.eventId) {
+                <p role="alert" class="mt-2 text-sm text-danger">
+                  We couldn't unhide this event. Check your connection and try again.
+                </p>
+              }
+            </div>
+            <button
+              type="button"
+              class="admin-btn-quiet"
+              [disabled]="busy()"
+              (click)="unhide(h.eventId)"
+            >
+              {{ busy() === h.eventId ? 'Unhiding…' : 'Unhide' }}
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="rounded-md border border-dashed border-admin-line p-6 text-admin-muted">
+        No hidden events. Events you hide from the reports show here.
+      </p>
+    }
+  } @else {
+    <p class="text-admin-muted" role="status">Loading hidden events…</p>
+  }
+</div>
