@@ -5,7 +5,9 @@ import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { of } from 'rxjs';
 import { AuthSession } from '../../core/auth-session';
+import { CommentsApi } from '../../core/comments-api';
 import { EventDetail } from '../../core/models';
 import { EventPage } from './event-page';
 
@@ -61,6 +63,12 @@ const event: EventDetail = {
 
 const oneDate = { ...event, occurrences: [event.occurrences[0]] };
 
+// The comments section has its own spec; here it only needs an answer so the page can settle.
+const noComments = {
+  provide: CommentsApi,
+  useValue: { list: () => of({ page: 0, size: 20, totalElements: 0, totalPages: 0, items: [] }) },
+};
+
 /** Re-render after a change made outside the template (an event, a sign-in). */
 const settle = () => TestBed.inject(ApplicationRef).whenStable();
 
@@ -75,6 +83,7 @@ async function open(
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      noComments,
       provideRouter([{ path: 'events/:id', component: EventPage }], withComponentInputBinding()),
     ],
   });
@@ -251,6 +260,12 @@ describe('EventPage', () => {
     expect(el.querySelector('[role="alert"]')).toBeNull();
   });
 
+  it('shows the comments under the event', async () => {
+    const el = await open((req) => req.flush(event));
+    expect(el.querySelector('#comments-title')?.textContent).toContain('Comments');
+    expect(el.textContent).toContain('No comments yet.');
+  });
+
   it('shows the save button with the saved state from the API', async () => {
     const el = await open((req) => req.flush({ ...event, saved: true }));
     expect(el.querySelector('button[aria-label="Save event"]')?.getAttribute('aria-pressed')).toBe(
@@ -264,6 +279,7 @@ describe('EventPage', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        noComments,
         provideRouter([{ path: 'events/:id', component: EventPage }], withComponentInputBinding()),
       ],
     });
