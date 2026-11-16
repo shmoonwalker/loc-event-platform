@@ -5,6 +5,13 @@ Every route needs `Authorization: Bearer <accessToken>` (see
 [Authentication](../../docs/architecture/authentication.md)); without a valid token
 the answer is `401`. The member is always the one of the token, never an id in the URL.
 The one exception is reading comments, which is public.
+
+The admin account does not act as a member. An admin token answers `403` (the same
+`ProblemDetail` as other `403`s) on every saved-events and followed-organizers route,
+on writing comments and replies, and on editing or deleting comments under
+`/api/me/comments`. Admins keep the account routes: password, email, profile, avatar
+and account deletion. Official replies go through the
+[admin comments API](admin-comments.md).
 Interactive docs: `/api/docs` (OpenAPI at `/api/docs/openapi.yaml`).
 
 | Endpoint | Purpose |

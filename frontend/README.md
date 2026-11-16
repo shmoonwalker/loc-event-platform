@@ -43,7 +43,9 @@ shows a new name or avatar without a reload. Preset avatars are served from
 Use `isAdmin()` for admin-only actions and `adminGuard` for admin routes. The backend
 still authorizes every request. Visitors see sign-up and login in the header; members
 and admins see only their avatar. It opens a small menu with their name and role,
-Account settings, Dashboard (`/me`) and Log out; Escape or a click outside closes it.
+Account settings, Dashboard (`/me`, members only) and Log out; Escape or a click outside
+closes it. The admin account does not act as a member: it gets no save heart, follow
+button, comment or reply form, or Edit and Delete links on comments.
 Logging out keeps the visitor on a public page and opens the home page from a page
 that needs an account (`needsAccount()` checks the route's guards). Google sign-in
 must use this same session path on return.
@@ -52,7 +54,7 @@ must use this same session path on return.
 
 The event page lists comments newest first, each with its replies, one page at a time.
 Anyone can read them. Signed-in members write comments, reply to top-level comments,
-and edit or delete their own; deleting asks to confirm first. Visitors get a link to log
+and edit or delete their own (the admin account only reads them); deleting asks to confirm first. Visitors get a link to log
 in instead of the form. A deleted comment that still has replies shows as "Comment
 deleted", authors of deleted accounts show as the API names them, and official replies
 carry an "Official" badge. API errors, such as text that is too long or posting too

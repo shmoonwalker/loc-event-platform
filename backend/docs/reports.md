@@ -5,8 +5,8 @@ itself. It never includes what an admin later decided. The queue that reads
 these reports is a separate piece of work.
 
 Every route needs `Authorization: Bearer <accessToken>`. Without a valid token
-the answer is `401`. The reporter is always the member of the token, never an
-id in the body.
+the answer is `401`. An admin token answers `403`. The reporter is always the
+member of the token, never an id in the body.
 
 | Endpoint | Purpose |
 | --- | --- |
