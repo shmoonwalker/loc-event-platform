@@ -22,7 +22,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(withToken(req, token)).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status !== 401 || req.context.get(SKIP_AUTH_REFRESH)) return throwError(() => err);
+      if (err.status !== 401 || req.context.get(SKIP_AUTH_REFRESH) || isWrongPassword(err)) {
+        return throwError(() => err);
+      }
       return session.refresh().pipe(
         catchError(() => {
           void router.navigateByUrl('/login');
@@ -33,6 +35,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     }),
   );
 };
+
+// Account changes answer a wrong current password with 401 too; a refresh and retry would only spend
+// another of the few attempts allowed. An expired token gets the title "Unauthorized" instead.
+const isWrongPassword = (err: HttpErrorResponse) => err.error?.title === 'Invalid credentials';
 
 const withToken = (req: HttpRequest<unknown>, token: string) =>
   req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });

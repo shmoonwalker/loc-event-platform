@@ -40,6 +40,7 @@
     <nav aria-label="Account" class="ml-auto flex flex-wrap items-center gap-3">
       @if (session.currentUser(); as user) {
         <a routerLink="/me" class="pill-btn min-h-11">My Loc</a>
+        <a routerLink="/account" class="pill-btn min-h-11">Account</a>
         <a routerLink="/me/profile" class="flex min-w-0 items-center gap-2 text-sm">
           <img
             [src]="user.avatarUrl"
