@@ -4,6 +4,10 @@ import java.time.Clock;
 import java.util.UUID;
 import nl.loc.backend.config.ratelimit.RateLimitPolicy;
 import nl.loc.backend.config.ratelimit.RateLimiter;
+import nl.loc.backend.photo.model.EventPhoto;
+import nl.loc.backend.photo.model.PhotoStatus;
+import nl.loc.backend.photo.repository.EventPhotoQueryRepository;
+import nl.loc.backend.photo.repository.EventPhotoRepository;
 import nl.loc.backend.user.dto.response.ReportResponse;
 import nl.loc.backend.user.model.Comment;
 import nl.loc.backend.user.model.Report;
@@ -24,16 +28,21 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final ReportQueryRepository reportQueryRepository;
     private final CommentRepository commentRepository;
+    private final EventPhotoRepository eventPhotoRepository;
+    private final EventPhotoQueryRepository eventPhotoQueryRepository;
     private final UserAccountRepository userAccountRepository;
     private final RateLimiter rateLimiter;
     private final Clock clock;
 
     public ReportService(ReportRepository reportRepository, ReportQueryRepository reportQueryRepository,
-                         CommentRepository commentRepository, UserAccountRepository userAccountRepository,
-                         RateLimiter rateLimiter, Clock clock) {
+                         CommentRepository commentRepository, EventPhotoRepository eventPhotoRepository,
+                         EventPhotoQueryRepository eventPhotoQueryRepository,
+                         UserAccountRepository userAccountRepository, RateLimiter rateLimiter, Clock clock) {
         this.reportRepository = reportRepository;
         this.reportQueryRepository = reportQueryRepository;
         this.commentRepository = commentRepository;
+        this.eventPhotoRepository = eventPhotoRepository;
+        this.eventPhotoQueryRepository = eventPhotoQueryRepository;
         this.userAccountRepository = userAccountRepository;
         this.rateLimiter = rateLimiter;
         this.clock = clock;
@@ -52,6 +61,16 @@ public class ReportService {
                 .filter(found -> !found.isDeleted())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found."));
         return ReportResponse.of(openOrCreate(ReportTargetType.COMMENT, comment.getId(), reporterId, reason, details));
+    }
+
+    public ReportResponse reportPhoto(UUID reporterId, UUID eventId, UUID photoId, ReportReason reason, String details) {
+        reporter(reporterId);
+        UUID showId = eventPhotoQueryRepository.findOpenShow(eventId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Photo not found."));
+        EventPhoto photo = eventPhotoRepository.findById(photoId)
+                .filter(found -> found.getEventId().equals(showId) && found.getStatus() == PhotoStatus.APPROVED)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Photo not found."));
+        return ReportResponse.of(openOrCreate(ReportTargetType.PHOTO, photo.getId(), reporterId, reason, details));
     }
 
     private void reporter(UUID reporterId) {

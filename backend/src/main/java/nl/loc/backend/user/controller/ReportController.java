@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api")
-@Tag(name = "Reports", description = "A signed-in member reports an event or a comment.")
+@Tag(name = "Reports", description = "A signed-in member reports an event, a comment, or an approved photo.")
 public class ReportController {
 
     private final ReportService reportService;
@@ -107,6 +107,41 @@ public class ReportController {
                                         @Parameter(description = "Id of the comment.") @PathVariable UUID commentId,
                                         @Valid @RequestBody ReportRequest request) {
         return reportService.reportComment(UUID.fromString(jwt.getSubject()), commentId, request.reason(),
+                request.details());
+    }
+
+    @PostMapping("/events/{eventId}/photos/{photoId}/reports")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(
+            summary = "Report a photo",
+            description = "Reports an approved photo as the member of the access token. Reporting the same photo "
+                    + "again returns the open report and adds no second one. A photo that is missing, on another "
+                    + "event, or not approved is not found. The answer never includes what an admin decided.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "The open report, including when it was already stored."),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "An id is not a UUID, the reason is missing or unknown, or details are longer "
+                            + "than 1000 characters.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Missing, invalid or expired access token, or the account no longer exists.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "The photo is missing, not on this event, or not approved.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Too many reports from this member. Retry-After says how many seconds to wait.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    public ReportResponse reportPhoto(@AuthenticationPrincipal Jwt jwt,
+                                      @Parameter(description = "Show id, or an older event id.") @PathVariable UUID eventId,
+                                      @Parameter(description = "Id of the approved photo.") @PathVariable UUID photoId,
+                                      @Valid @RequestBody ReportRequest request) {
+        return reportService.reportPhoto(UUID.fromString(jwt.getSubject()), eventId, photoId, request.reason(),
                 request.details());
     }
 }

@@ -4,9 +4,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.UUID;
 
-@Schema(description = "Open reports of one event or comment.")
+@Schema(description = "Open reports of one event, comment, or photo.")
 public record ReportGroupResponse(
-        @Schema(description = "EVENT or COMMENT.", example = "EVENT", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "EVENT, COMMENT, or PHOTO.", example = "EVENT", requiredMode = Schema.RequiredMode.REQUIRED)
         String targetType,
         @Schema(description = "Show id for an event, or the comment id.", requiredMode = Schema.RequiredMode.REQUIRED)
         UUID targetId,

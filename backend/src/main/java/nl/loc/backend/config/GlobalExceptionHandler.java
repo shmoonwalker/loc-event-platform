@@ -4,6 +4,7 @@ import nl.loc.backend.config.ratelimit.RateLimitExceededException;
 import nl.loc.backend.event.controller.InvalidBrowseQueryException;
 import nl.loc.backend.user.controller.RefreshTokenCookie;
 import nl.loc.backend.user.service.AccountNotFoundException;
+import nl.loc.backend.photo.service.EventPhotoStorageUnavailableException;
 import nl.loc.backend.user.service.AvatarStorageUnavailableException;
 import nl.loc.backend.user.service.EmailNotVerifiedException;
 import nl.loc.backend.user.service.InvalidImageException;
@@ -147,9 +148,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        long max = ex.getMaxUploadSize();
+        String limit = max > 0 && max <= 5L * 1024 * 1024 ? "5 MB" : "10 MB";
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONTENT_TOO_LARGE);
         problem.setTitle("File too large");
-        problem.setDetail("The file must not exceed 5 MB");
+        problem.setDetail("The file must not exceed " + limit);
         return problem;
     }
 
@@ -158,6 +161,14 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
         problem.setTitle("Uploads unavailable");
         problem.setDetail("Picture uploads are not available right now");
+        return problem;
+    }
+
+    @ExceptionHandler(EventPhotoStorageUnavailableException.class)
+    public ProblemDetail handleEventPhotoStorageUnavailable(EventPhotoStorageUnavailableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
+        problem.setTitle("Uploads unavailable");
+        problem.setDetail("Photo uploads are not available right now");
         return problem;
     }
 

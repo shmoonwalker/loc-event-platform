@@ -80,6 +80,11 @@ services:
       AVATAR_R2_SECRET_KEY: ${AVATAR_R2_SECRET_KEY:?set AVATAR_R2_SECRET_KEY}
       AVATAR_R2_BUCKET: ${AVATAR_R2_BUCKET:?set AVATAR_R2_BUCKET}
       AVATAR_PUBLIC_URL: ${AVATAR_PUBLIC_URL:?set AVATAR_PUBLIC_URL (public domain of the avatar bucket)}
+      # Event photos share R2_ENDPOINT and R2_REGION. An empty key or bucket falls back to the avatar bucket.
+      EVENT_PHOTO_R2_ACCESS_KEY: ${EVENT_PHOTO_R2_ACCESS_KEY:-}
+      EVENT_PHOTO_R2_SECRET_KEY: ${EVENT_PHOTO_R2_SECRET_KEY:-}
+      EVENT_PHOTO_R2_BUCKET: ${EVENT_PHOTO_R2_BUCKET:-}
+      EVENT_PHOTO_PUBLIC_URL: ${EVENT_PHOTO_PUBLIC_URL:-}
       # The agent's classes and metaspace live outside the heap, so the heap gets 65% of the limit.
       JAVA_TOOL_OPTIONS: -javaagent:/opt/opentelemetry-javaagent.jar ${LOC_BACKEND_JAVA_OPTS:--XX:MaxRAMPercentage=65}
     networks:

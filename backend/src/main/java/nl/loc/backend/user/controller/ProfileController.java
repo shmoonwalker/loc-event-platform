@@ -28,12 +28,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/me")
 @Tag(name = "Profile", description = "Display name and avatar of the signed-in member.")
 public class ProfileController {
+
+    private static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024;
 
     private final ProfileService profileService;
     private final RateLimiter rateLimiter;
@@ -118,6 +121,9 @@ public class ProfileController {
     public UserResponse uploadAvatar(@AuthenticationPrincipal Jwt jwt,
                                      @Parameter(description = "The image file.") @RequestParam MultipartFile file)
             throws IOException {
+        if (file.getSize() > MAX_AVATAR_BYTES) {
+            throw new MaxUploadSizeExceededException(MAX_AVATAR_BYTES);
+        }
         // before decoding, so blocked requests cost almost nothing
         rateLimiter.consume(RateLimitPolicy.AVATAR_UPLOAD, jwt.getSubject());
         return profileService.uploadAvatar(UUID.fromString(jwt.getSubject()), file.getBytes());

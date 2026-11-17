@@ -12,6 +12,7 @@ member of the token, never an id in the body.
 | --- | --- |
 | `POST /api/events/{eventId}/reports` | Report an event. `201` with the open report. |
 | `POST /api/comments/{commentId}/reports` | Report a comment. `201` with the open report. |
+| `POST /api/events/{eventId}/photos/{photoId}/reports` | Report an approved photo. See [Event photos](photos.md). |
 
 ## Body
 
@@ -27,7 +28,7 @@ stored as null and comes back as `null`.
 
 ## Answer
 
-`201` with `id`, `targetType` (`EVENT` or `COMMENT`), `targetId`, `reason`,
+`201` with `id`, `targetType` (`EVENT`, `COMMENT` or `PHOTO`), `targetId`, `reason`,
 `details` and `createdAt`. There is no status and no resolution.
 
 Reporting the same event or comment again, while the first report is still

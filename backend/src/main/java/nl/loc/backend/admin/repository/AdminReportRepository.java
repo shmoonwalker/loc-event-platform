@@ -84,6 +84,19 @@ public class AdminReportRepository {
                 .update();
     }
 
+    /** Closes open PHOTO reports of this photo. Event and comment reports stay open. */
+    public int resolveOpenPhotoReports(UUID photoId, UUID resolverId, OffsetDateTime resolvedAt) {
+        return jdbc.sql("""
+                UPDATE app.report
+                SET resolved_at = :resolvedAt, resolved_by = :resolverId, resolution = 'REMOVED'
+                WHERE target_type = 'PHOTO' AND target_id = :photoId AND resolved_at IS NULL
+                """)
+                .param("photoId", photoId)
+                .param("resolverId", resolverId)
+                .param("resolvedAt", resolvedAt)
+                .update();
+    }
+
     /** Closes open EVENT reports of this show. Comment reports and other shows stay open. */
     public int resolveOpenEventReports(UUID showId, UUID adminId, OffsetDateTime resolvedAt) {
         return jdbc.sql("""
