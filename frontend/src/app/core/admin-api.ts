@@ -4,9 +4,23 @@ import { Observable } from 'rxjs';
 import { EventComment } from './models';
 import { ReportReason } from './reports-api';
 
-/** Open reports of one event or comment. */
+export type AdminPhotoStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+/** One event photo in the admin queue. cardUrl and fullUrl are used as the API sent them. */
+export interface AdminPhoto {
+  id: string;
+  eventId: string;
+  eventTitle?: string;
+  status: AdminPhotoStatus;
+  cardUrl: string;
+  fullUrl: string;
+  createdAt: string;
+  uploader: { displayName: string };
+}
+
+/** Open reports of one event, comment or photo. */
 export interface ReportGroup {
-  targetType: 'EVENT' | 'COMMENT';
+  targetType: 'EVENT' | 'COMMENT' | 'PHOTO';
   /** The show id for an event, else the comment id. */
   targetId: string;
   openCount: number;
@@ -110,5 +124,29 @@ export class AdminApi {
   /** Most recently hidden first. */
   hiddenEvents(): Observable<HiddenEvent[]> {
     return this.http.get<HiddenEvent[]>('/api/admin/hidden-events');
+  }
+
+  /** Newest first, at most 50. */
+  photos(status: AdminPhotoStatus): Observable<AdminPhoto[]> {
+    return this.http.get<AdminPhoto[]>('/api/admin/photos', { params: { status } });
+  }
+
+  approvePhoto(photoId: string): Observable<AdminPhoto> {
+    return this.http.post<AdminPhoto>(
+      `/api/admin/photos/${encodeURIComponent(photoId)}/approve`,
+      null,
+    );
+  }
+
+  rejectPhoto(photoId: string): Observable<AdminPhoto> {
+    return this.http.post<AdminPhoto>(
+      `/api/admin/photos/${encodeURIComponent(photoId)}/reject`,
+      null,
+    );
+  }
+
+  /** Deletes the photo and its stored files, and closes its open reports. */
+  removePhoto(photoId: string): Observable<void> {
+    return this.http.delete<void>(`/api/admin/photos/${encodeURIComponent(photoId)}`);
   }
 }

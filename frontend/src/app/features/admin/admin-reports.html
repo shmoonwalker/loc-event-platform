@@ -1,6 +1,6 @@
 <h1 class="text-2xl font-bold">Reports</h1>
 <p class="mt-1 text-admin-muted">
-  Open reports from members, one row per event or comment, newest activity first.
+  Open reports from members, one row per event, comment or photo, newest activity first.
 </p>
 
 <div class="mt-6">
@@ -19,7 +19,13 @@
           <li class="flex flex-col gap-3 p-4">
             <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_11rem_13rem] lg:items-start">
               <div class="min-w-0">
-                <span class="admin-tag">{{ g.targetType === 'EVENT' ? 'Event' : 'Comment' }}</span>
+                <span class="admin-tag">{{
+                  g.targetType === 'EVENT'
+                    ? 'Event'
+                    : g.targetType === 'COMMENT'
+                      ? 'Comment'
+                      : 'Photo'
+                }}</span>
                 <div class="mt-1 break-words">
                   @if (g.targetType === 'EVENT') {
                     @if (g.eventTitle) {
@@ -28,6 +34,18 @@
                       }}</a>
                     } @else {
                       Event <code class="text-xs text-admin-muted">{{ g.targetId }}</code>
+                    }
+                  } @else if (g.targetType === 'PHOTO') {
+                    <span>
+                      Photo <code class="text-xs text-admin-muted">{{ g.targetId }}</code>
+                    </span>
+                    @if (g.eventTitle && g.eventId) {
+                      <span class="mt-1 block text-sm text-admin-muted">
+                        on
+                        <a [routerLink]="['/events', g.eventId]" class="admin-link">{{
+                          g.eventTitle
+                        }}</a>
+                      </span>
                     }
                   } @else {
                     @if (g.commentBody !== null) {
@@ -57,6 +75,20 @@
                 @if (g.targetType === 'EVENT' && hiding() !== g.targetId) {
                   <button type="button" class="admin-btn" [disabled]="busy()" (click)="openHide(g)">
                     Hide event
+                  </button>
+                }
+                @if (g.targetType === 'PHOTO') {
+                  <button
+                    type="button"
+                    class="admin-btn"
+                    [disabled]="busy()"
+                    (click)="removePhoto(g)"
+                  >
+                    {{
+                      busy()?.id === g.targetId && busy()?.action === 'remove'
+                        ? 'Removing…'
+                        : 'Remove photo'
+                    }}
                   </button>
                 }
                 <button

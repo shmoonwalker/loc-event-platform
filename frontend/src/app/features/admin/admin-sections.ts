@@ -13,6 +13,11 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     description: 'Open reports from members: hide the event or dismiss the reports.',
   },
   {
+    path: 'photos',
+    label: 'Event photos',
+    description: 'Photos members uploaded. Nothing is public until you approve it.',
+  },
+  {
     path: 'hidden-events',
     label: 'Hidden events',
     description: 'Events taken out of public lists, who hid them and why.',

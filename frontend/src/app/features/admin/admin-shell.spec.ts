@@ -37,6 +37,22 @@ async function open(url = '/admin') {
   const harness = await RouterTestingHarness.create(url);
   // The overview counts what waits in each section.
   http.match('/api/admin/reports').forEach((req) => req.flush([REPORT, REPORT_2]));
+  http
+    .match((req) => req.url.startsWith('/api/admin/photos'))
+    .forEach((req) =>
+      req.flush([
+        {
+          id: 'p1',
+          eventId: 'e1',
+          eventTitle: 'Jazz night',
+          status: 'PENDING',
+          cardUrl: '/card.jpg',
+          fullUrl: '/full.jpg',
+          createdAt: '2026-11-16T20:00:00Z',
+          uploader: { displayName: 'Anouk' },
+        },
+      ]),
+    );
   http.match('/api/admin/hidden-events').forEach((req) => req.flush([]));
   http.match('/api/admin/feedback?page=0').forEach((req) =>
     req.flush({
@@ -87,11 +103,14 @@ describe('AdminShell', () => {
     const { el, link } = await open();
 
     expect(link('Reports').getAttribute('href')).toBe('/admin/reports');
+    expect(link('Event photos').getAttribute('href')).toBe('/admin/photos');
     expect(link('Hidden events').getAttribute('href')).toBe('/admin/hidden-events');
     const card = (label: string) =>
       [...el.querySelectorAll('main a')].find((a) => a.textContent?.includes(label))!;
     expect(card('Reports').getAttribute('href')).toBe('/admin/reports');
     expect(card('Reports').textContent).toContain('2');
+    expect(card('Event photos').getAttribute('href')).toBe('/admin/photos');
+    expect(card('Event photos').textContent).toContain('1');
     expect(card('Hidden events').getAttribute('href')).toBe('/admin/hidden-events');
     expect(card('Hidden events').textContent).not.toMatch(/\d/);
     expect(link('Feedback').getAttribute('href')).toBe('/admin/feedback');

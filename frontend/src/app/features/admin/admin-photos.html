@@ -1,0 +1,157 @@
+<h1 class="text-2xl font-bold">Event photos</h1>
+<p class="mt-1 text-admin-muted">
+  Photos members uploaded. Nothing is public until you approve it.
+</p>
+
+<div class="mt-4 flex flex-wrap gap-2">
+  <button
+    type="button"
+    [class]="status() === 'PENDING' ? 'admin-btn' : 'admin-btn-quiet'"
+    [attr.aria-pressed]="status() === 'PENDING'"
+    (click)="show('PENDING')"
+  >
+    Pending
+  </button>
+  <button
+    type="button"
+    [class]="status() === 'APPROVED' ? 'admin-btn' : 'admin-btn-quiet'"
+    [attr.aria-pressed]="status() === 'APPROVED'"
+    (click)="show('APPROVED')"
+  >
+    Approved
+  </button>
+</div>
+
+<div class="mt-6">
+  @if (photos.error()) {
+    <app-admin-error
+      message="We couldn't load the photos. Check your connection and try again."
+      (retry)="photos.reload()"
+    />
+  } @else if (list(); as items) {
+    @if (items.length) {
+      <ul
+        role="list"
+        class="divide-y divide-admin-line rounded-md border border-admin-line bg-admin-surface"
+      >
+        @for (photo of items; track photo.id) {
+          <li
+            class="grid gap-3 p-4 sm:grid-cols-[4.5rem_minmax(0,1fr)] lg:grid-cols-[4.5rem_minmax(0,1fr)_13rem] lg:items-start"
+          >
+            <button
+              type="button"
+              class="shrink-0"
+              aria-haspopup="dialog"
+              (click)="view(photo, viewer)"
+            >
+              <img
+                [src]="photo.cardUrl"
+                alt=""
+                class="size-16 rounded border border-admin-line object-cover"
+                width="64"
+                height="64"
+              />
+              <span class="sr-only">View the full photo</span>
+            </button>
+            <div class="min-w-0">
+              <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-admin-muted">
+                <span class="admin-tag">{{
+                  photo.status === 'PENDING' ? 'Pending' : 'Approved'
+                }}</span>
+                <time [attr.datetime]="photo.createdAt">{{ when(photo.createdAt) }}</time>
+                <span>· {{ photo.uploader.displayName }}</span>
+              </p>
+              <p class="mt-1 break-words">
+                @if (photo.eventTitle) {
+                  <a [routerLink]="['/events', photo.eventId]" class="admin-link">{{
+                    photo.eventTitle
+                  }}</a>
+                } @else {
+                  Event <code class="text-xs text-admin-muted">{{ photo.eventId }}</code>
+                }
+              </p>
+              @if (confirming() === photo.id) {
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                  <span class="font-semibold">Remove this photo?</span>
+                  <button
+                    type="button"
+                    class="admin-btn"
+                    [disabled]="busy()"
+                    (click)="remove(photo.id)"
+                  >
+                    {{ busy() === photo.id ? 'Removing…' : 'Remove' }}
+                  </button>
+                  <button type="button" class="admin-btn-quiet" (click)="confirming.set(null)">
+                    Keep it
+                  </button>
+                </div>
+              }
+              @if (failed()?.id === photo.id) {
+                <p role="alert" class="mt-2 text-sm text-danger">{{ failed()?.message }}</p>
+              }
+            </div>
+            @if (confirming() !== photo.id) {
+              <div class="flex flex-wrap gap-2 sm:col-start-2 lg:col-start-auto lg:justify-end">
+                @if (status() === 'PENDING') {
+                  <button
+                    type="button"
+                    class="admin-btn"
+                    [disabled]="busy()"
+                    (click)="approve(photo.id)"
+                  >
+                    {{ busy() === photo.id ? 'Saving…' : 'Approve' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="admin-btn-quiet"
+                    [disabled]="busy()"
+                    (click)="reject(photo.id)"
+                  >
+                    Reject
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="admin-btn"
+                    [disabled]="busy()"
+                    (click)="askRemove(photo.id)"
+                  >
+                    Remove
+                  </button>
+                }
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="rounded-md border border-dashed border-admin-line p-6 text-admin-muted">
+        @if (status() === 'PENDING') {
+          No photos waiting. Member uploads show here until you approve or reject them.
+        } @else {
+          No approved photos.
+        }
+      </p>
+    }
+  } @else {
+    <p class="text-admin-muted" role="status">Loading photos…</p>
+  }
+</div>
+
+<dialog
+  class="m-auto max-w-[calc(100vw-2rem)] rounded-md border border-admin-line bg-admin-surface p-5 text-admin-ink backdrop:bg-admin-ink/60"
+  aria-labelledby="admin-photo-title"
+  #viewer
+>
+  <h2 id="admin-photo-title" class="text-xl font-bold">
+    {{ viewing()?.eventTitle ?? 'Photo' }}
+  </h2>
+  @if (viewing(); as photo) {
+    <img
+      [src]="photo.fullUrl"
+      [alt]="'Photo by ' + photo.uploader.displayName"
+      class="mt-4 max-h-[70vh] w-full rounded border border-admin-line object-contain"
+    />
+  }
+  <button type="button" class="admin-btn mt-4" (click)="viewer.close()">Close</button>
+</dialog>
