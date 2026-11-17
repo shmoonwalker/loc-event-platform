@@ -2,7 +2,6 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { CurrentUser } from '../../core/auth-api';
 import { AuthSession } from '../../core/auth-session';
 import { CommentPage, EventComment } from '../../core/models';
 import { EventComments } from './event-comments';
