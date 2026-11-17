@@ -37,6 +37,12 @@
       <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
       <span class="max-sm:hidden">{{ theme.theme() === 'dark' ? 'Light' : 'Dark' }}</span>
     </button>
+    @if (!session.isAdmin()) {
+      <a routerLink="/feedback" class="pill-btn" aria-label="Send feedback">
+        <app-icon name="message" />
+        <span class="max-sm:hidden">Feedback</span>
+      </a>
+    }
     <nav aria-label="Account" class="ml-auto flex flex-wrap items-center gap-3">
       @if (session.currentUser()) {
         <app-account-menu />

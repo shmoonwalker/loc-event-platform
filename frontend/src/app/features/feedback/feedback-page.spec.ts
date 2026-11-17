@@ -3,7 +3,6 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthSession } from '../../core/auth-session';
-import { Shell } from '../../layout/shell';
 import { FeedbackPage } from './feedback-page';
 
 async function render(signedIn = false) {
@@ -127,21 +126,5 @@ describe('FeedbackPage', () => {
     [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Send more'))!.click();
     await settle();
     expect(el.querySelector<HTMLTextAreaElement>('#feedback-message')?.value).toBe('');
-  });
-});
-
-describe('Shell footer', () => {
-  it('links to the feedback page', async () => {
-    TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
-    });
-    const fixture = TestBed.createComponent(Shell);
-    fixture.detectChanges();
-    TestBed.inject(HttpTestingController).expectOne('/api/cities').flush([]);
-    await fixture.whenStable();
-
-    const link = (fixture.nativeElement as HTMLElement).querySelector('footer a');
-    expect(link?.textContent?.trim()).toBe('Send feedback');
-    expect(link?.getAttribute('href')).toBe('/feedback');
   });
 });

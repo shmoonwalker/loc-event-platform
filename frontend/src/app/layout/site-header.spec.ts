@@ -72,6 +72,23 @@ describe('SiteHeader', () => {
     expect(el().textContent).not.toContain('Shadi');
   });
 
+  it('links to the feedback page next to the theme switch for visitors', async () => {
+    const { el } = await open(null);
+    const link = el().querySelector('a[href="/feedback"]');
+    expect(link?.getAttribute('aria-label')).toBe('Send feedback');
+    expect(link?.previousElementSibling?.getAttribute('aria-label')).toMatch(/theme/);
+  });
+
+  it('links to the feedback page for members', async () => {
+    const { el } = await open('USER');
+    expect(el().querySelector('a[href="/feedback"]')).not.toBeNull();
+  });
+
+  it('gives the admin account no feedback link', async () => {
+    const { el } = await open('ADMIN');
+    expect(el().querySelector('a[href="/feedback"]')).toBeNull();
+  });
+
   it('shows only the avatar while signed in, with a closed menu', async () => {
     const { el, loginLink, menuButton, menu } = await open('USER');
 
