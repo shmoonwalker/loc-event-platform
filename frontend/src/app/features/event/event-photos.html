@@ -176,7 +176,7 @@
             [attr.aria-expanded]="expanded()"
             (click)="expanded.set(!expanded())"
           >
-            {{ expanded() ? 'Show fewer photos' : 'See all photos (' + all.length + ')' }}
+            {{ expanded() ? 'Show fewer photos' : 'Show ' + (all.length - preview) + ' more' }}
           </button>
         }
       } @else if (!list.length) {

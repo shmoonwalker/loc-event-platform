@@ -119,7 +119,7 @@ for everyone; the admin endpoints are in [Admin comments](../backend/docs/admin-
 ### Photos
 
 The event page has a Photos section under the description, for every event including online
-ones. It shows the first six approved photos, newest first; "See all photos (N)" expands the
+ones. It shows the first six approved photos, newest first; "Show N more" expands the
 grid to all of them and "Show fewer photos" collapses it again. Clicking a photo opens it larger,
 at the URL the API returns. When there are none, one small line says so. A signed-in member can
 add a picture, see their own photos (waiting for approval, or not approved) and delete them, and

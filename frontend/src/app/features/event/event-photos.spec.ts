@@ -148,7 +148,7 @@ describe('EventPhotos', () => {
 
     expect(el.querySelector('#photos-title')?.textContent).toContain(`(${many.length})`);
     expect(shown()).toBe(PHOTO_PREVIEW);
-    expect(toggle.textContent?.trim()).toBe(`See all photos (${many.length})`);
+    expect(toggle.textContent?.trim()).toBe(`Show ${many.length - PHOTO_PREVIEW} more`);
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(toggle.getAttribute('aria-controls')).toBe('photo-grid');
 
