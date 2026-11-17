@@ -3,6 +3,7 @@ package nl.loc.backend.user.repository;
 import static nl.loc.backend.event.repository.PublicEventRepository.AVAILABLE;
 import static nl.loc.backend.event.repository.PublicEventRepository.CITY_SLUG;
 import static nl.loc.backend.event.repository.PublicEventRepository.ENDS;
+import static nl.loc.backend.event.repository.PublicEventRepository.NOT_HIDDEN;
 import static nl.loc.backend.event.repository.PublicEventRepository.SHOW_OF;
 import static nl.loc.backend.event.repository.PublicEventRepository.STARTS;
 
@@ -63,10 +64,10 @@ public class SavedEventRepository {
         return jdbc.sql("""
             SELECT EXISTS (
                 SELECT 1
-                FROM publication.discoverable_events
-                WHERE loc_group_id = %s
+                FROM publication.discoverable_events s
+                WHERE s.loc_group_id = %s AND %s
             )
-            """.formatted(SHOW_OF))
+            """.formatted(SHOW_OF, NOT_HIDDEN))
                 .param("id", id)
                 .query(Boolean.class)
                 .single();
@@ -77,8 +78,8 @@ public class SavedEventRepository {
             SELECT COUNT(DISTINCT s.loc_group_id)
             FROM app.saved_event se
             JOIN publication.event_snapshot s ON s.loc_event_id = se.event_id
-            WHERE se.user_id = :userId
-            """)
+            WHERE se.user_id = :userId AND %s
+            """.formatted(NOT_HIDDEN))
                 .param("userId", userId)
                 .query(Long.class)
                 .single();
@@ -114,9 +115,10 @@ public class SavedEventRepository {
                 ORDER BY %4$s DESC, CASE WHEN %4$s THEN %1$s END, %1$s DESC NULLS LAST, s.loc_occurrence_id
                 LIMIT 1
             ) s ON true
+            WHERE %5$s
             ORDER BY sv.saved_at DESC, sv.loc_group_id
             LIMIT :limit OFFSET :offset
-            """.formatted(STARTS, ENDS, CITY_SLUG, AVAILABLE);
+            """.formatted(STARTS, ENDS, CITY_SLUG, AVAILABLE, NOT_HIDDEN);
         return jdbc.sql(sql)
                 .param("userId", userId)
                 .param("limit", size)
