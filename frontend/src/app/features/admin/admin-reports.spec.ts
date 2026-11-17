@@ -49,7 +49,7 @@ async function render(list: ReportGroup[] = [EVENT_GROUP, COMMENT_GROUP]) {
     [...el.querySelectorAll('li')].find((li) => li.textContent?.includes(text))!;
   const button = (label: string, within: ParentNode = el) =>
     [...within.querySelectorAll('button')].find((b) => b.textContent?.trim() === label);
-  return { el, http, tick, row, button, settle: () => fixture.whenStable() };
+  return { el, fixture, http, tick, row, button, settle: () => fixture.whenStable() };
 }
 
 describe('AdminReports', () => {
@@ -95,6 +95,36 @@ describe('AdminReports', () => {
     expect(button('Hide event', row('Jazz night'))).toBeDefined();
     expect(button('Hide event', row('Parking is free here'))).toBeUndefined();
     expect(button('Dismiss', row('Parking is free here'))).toBeDefined();
+  });
+
+  it('shows a photo report and removes the photo', async () => {
+    const { fixture, http, tick, row, button } = await render([
+      {
+        ...EVENT_GROUP,
+        targetType: 'PHOTO',
+        targetId: 'p1',
+        eventId: 'e1',
+        eventTitle: 'Jazz night',
+        openCount: 1,
+        reasons: ['INAPPROPRIATE'],
+        reportIds: ['r9'],
+      },
+    ]);
+
+    expect(row('Jazz night').textContent).toContain('Photo');
+    expect(row('Jazz night').textContent).toContain('p1');
+    expect(button('Hide event', row('Jazz night'))).toBeUndefined();
+    expect(button('Remove photo', row('Jazz night'))).toBeDefined();
+    button('Remove photo', row('Jazz night'))!.click();
+
+    const req = http.expectOne('/api/admin/photos/p1');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+    tick();
+    http.expectOne(LIST).flush([]);
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('No open reports');
   });
 
   it('dismisses every open report of the item, then loads the list again', async () => {
