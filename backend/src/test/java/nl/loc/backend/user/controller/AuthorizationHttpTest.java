@@ -3,7 +3,11 @@ package nl.loc.backend.user.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +18,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 import javax.crypto.spec.SecretKeySpec;
 import nl.loc.backend.user.model.UserAccount;
 import nl.loc.backend.user.repository.EmailVerificationTokenRepository;
@@ -34,6 +39,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -45,6 +51,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @Testcontainers
 // nothing listens on port 1, so the rate limiter fails open and never limits these tests
 @TestPropertySource(properties = "spring.data.redis.url=redis://localhost:1")
+// the member lists read the publication view
+@Sql(scripts = "/db/publication-discoverable-events.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class AuthorizationHttpTest {
     private static final String OTHER_SECRET = "8m8qJx6Ow3tKkK3PZ0a4cQ2u7L1vYb9sN5eR0dT6fHg=";
 
@@ -149,6 +157,54 @@ class AuthorizationHttpTest {
 
         // no admin endpoints exist yet: 404 means security let the request through
         perform(get("/api/admin/anything"), adminToken).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminsAreForbiddenFromMemberActions() throws Exception {
+        String adminToken = token(user.getId().toString(), List.of("ADMIN"), Instant.now().plus(Duration.ofMinutes(5)));
+        UUID id = UUID.randomUUID();
+        List<MockHttpServletRequestBuilder> memberActions = List.of(
+                get("/api/me/saved-events"),
+                get("/api/me/saved-events/{id}", id),
+                put("/api/me/saved-events/{id}", id),
+                delete("/api/me/saved-events/{id}", id),
+                get("/api/me/followed-organizers"),
+                get("/api/me/followed-organizers/events"),
+                put("/api/me/followed-organizers/{id}", id),
+                delete("/api/me/followed-organizers/{id}", id),
+                post("/api/events/{id}/comments", id),
+                post("/api/comments/{id}/replies", id),
+                patch("/api/me/comments/{id}", id),
+                delete("/api/me/comments/{id}", id),
+                post("/api/events/{id}/reports", id),
+                post("/api/comments/{id}/reports", id));
+
+        for (MockHttpServletRequestBuilder request : memberActions) {
+            perform(request, adminToken)
+                    .andExpect(status().isForbidden())
+                    .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.title").value("Forbidden"));
+        }
+    }
+
+    @Test
+    void membersStillReachTheirLists() throws Exception {
+        String memberToken = accessTokenService.issueAccessToken(user);
+
+        perform(get("/api/me/saved-events"), memberToken).andExpect(status().isOk());
+        perform(get("/api/me/followed-organizers"), memberToken).andExpect(status().isOk());
+        perform(get("/api/me/followed-organizers/events"), memberToken).andExpect(status().isOk());
+    }
+
+    @Test
+    void adminsKeepTheirAccountSettings() throws Exception {
+        String adminToken = token(user.getId().toString(), List.of("ADMIN"), Instant.now().plus(Duration.ofMinutes(5)));
+
+        perform(get("/api/auth/me"), adminToken).andExpect(status().isOk());
+        perform(patch("/api/me/profile").contentType(MediaType.APPLICATION_JSON).content("{\"displayName\":\"Ada\"}"),
+                adminToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Ada"));
     }
 
     @Test

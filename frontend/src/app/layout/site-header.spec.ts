@@ -107,6 +107,8 @@ describe('SiteHeader', () => {
     const { menu, toggleMenu } = await open('ADMIN');
     toggleMenu();
     expect(menu()?.textContent).toContain('Admin');
+    expect(menu()?.textContent).not.toContain('Dashboard');
+    expect(menu()?.querySelector('a[href="/me"]')).toBeNull();
     expect(menu()?.querySelector('a[href="/admin"]')?.textContent?.trim()).toBe('Admin');
   });
 

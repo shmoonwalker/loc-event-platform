@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
+import { CurrentUser } from '../../core/auth-api';
 import { AuthSession } from '../../core/auth-session';
 import { FollowButton } from './follow-button';
 
@@ -22,8 +23,35 @@ function render(followed: boolean, signedIn = true) {
   return { fixture, button, click, http: TestBed.inject(HttpTestingController) };
 }
 
+/** Signs in an admin account, whose session knows its role once /api/auth/me answered. */
+function signInAdmin() {
+  TestBed.inject(AuthSession).start('token').subscribe();
+  TestBed.inject(HttpTestingController)
+    .expectOne('/api/auth/me')
+    .flush({
+      id: 'admin-id',
+      email: 'admin@example.com',
+      displayName: 'Admin',
+      role: 'ADMIN',
+      avatarUrl: '/avatars/sun.svg',
+      avatarPreset: 'SUN',
+    } satisfies CurrentUser);
+}
+
 describe('FollowButton', () => {
   afterEach(() => TestBed.inject(HttpTestingController).verify());
+
+  it('shows nothing to the admin account', () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    signInAdmin();
+    const fixture = TestBed.createComponent(FollowButton);
+    fixture.componentRef.setInput('organizerId', 'o1');
+    fixture.componentRef.setInput('initiallyFollowed', false);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('button')).toBeNull();
+  });
 
   it('follows at once, before the server answers, and keeps the "Follow" label', () => {
     const { button, click, http } = render(false);

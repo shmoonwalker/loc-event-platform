@@ -12,7 +12,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Member report routes only. The rest of the API stays on {@link SecurityConfig}.
+ * Member report routes only; admin tokens get 403. The rest of the API stays on {@link SecurityConfig}.
  */
 @Configuration
 public class ReportSecurityConfig {
@@ -26,7 +26,7 @@ public class ReportSecurityConfig {
                         "/api/events/*/reports", "/api/comments/*/reports"))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/events/*/reports", "/api/comments/*/reports")
-                        .authenticated()
+                        .hasRole("USER")
                         .anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)

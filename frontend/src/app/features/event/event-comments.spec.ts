@@ -117,6 +117,16 @@ describe('EventComments', () => {
     expect(button('Report')).toBeUndefined();
   });
 
+  it('gives the admin account no member comment form, member actions or login prompt', async () => {
+    const { el, button } = await render('ADMIN', pageOf([comment({ mine: true })]));
+
+    expect(el.querySelector('form')).toBeNull();
+    expect(el.querySelector('a[href^="/login"]')).toBeNull();
+    expect(button('Reply')).toBeUndefined();
+    expect(button('Edit')).toBeUndefined();
+    expect(button('Delete')).toBeUndefined();
+  });
+
   it('says so when there are no comments yet', async () => {
     const { el } = await render(true, pageOf([]));
     expect(el.textContent).toContain('No comments yet.');
@@ -237,7 +247,8 @@ describe('EventComments', () => {
     expect(button('Remove', item('Deleted user'))).toBeTruthy();
     expect(button('Remove', item('Comment deleted'))).toBeUndefined();
     expect(button('Delete')).toBeUndefined();
-    expect(button('Edit', item('Anouk'))).toBeTruthy();
+    // editing uses the member endpoint, which refuses admins
+    expect(button('Edit')).toBeUndefined();
   });
 
   it('posts an official reply through the admin API', async () => {

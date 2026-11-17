@@ -51,6 +51,10 @@ public class SavedEventController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public SavedEventPage savedEvents(@AuthenticationPrincipal Jwt jwt,
@@ -76,6 +80,10 @@ public class SavedEventController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
                     responseCode = "404",
@@ -104,6 +112,10 @@ public class SavedEventController {
                     description = "Missing, invalid or expired access token, or the account no longer exists.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
                     responseCode = "404",
                     description = "The event is unknown, withdrawn, or over.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -129,6 +141,10 @@ public class SavedEventController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public void unsave(@AuthenticationPrincipal Jwt jwt,

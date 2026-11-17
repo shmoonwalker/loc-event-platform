@@ -12,24 +12,27 @@ import { IconComponent } from '../icon/icon';
 @Component({
   selector: 'app-follow-button',
   imports: [IconComponent],
+  // the admin account does not follow organizers, so it gets no button
   template: `
-    <button
-      type="button"
-      class="pill-btn aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-panel"
-      [attr.aria-pressed]="followed()"
-      [attr.aria-busy]="pending()"
-      (click)="toggle()"
-    >
-      @if (followed()) {
-        <app-icon name="check" />
-      }
-      Follow
-    </button>
+    @if (!session.isAdmin()) {
+      <button
+        type="button"
+        class="pill-btn aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-panel"
+        [attr.aria-pressed]="followed()"
+        [attr.aria-busy]="pending()"
+        (click)="toggle()"
+      >
+        @if (followed()) {
+          <app-icon name="check" />
+        }
+        Follow
+      </button>
+    }
   `,
 })
 export class FollowButton {
   private readonly api = inject(FollowedOrganizersApi);
-  private readonly session = inject(AuthSession);
+  protected readonly session = inject(AuthSession);
   private readonly router = inject(Router);
 
   readonly organizerId = input.required<string>();

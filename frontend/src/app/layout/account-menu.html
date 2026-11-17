@@ -47,15 +47,6 @@
             Account settings
           </a>
         </li>
-        <li>
-          <a
-            routerLink="/me"
-            class="flex min-h-11 items-center rounded-xl px-3 font-semibold hover:bg-bg"
-            (click)="open.set(false)"
-          >
-            Dashboard
-          </a>
-        </li>
         @if (session.isAdmin()) {
           <li>
             <a
@@ -64,6 +55,16 @@
               (click)="open.set(false)"
             >
               Admin
+            </a>
+          </li>
+        } @else {
+          <li>
+            <a
+              routerLink="/me"
+              class="flex min-h-11 items-center rounded-xl px-3 font-semibold hover:bg-bg"
+              (click)="open.set(false)"
+            >
+              Dashboard
             </a>
           </li>
         }

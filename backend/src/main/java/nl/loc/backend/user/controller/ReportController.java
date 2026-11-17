@@ -53,6 +53,10 @@ public class ReportController {
                     description = "Missing, invalid or expired access token, or the account no longer exists.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
                     responseCode = "404",
                     description = "No published event with this id.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
@@ -85,6 +89,10 @@ public class ReportController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired access token, or the account no longer exists.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
                     responseCode = "404",

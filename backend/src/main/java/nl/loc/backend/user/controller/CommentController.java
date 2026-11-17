@@ -83,6 +83,10 @@ public class CommentController {
                     description = "Missing, invalid or expired access token, or the account no longer exists.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
                     responseCode = "404",
                     description = "The event is unknown or hidden.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
@@ -115,6 +119,10 @@ public class CommentController {
                     description = "Missing, invalid or expired access token, or the account no longer exists.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
                     responseCode = "404",
                     description = "The comment is unknown, deleted, or on a hidden event.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
@@ -145,6 +153,10 @@ public class CommentController {
                     description = "Missing, invalid or expired access token, or the account no longer exists.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
                     responseCode = "404",
                     description = "No comment of this member with this id, or it is deleted or on a hidden event.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -171,6 +183,10 @@ public class CommentController {
             @ApiResponse(
                     responseCode = "401",
                     description = "Missing, invalid or expired access token.",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "The access token is an admin; admins do not take member actions.",
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
             @ApiResponse(
                     responseCode = "404",

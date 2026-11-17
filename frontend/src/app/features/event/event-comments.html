@@ -7,14 +7,14 @@
   </h2>
 
   <div class="mt-4">
-    @if (session.loggedIn()) {
+    @if (member()) {
       <app-comment-form
         label="Write a comment"
         submitLabel="Post"
         [save]="post"
         (saved)="posted()"
       />
-    } @else {
+    } @else if (!session.loggedIn()) {
       <p class="text-muted">
         <a class="link" routerLink="/login" [queryParams]="{ returnUrl: router.url }">Log in</a>
         to write a comment or reply.
@@ -186,9 +186,7 @@
                   </button>
                 }
                 @if (session.isAdmin()) {
-                  @if (c.mine) {
-                    <button type="button" class="link" (click)="openEdit(c.id)">Edit</button>
-                  }
+                  <!-- the edit endpoint is for members; an admin removes an official reply instead -->
                   <button type="button" class="link" (click)="askRemove(c.id)">Remove</button>
                 } @else if (c.mine) {
                   <button type="button" class="link" (click)="openEdit(c.id)">Edit</button>
