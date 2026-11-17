@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { AuthSession } from '../../core/auth-session';
 import { EventPhoto } from '../../core/photos-api';
-import { EventPhotos } from './event-photos';
+import { EventPhotos, PHOTO_PREVIEW } from './event-photos';
 
 const photo = (over: Partial<EventPhoto> = {}): EventPhoto => ({
   id: 'p1',
@@ -119,10 +119,76 @@ describe('EventPhotos', () => {
     await flush([]);
 
     expect(el.querySelector('#photos-title')?.textContent).toContain('Photos');
-    expect(el.textContent).toContain('There are no photos yet.');
+    // one small line, not a big empty box
+    expect(el.querySelector('#photos-empty')?.textContent?.trim()).toBe('There are no photos yet.');
+    expect(el.querySelector('#photo-grid')).toBeNull();
+    expect(el.querySelector('#photos-toggle')).toBeNull();
     expect(el.querySelector('input[type="file"]')).toBeNull();
     expect(el.textContent).not.toContain('You own this photo');
     expect(button('Report')).toBeUndefined();
+    http.expectNone(MINE);
+  });
+
+  it('invites a member to add the first photo from the empty album', async () => {
+    const { el, flush } = await render(true);
+    await flush([], []);
+    expect(el.querySelector('#photos-empty')?.textContent).toContain('There are no photos yet.');
+    expect(el.querySelector('#photos-empty')?.textContent).toContain('Add the first one.');
+    expect(el.querySelector('label[for="event-photo-file"]')?.textContent).toContain('Add a photo');
+  });
+
+  it('shows the first photos and expands to all of them, and back', async () => {
+    const { el, flush, tick } = await render(false);
+    const many = Array.from({ length: PHOTO_PREVIEW + 2 }, (_, i) =>
+      photo({ id: `m${i}`, cardUrl: `https://photos.example/m${i}/card.jpg` }),
+    );
+    await flush(many);
+    const shown = () => el.querySelectorAll('#photo-grid li').length;
+    const toggle = el.querySelector<HTMLButtonElement>('#photos-toggle')!;
+
+    expect(el.querySelector('#photos-title')?.textContent).toContain(`(${many.length})`);
+    expect(shown()).toBe(PHOTO_PREVIEW);
+    expect(toggle.textContent?.trim()).toBe(`Show ${many.length - PHOTO_PREVIEW} more`);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.getAttribute('aria-controls')).toBe('photo-grid');
+
+    toggle.click();
+    tick();
+    expect(shown()).toBe(many.length);
+    expect(toggle.textContent?.trim()).toBe('Show fewer photos');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    toggle.click();
+    tick();
+    expect(shown()).toBe(PHOTO_PREVIEW);
+  });
+
+  it('offers no "See all" when every photo already shows', async () => {
+    const { el, flush } = await render(false);
+    await flush([newer, older]);
+    expect(el.querySelectorAll('#photo-grid li').length).toBe(2);
+    expect(el.querySelector('#photos-toggle')).toBeNull();
+  });
+
+  it('offers the admin account no upload, own photos or report', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    TestBed.inject(AuthSession).start('token').subscribe();
+    http.expectOne('/api/auth/me').flush({ id: 'a1', displayName: 'Loc team', role: 'ADMIN' });
+    const fixture = TestBed.createComponent(EventPhotos);
+    fixture.componentRef.setInput('eventId', 'e1');
+    fixture.detectChanges();
+    http.expectOne({ method: 'GET', url: PUBLIC }).flush([older]);
+    await fixture.whenStable();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('input[type="file"]')).toBeNull();
+    expect(el.textContent).not.toContain('You own this photo');
+    expect([...el.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Report')).toBe(
+      false,
+    );
     http.expectNone(MINE);
   });
 

@@ -2,21 +2,21 @@
 
 This Angular application is Loc's user interface. It has these pages:
 
-| Route | Page |
-|---|---|
-| `/` | Home: highlight rails (tonight, this weekend, near you, online) and a searchable, filterable event list |
-| `/events/:id` | Event detail: description, location, organizers, every upcoming date, per-date weather, photos and comments |
-| `/organizers/:id` | Organizer profile and their upcoming events |
-| `/register` | Create an account with name, email and password, then "check your email" |
-| `/verify-email` | Opened from the verification or email-change email; verifies the account (or its new address) or offers a new link |
-| `/login` | Log in with email and password, or resend verification for an unverified account |
-| `/forgot-password` | Ask for a password reset link; always shows the same "check your email", whether or not the email has an account |
-| `/reset-password` | Opened from the reset email; choose a new password, which signs out every session, or request a new link when this one is invalid or expired |
-| `/me` | Signed in: the dashboard with saved events and followed organizers |
-| `/me/settings/profile` | Signed in: change the display name, pick a preset avatar, or upload a picture (cropped and zoomed in a round preview first) and remove it again |
-| `/me/settings/security` | Signed in: change the email (the current one is shown) or the password |
-| `/me/settings/account` | Signed in: delete the account |
-| `/holding` | Holding page from the earlier version of the site |
+| Route                   | Page                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                     | Home: highlight rails (tonight, this weekend, near you, online) and a searchable, filterable event list                                         |
+| `/events/:id`           | Event detail: description, location, organizers, every upcoming date, per-date weather, photos and comments                                     |
+| `/organizers/:id`       | Organizer profile and their upcoming events                                                                                                     |
+| `/register`             | Create an account with name, email and password, then "check your email"                                                                        |
+| `/verify-email`         | Opened from the verification or email-change email; verifies the account (or its new address) or offers a new link                              |
+| `/login`                | Log in with email and password, or resend verification for an unverified account                                                                |
+| `/forgot-password`      | Ask for a password reset link; always shows the same "check your email", whether or not the email has an account                                |
+| `/reset-password`       | Opened from the reset email; choose a new password, which signs out every session, or request a new link when this one is invalid or expired    |
+| `/me`                   | Signed in: the dashboard with saved events and followed organizers                                                                              |
+| `/me/settings/profile`  | Signed in: change the display name, pick a preset avatar, or upload a picture (cropped and zoomed in a round preview first) and remove it again |
+| `/me/settings/security` | Signed in: change the email (the current one is shown) or the password                                                                          |
+| `/me/settings/account`  | Signed in: delete the account                                                                                                                   |
+| `/holding`              | Holding page from the earlier version of the site                                                                                               |
 
 The list's filters are picked from menus: date (a preset or your own date range), time
 of day (morning, afternoon, evening or late night), one city, and any number of
@@ -91,6 +91,15 @@ for one. After sending, the page says thanks and offers to send more. Field erro
 under their fields, and the rate limit shows with its wait time. The endpoint is in
 [Website feedback](../backend/docs/feedback.md).
 
+### Event page
+
+The event page opens with the title, categories, date (a date picker when there are several),
+place, the save heart and Report, next to the event image; on phones the image comes first.
+Under it, the description and tags sit in the main column with the photos and comments, and
+the weather, map and organizers are cards in a side column. On phones the side cards come
+after the description. Each organizer has a Follow button; a member's button starts in the
+state their followed organizers list gives.
+
 ### Comments
 
 The event page lists comments newest first, each with its replies, one page at a time.
@@ -109,10 +118,12 @@ for everyone; the admin endpoints are in [Admin comments](../backend/docs/admin-
 
 ### Photos
 
-The event page has a Photos section in the side column, after the organizers, for every event
-including online ones. It lists approved photos newest first and opens each one at the URL the
-API returns. When there are none, it says so. A signed-in member can add a picture, see their own
-photos (waiting for approval, or not approved) and delete them, and report a photo that isn't theirs.
+The event page has a Photos section under the description, for every event including online
+ones. It shows the first six approved photos, newest first; "Show N more" expands the
+grid to all of them and "Show fewer photos" collapses it again. Clicking a photo opens it larger,
+at the URL the API returns. When there are none, one small line says so. A signed-in member can
+add a picture, see their own photos (waiting for approval, or not approved) and delete them, and
+report a photo that isn't theirs. The admin account does not add or report photos.
 
 ### Account settings
 

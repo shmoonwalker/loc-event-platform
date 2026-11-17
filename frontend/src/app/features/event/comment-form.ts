@@ -11,22 +11,22 @@ let nextId = 0;
   imports: [ReactiveFormsModule],
   template: `
     <form [formGroup]="form" class="flex max-w-[70ch] flex-col gap-1.5" (ngSubmit)="submit()">
-      <label [for]="id" class="font-semibold">{{ label() }}</label>
+      <label [for]="id" class="text-sm font-semibold">{{ label() }}</label>
       <textarea
         [id]="id"
         formControlName="body"
         rows="3"
-        class="field-input py-2"
+        class="field-input resize-y py-2.5 leading-relaxed"
         [attr.aria-describedby]="id + '-error'"
         [attr.aria-invalid]="error() ? true : null"
       ></textarea>
       <p [id]="id + '-error'" class="text-sm text-danger" aria-live="polite">{{ error() }}</p>
-      <div class="flex items-center gap-4">
-        <button type="submit" class="btn-dark" [disabled]="sending()">
+      <div class="flex items-center gap-3">
+        <button type="submit" class="btn-dark min-h-11 text-sm" [disabled]="sending()">
           {{ sending() ? 'Sending…' : submitLabel() }}
         </button>
         @if (cancelable()) {
-          <button type="button" class="link" (click)="cancelled.emit()">Cancel</button>
+          <button type="button" class="quiet-btn" (click)="cancelled.emit()">Cancel</button>
         }
       </div>
     </form>

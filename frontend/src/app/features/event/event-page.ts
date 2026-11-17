@@ -8,11 +8,13 @@ import { AuthSession } from '../../core/auth-session';
 import { categoryImage } from '../../core/event-image';
 import { EventsApi, QueryParams } from '../../core/events-api';
 import { externalUrl } from '../../core/external-url';
+import { FollowedOrganizersApi } from '../../core/followed-organizers-api';
 import { EMPTY_FILTERS, Filters, filtersToParams } from '../../core/filters';
 import { errorStatus, valueOf } from '../../core/resource';
 import { SavedEventsApi } from '../../core/saved-events-api';
 import { amsterdamDate, formatWhen } from '../../core/time';
 import { ErrorState } from '../../shared/error-state/error-state';
+import { FollowButton } from '../../shared/follow-button/follow-button';
 import { IconComponent } from '../../shared/icon/icon';
 import { NotFoundState } from '../../shared/not-found-state/not-found-state';
 import { EventComments } from './event-comments';
@@ -31,6 +33,7 @@ import { SaveButton } from '../../shared/save-button/save-button';
     NotFoundState,
     SaveButton,
     ReportButton,
+    FollowButton,
     EventComments,
     EventPhotos,
   ],
@@ -39,6 +42,7 @@ import { SaveButton } from '../../shared/save-button/save-button';
 export class EventPage {
   private readonly api = inject(EventsApi);
   private readonly savedApi = inject(SavedEventsApi);
+  private readonly followedApi = inject(FollowedOrganizersApi);
   private readonly title = inject(Title);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly session = inject(AuthSession);
@@ -60,6 +64,23 @@ export class EventPage {
   });
 
   protected readonly event = computed(() => valueOf(this.detail));
+
+  /** A member's followed organizers, so each Follow button starts in the right state. */
+  private readonly followedList = rxResource({
+    params: () => {
+      const e = this.event();
+      return this.session.loggedIn() && !this.session.isAdmin() && e?.organizers.length
+        ? e.id
+        : undefined;
+    },
+    stream: () => this.followedApi.list(),
+  });
+  /** Ids to start Follow from: empty for visitors (the button sends them to log in), null until known. */
+  protected readonly followed = computed(() => {
+    if (!this.session.loggedIn()) return new Set<string>();
+    const list = valueOf(this.followedList);
+    return list ? new Set(list.map((o) => o.id)) : null;
+  });
   protected readonly notFound = computed(() => errorStatus(this.detail) === 404);
   protected readonly online = computed(() => this.event()?.place === 'ONLINE');
   /** The main image, else the same category photo the event card falls back to (decorative, so no alt text). */

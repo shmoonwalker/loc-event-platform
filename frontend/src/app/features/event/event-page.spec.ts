@@ -8,7 +8,8 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { of } from 'rxjs';
 import { AuthSession } from '../../core/auth-session';
 import { CommentsApi } from '../../core/comments-api';
-import { EventDetail } from '../../core/models';
+import { FollowedOrganizersApi } from '../../core/followed-organizers-api';
+import { EventDetail, OrganizerInfo } from '../../core/models';
 import { PhotosApi } from '../../core/photos-api';
 import { EventPage } from './event-page';
 
@@ -76,6 +77,12 @@ const noPhotos = {
   useValue: { list: () => of([]), mine: () => of([]) },
 };
 
+// A member's followed organizers; the follow button has its own spec.
+const follows = (list: OrganizerInfo[] = []) => ({
+  provide: FollowedOrganizersApi,
+  useValue: { list: () => of(list) },
+});
+
 /** Re-render after a change made outside the template (an event, a sign-in). */
 const settle = () => TestBed.inject(ApplicationRef).whenStable();
 
@@ -85,6 +92,7 @@ const before = (a: Element | null, b: Element | null) =>
 
 async function open(
   respond: (req: ReturnType<HttpTestingController['expectOne']>) => void,
+  followed = follows(),
 ): Promise<HTMLElement> {
   TestBed.configureTestingModule({
     providers: [
@@ -92,6 +100,7 @@ async function open(
       provideHttpClientTesting(),
       noComments,
       noPhotos,
+      followed,
       provideRouter([{ path: 'events/:id', component: EventPage }], withComponentInputBinding()),
     ],
   });
@@ -303,6 +312,25 @@ describe('EventPage', () => {
     expect(el.textContent).toContain('No comments yet.');
   });
 
+  it('reads about, the side cards, photos, then comments, in that order', async () => {
+    const el = await open((req) => req.flush(event));
+    const order = ['#about-title', '#weather-title', '#organizers-title', '#photos-title'];
+    order.push('#comments-title');
+    const headings = order.map((id) => el.querySelector(id));
+    headings.slice(1).forEach((h, i) => expect(before(headings[i], h)).toBe(true));
+  });
+
+  it('offers Follow for each organizer, pressed when the member follows them', async () => {
+    const el = await open((req) => req.flush(event), follows([event.organizers[0]]));
+    const follow = () =>
+      [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Follow');
+    expect(follow()?.getAttribute('aria-pressed')).toBe('false');
+
+    TestBed.inject(AuthSession).start('token');
+    await settle();
+    expect(follow()?.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('shows the save button with the saved state from the API', async () => {
     const el = await open((req) => req.flush({ ...event, saved: true }));
     expect(el.querySelector('button[aria-label="Save event"]')?.getAttribute('aria-pressed')).toBe(
@@ -337,6 +365,7 @@ describe('EventPage', () => {
         provideHttpClientTesting(),
         noComments,
         noPhotos,
+        follows(),
         provideRouter([{ path: 'events/:id', component: EventPage }], withComponentInputBinding()),
       ],
     });
