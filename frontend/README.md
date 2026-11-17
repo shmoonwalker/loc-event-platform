@@ -64,12 +64,16 @@ the `--admin-*` tokens in `src/styles.css`, and its buttons and fields use the
 number of items waiting there; sections are listed in `features/admin/admin-sections.ts`.
 An unknown page under `/admin` opens the overview.
 
-- **Reports** (`/admin/reports`) lists open reports, one row per event or comment,
+- **Reports** (`/admin/reports`) lists open reports, one row per event, comment or photo,
   newest activity first, with the number of reports and their reasons. Event rows link
   to the event by title; comment rows show the comment, its author and the event it is
-  on. Dismiss closes all of an item's open reports without changing
-  it. Hide event asks for a reason, takes the event out of every public list and page,
-  and closes its reports.
+  on; photo rows name the photo and the event. Dismiss closes all of an item's open
+  reports without changing it. Hide event asks for a reason, takes the event out of
+  every public list and page, and closes its reports. Remove photo deletes that photo.
+- **Event photos** (`/admin/photos`) lists photos members uploaded, pending first.
+  Approve makes a photo public; reject keeps it hidden. The approved list can remove
+  a photo. The overview counts the photos still waiting. The picture URLs are the ones
+  the API returns.
 - **Hidden events** (`/admin/hidden-events`) lists hidden events, most recent first, with
   its title, who hid it, when and why, and Unhide.
 - **Feedback** (`/admin/feedback`) lists website feedback, open items first and then the
