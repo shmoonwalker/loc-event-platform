@@ -16,6 +16,7 @@ import { ErrorState } from '../../shared/error-state/error-state';
 import { IconComponent } from '../../shared/icon/icon';
 import { NotFoundState } from '../../shared/not-found-state/not-found-state';
 import { EventComments } from './event-comments';
+import { EventPhotos } from './event-photos';
 import { weatherMessage, weatherView } from './weather';
 import { ReportButton } from '../../shared/report-button/report-button';
 import { SaveButton } from '../../shared/save-button/save-button';
@@ -31,6 +32,7 @@ import { SaveButton } from '../../shared/save-button/save-button';
     SaveButton,
     ReportButton,
     EventComments,
+    EventPhotos,
   ],
   templateUrl: './event-page.html',
 })

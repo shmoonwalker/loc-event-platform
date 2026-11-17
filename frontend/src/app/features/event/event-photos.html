@@ -1,0 +1,219 @@
+<section class="min-w-0" aria-labelledby="photos-title">
+  <h2 class="text-xl font-semibold" id="photos-title">Photos</h2>
+  <div class="mt-2 flex flex-col gap-4 rounded-[14px] border border-line bg-panel p-4">
+    @if (session.loggedIn()) {
+      <div>
+        <label
+          for="event-photo-file"
+          class="btn-dark cursor-pointer"
+          [class.pointer-events-none]="uploading()"
+          [class.opacity-60]="uploading()"
+        >
+          {{ uploading() ? 'Uploading…' : 'Choose a picture' }}
+        </label>
+        <input
+          id="event-photo-file"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          class="sr-only"
+          aria-describedby="photo-consent"
+          [disabled]="uploading()"
+          (change)="addPhoto(photoInput)"
+          #photoInput
+        />
+        <p id="photo-consent" class="mt-2 text-sm text-muted">
+          You own this photo and agree it can be shown. Someone in the photo can ask for it to be
+          removed.
+        </p>
+        @if (uploadError(); as message) {
+          <p id="photo-upload-error" role="alert" class="mt-2 text-sm text-danger">{{ message }}</p>
+        }
+      </div>
+
+      @if (ownPhotos.error()) {
+        <app-error-state
+          message="We couldn't load your photos. Check your connection and try again."
+          (action)="ownPhotos.reload()"
+        />
+      } @else if (own(); as mine) {
+        @if (mine.length) {
+          <div id="your-photos">
+            <h3 class="font-semibold" id="your-photos-title">Your photos</h3>
+            <ul role="list" class="mt-2 flex flex-col gap-3" aria-labelledby="your-photos-title">
+              @for (photo of mine; track photo.id) {
+                <li class="flex min-w-0 flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    class="shrink-0"
+                    aria-haspopup="dialog"
+                    (click)="view(photo, viewer)"
+                  >
+                    <img
+                      [src]="photo.cardUrl"
+                      alt=""
+                      class="size-16 rounded-[14px] border border-line object-cover"
+                      width="64"
+                      height="64"
+                    />
+                    <span class="sr-only">View photo by {{ photo.uploader.displayName }}</span>
+                  </button>
+                  <div class="min-w-0">
+                    @if (photo.status === 'PENDING') {
+                      <p class="text-sm font-semibold">Waiting for approval</p>
+                    } @else if (photo.status === 'REJECTED') {
+                      <p class="text-sm font-semibold">Not approved</p>
+                    } @else {
+                      <p class="text-sm text-muted">{{ photo.uploader.displayName }}</p>
+                    }
+                    @if (confirmingDelete() === photo.id) {
+                      <div class="mt-1 flex flex-wrap items-center gap-3 text-sm">
+                        <span class="font-semibold">Delete this photo?</span>
+                        <button
+                          type="button"
+                          class="link text-danger"
+                          [disabled]="deleting()"
+                          (click)="remove(photo.id)"
+                        >
+                          {{ deleting() ? 'Deleting…' : 'Delete' }}
+                        </button>
+                        <button type="button" class="link" (click)="confirmingDelete.set(null)">
+                          Keep it
+                        </button>
+                      </div>
+                      @if (deleteError(); as message) {
+                        <p role="alert" class="mt-1 text-sm text-danger">{{ message }}</p>
+                      }
+                    } @else {
+                      <button type="button" class="link text-sm" (click)="askDelete(photo.id)">
+                        Delete
+                      </button>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      }
+    }
+
+    @if (publicPhotos.error()) {
+      <app-error-state
+        message="We couldn't load the photos. Check your connection and try again."
+        (action)="publicPhotos.reload()"
+      />
+    } @else if (photos(); as list) {
+      @if (grid(); as shown) {
+        @if (shown.length) {
+          <ul
+            id="photo-grid"
+            role="list"
+            class="grid grid-cols-2 gap-2"
+            aria-label="Approved photos"
+          >
+            @for (photo of shown; track photo.id) {
+              <li class="min-w-0">
+                <button
+                  type="button"
+                  class="block w-full"
+                  aria-haspopup="dialog"
+                  (click)="view(photo, viewer)"
+                >
+                  <img
+                    [src]="photo.cardUrl"
+                    alt=""
+                    class="aspect-square w-full rounded-[14px] border border-line object-cover"
+                  />
+                  <span class="sr-only">View photo by {{ photo.uploader.displayName }}</span>
+                </button>
+                <p class="mt-1 truncate text-sm text-muted">{{ photo.uploader.displayName }}</p>
+                @if (canReport(photo)) {
+                  <button
+                    type="button"
+                    class="link text-sm"
+                    aria-haspopup="dialog"
+                    (click)="openReport(photo, reportDialog)"
+                  >
+                    Report
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+        } @else if (!list.length) {
+          <p class="text-muted">There are no photos yet.</p>
+        }
+      }
+    } @else {
+      <p class="text-muted" role="status">Loading photos…</p>
+    }
+
+    @if (reported()) {
+      <p id="report-status" role="status" class="text-sm text-muted">Report sent.</p>
+    }
+  </div>
+
+  <dialog
+    id="photo-viewer"
+    class="m-auto max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-panel p-6 text-ink backdrop:bg-ink/60"
+    aria-labelledby="photo-view-title"
+    #viewer
+  >
+    <h3 id="photo-view-title" class="text-xl font-semibold">
+      {{ viewing()?.uploader?.displayName ?? 'Photo' }}
+    </h3>
+    @if (viewing(); as photo) {
+      <img
+        [src]="photo.fullUrl"
+        [alt]="'Photo by ' + photo.uploader.displayName"
+        class="mt-4 max-h-[70vh] w-full rounded-[14px] border border-line bg-panel object-contain"
+      />
+    }
+    <button type="button" class="btn-dark mt-5" (click)="viewer.close()">Close</button>
+  </dialog>
+
+  <dialog
+    id="photo-report"
+    class="m-auto w-[min(100%,24rem)] max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-panel p-6 text-ink backdrop:bg-ink/60"
+    aria-labelledby="report-photo-title"
+    #reportDialog
+  >
+    <h3 id="report-photo-title" class="text-xl font-semibold">Report this photo</h3>
+    @if (reporting()) {
+      <form
+        class="mt-4 flex flex-col gap-3"
+        [formGroup]="reportForm"
+        (ngSubmit)="sendReport(reportDialog)"
+      >
+        <label class="flex flex-col gap-1 text-sm" for="report-reason">
+          Reason
+          <select id="report-reason" formControlName="reason" class="field-input text-ink">
+            <option value="" disabled>Choose a reason</option>
+            @for (reason of reportReasons; track reason.value) {
+              <option [value]="reason.value">{{ reason.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-sm" for="report-details">
+          Details
+          <textarea
+            id="report-details"
+            formControlName="details"
+            rows="3"
+            maxlength="1000"
+            class="field-input py-2 text-ink"
+          ></textarea>
+        </label>
+        @if (reportProblem(); as message) {
+          <p id="report-error" role="alert" class="text-sm text-danger">{{ message }}</p>
+        }
+        <div class="flex flex-wrap items-center gap-4">
+          <button type="submit" class="btn-dark" [disabled]="sendingReport()">
+            {{ sendingReport() ? 'Sending…' : 'Report' }}
+          </button>
+          <button type="button" class="link" (click)="reportDialog.close()">Cancel</button>
+        </div>
+      </form>
+    }
+  </dialog>
+</section>
