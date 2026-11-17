@@ -7,15 +7,20 @@ import { AuthSession } from '../../core/auth-session';
 import { EventPhoto, PhotoReportReason, PhotosApi } from '../../core/photos-api';
 import { valueOf } from '../../core/resource';
 import { ErrorState } from '../../shared/error-state/error-state';
+import { IconComponent } from '../../shared/icon/icon';
+
+/** How many approved photos show before "See all photos". */
+export const PHOTO_PREVIEW = 6;
 
 /**
  * Photos for one event. Approved photos are public; a member's own photos stay in a separate
  * list (a new upload is waiting, and is not mixed into the public grid). Picture URLs are the
- * ones the API returned.
+ * ones the API returned. The admin account does not add or report photos; it reviews them in
+ * the admin panel.
  */
 @Component({
   selector: 'app-event-photos',
-  imports: [ReactiveFormsModule, ErrorState],
+  imports: [ReactiveFormsModule, ErrorState, IconComponent],
   templateUrl: './event-photos.html',
 })
 export class EventPhotos {
@@ -36,9 +41,12 @@ export class EventPhotos {
     params: () => this.eventId(),
     stream: ({ params }) => this.api.list(params),
   });
+  /** Signed in and not the admin account. */
+  protected readonly member = computed(() => this.session.loggedIn() && !this.session.isAdmin());
+
   /** Signing in loads the member's own photos; signing out leaves this idle. */
   protected readonly ownPhotos = rxResource({
-    params: () => (this.session.loggedIn() ? this.eventId() : undefined),
+    params: () => (this.member() ? this.eventId() : undefined),
     stream: ({ params }) => this.api.mine(params),
   });
 
@@ -52,9 +60,17 @@ export class EventPhotos {
   protected readonly grid = computed(() => {
     const list = this.photos();
     if (!list) return undefined;
-    if (!this.session.loggedIn() || !this.ownPhotos.hasValue()) return list;
+    if (!this.member() || !this.ownPhotos.hasValue()) return list;
     const mine = this.ownIds();
     return list.filter((photo) => !mine.has(photo.id));
+  });
+
+  protected readonly preview = PHOTO_PREVIEW;
+  /** The album shows the first few photos until someone asks for all; collapsed again for another event. */
+  protected readonly expanded = linkedSignal({ source: this.eventId, computation: () => false });
+  protected readonly shown = computed(() => {
+    const list = this.grid();
+    return list && !this.expanded() ? list.slice(0, PHOTO_PREVIEW) : list;
   });
 
   protected readonly uploading = signal(false);
@@ -75,7 +91,7 @@ export class EventPhotos {
 
   /** A report is only offered once we know the photo is not the member's. */
   protected canReport(photo: EventPhoto): boolean {
-    return this.session.loggedIn() && this.ownPhotos.hasValue() && !this.ownIds().has(photo.id);
+    return this.member() && this.ownPhotos.hasValue() && !this.ownIds().has(photo.id);
   }
 
   protected addPhoto(input: HTMLInputElement): void {
