@@ -61,7 +61,8 @@ shows stay open. The 11th pending or approved photo for that member and show is
 `409`. A rejected photo does not count toward the 10.
 
 Uploads are limited to 10 per member per hour (policy `photo-upload`). A limited
-request returns `429` with `Retry-After`. Signed out is `401`.
+request returns `429` with `Retry-After`. Signed out is `401`. An admin token is
+`403` on upload, the own list, delete and report, the same as other member actions.
 
 If no R2 settings exist, the upload answers `503` and nothing is stored.
 
