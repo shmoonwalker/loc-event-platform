@@ -232,6 +232,15 @@
   .link {
     @apply font-semibold text-blush-ink underline underline-offset-4;
   }
+  /* A content block on the event page: same surface as the event and organizer cards. */
+  .card {
+    @apply rounded-[18px] border border-line bg-panel p-5 shadow-card sm:p-6;
+  }
+  /* Secondary actions in a list (Reply, Edit, Report): quiet until hovered. */
+  .quiet-btn {
+    @apply inline-flex min-h-8 items-center rounded-lg px-1.5 text-sm font-semibold text-muted
+      hover:bg-bg hover:text-ink disabled:cursor-not-allowed disabled:opacity-60;
+  }
   /* Admin panel controls: square, flat and dense, unlike the member pills. */
   .admin-btn {
     @apply inline-flex min-h-10 items-center justify-center rounded bg-admin-fill px-3.5 text-sm font-semibold text-admin-on-fill

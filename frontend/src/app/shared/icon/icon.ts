@@ -17,7 +17,9 @@ export type IconName =
   | 'fog'
   | 'heart'
   | 'heart-filled'
-  | 'message';
+  | 'message'
+  | 'calendar'
+  | 'plus';
 
 /** One inline-SVG icon component instead of copy-pasting SVG markup. Decorative: hidden from screen readers. */
 @Component({
@@ -61,6 +63,13 @@ export type IconName =
         }
         @case ('moon') {
           <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+        }
+        @case ('calendar') {
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M3 10h18M8 3v4M16 3v4" />
+        }
+        @case ('plus') {
+          <path d="M12 5v14M5 12h14" />
         }
         @case ('message') {
           <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
