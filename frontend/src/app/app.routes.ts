@@ -37,6 +37,11 @@ export const routes: Routes = [
         title: 'Feedback – Admin – Loc',
         loadComponent: () => import('./features/admin/admin-feedback').then((m) => m.AdminFeedback),
       },
+      {
+        path: 'photos',
+        title: 'Event photos – Admin – Loc',
+        loadComponent: () => import('./features/admin/admin-photos').then((m) => m.AdminPhotos),
+      },
       { path: '**', redirectTo: '' },
     ],
   },

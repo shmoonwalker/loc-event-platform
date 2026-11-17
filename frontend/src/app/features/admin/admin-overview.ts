@@ -49,12 +49,14 @@ export class AdminOverview {
   protected readonly sections = ADMIN_SECTIONS;
 
   private readonly reports = rxResource({ stream: () => this.api.reports() });
+  private readonly photos = rxResource({ stream: () => this.api.photos('PENDING') });
   private readonly hidden = rxResource({ stream: () => this.api.hiddenEvents() });
   private readonly feedback = rxResource({ stream: () => this.api.feedback(0) });
 
   /** Per section path; missing while loading or after an error, and zero shows no number. */
   protected readonly counts = computed<Record<string, number | string | undefined>>(() => ({
     reports: valueOf(this.reports)?.length,
+    photos: valueOf(this.photos)?.length,
     'hidden-events': valueOf(this.hidden)?.length,
     feedback: openFeedback(valueOf(this.feedback)),
   }));

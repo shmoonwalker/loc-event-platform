@@ -10,9 +10,9 @@ import { valueOf } from '../../core/resource';
 import { AdminError } from './admin-error';
 
 /**
- * The open reports, one row per reported event or comment, newest activity first. Dismiss closes all of
- * an item's open reports without changing it; hiding an event takes it out of public lists and closes its
- * reports. After every action the list is fetched again.
+ * The open reports, one row per reported event, comment or photo, newest activity first. Dismiss closes
+ * all of an item's open reports without changing it; hiding an event takes it out of public lists and
+ * closes its reports. Removing a photo deletes it. After every action the list is fetched again.
  */
 @Component({
   selector: 'app-admin-reports',
@@ -28,7 +28,9 @@ export class AdminReports {
     group.reasons.map((r) => REPORT_REASON_LABELS[r]).join(', ');
 
   /** The item an action is running for, the event with an open hide form, and the last failure. */
-  protected readonly busy = signal<{ id: string; action: 'hide' | 'dismiss' } | null>(null);
+  protected readonly busy = signal<{ id: string; action: 'hide' | 'dismiss' | 'remove' } | null>(
+    null,
+  );
   protected readonly hiding = signal<string | null>(null);
   protected readonly failed = signal<{ id: string; message: string } | null>(null);
   // Same limits as the backend's HideEventRequest; \S refuses a reason of only spaces.
@@ -64,6 +66,15 @@ export class AdminReports {
     );
   }
 
+  /** A missing photo was already removed; the fresh list then shows what is left. */
+  protected removePhoto(group: ReportGroup): void {
+    this.run(group, 'remove', this.api.removePhoto(group.targetId), (err) =>
+      err.status === 404
+        ? null
+        : "We couldn't remove this photo. Check your connection and try again.",
+    );
+  }
+
   /** A report someone else already closed answers 404; the fresh list then shows what is left. */
   protected dismiss(group: ReportGroup): void {
     this.run(
@@ -79,7 +90,7 @@ export class AdminReports {
 
   private run(
     group: ReportGroup,
-    kind: 'hide' | 'dismiss',
+    kind: 'hide' | 'dismiss' | 'remove',
     action: Observable<unknown>,
     message: (err: HttpErrorResponse) => string | null,
   ): void {
