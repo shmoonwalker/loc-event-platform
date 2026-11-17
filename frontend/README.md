@@ -81,7 +81,7 @@ The endpoints are in the [admin moderation API](../backend/docs/admin-moderation
 
 ### Feedback
 
-`/feedback` is linked from the footer and open to everyone. Visitors can leave an email
+`/feedback` is linked from the header, next to the theme switch, and open to everyone. Visitors can leave an email
 to be answered on; a member's feedback is linked to their account, so they are not asked
 for one. After sending, the page says thanks and offers to send more. Field errors show
 under their fields, and the rate limit shows with its wait time. The endpoint is in

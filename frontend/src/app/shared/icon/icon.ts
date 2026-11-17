@@ -16,7 +16,8 @@ export type IconName =
   | 'storm'
   | 'fog'
   | 'heart'
-  | 'heart-filled';
+  | 'heart-filled'
+  | 'message';
 
 /** One inline-SVG icon component instead of copy-pasting SVG markup. Decorative: hidden from screen readers. */
 @Component({
@@ -60,6 +61,9 @@ export type IconName =
         }
         @case ('moon') {
           <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+        }
+        @case ('message') {
+          <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
         }
         @case ('photo') {
           <rect x="3" y="4" width="18" height="16" rx="2" />
